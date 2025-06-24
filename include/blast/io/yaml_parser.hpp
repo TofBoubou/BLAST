@@ -1,0 +1,141 @@
+#pragma once
+#include "config_types.hpp"
+#include "../core/exceptions.hpp"
+#include <yaml-cpp/yaml.h>
+#include <expected>
+#include <concepts>
+#include <source_location>
+
+namespace blast::io {
+
+class YamlParser {
+private:
+    YAML::Node root_;
+    std::string file_path_;
+    
+    template<typename T>
+    [[nodiscard]] auto extract_value(const YAML::Node& node, std::string_view key, 
+                                    const T& default_value = T{}) const -> T;
+    
+    template<typename EnumType>
+    [[nodiscard]] auto extract_enum(const YAML::Node& node, std::string_view key, 
+                                   const std::unordered_map<std::string, EnumType>& mapping,
+                                   EnumType default_value) const -> EnumType;
+    
+    [[nodiscard]] auto parse_simulation_config(const YAML::Node& node) const 
+        -> std::expected<SimulationConfig, core::ConfigurationError>;
+    
+    [[nodiscard]] auto parse_numerical_config(const YAML::Node& node) const 
+        -> std::expected<NumericalConfig, core::ConfigurationError>;
+    
+    [[nodiscard]] auto parse_mixture_config(const YAML::Node& node) const 
+        -> std::expected<MixtureConfig, core::ConfigurationError>;
+    
+    [[nodiscard]] auto parse_output_config(const YAML::Node& node) const 
+        -> std::expected<OutputConfig, core::ConfigurationError>;
+
+    [[nodiscard]] auto parse_initial_guess_config(const YAML::Node& node) const 
+    -> std::expected<InitialGuessConfig, core::ConfigurationError>;
+
+    [[nodiscard]] auto parse_outer_edge_config(const YAML::Node& node) const 
+        -> std::expected<OuterEdgeConfig, core::ConfigurationError>;
+
+    [[nodiscard]] auto parse_wall_parameters_config(const YAML::Node& node) const 
+        -> std::expected<WallParametersConfig, core::ConfigurationError>;
+
+public:
+    explicit YamlParser(std::string file_path) : file_path_(std::move(file_path)) {} // constructor so no ->
+    
+    [[nodiscard]] auto load() -> std::expected<void, core::FileError>;
+    
+    [[nodiscard]] auto parse() const -> std::expected<Configuration, core::ConfigurationError>;
+    
+};
+
+// Implementation of template methods
+template<typename T>
+auto YamlParser::extract_value(const YAML::Node& node, std::string_view key, 
+                               const T& default_value) const -> T {
+    try {
+        if (!node[std::string(key)]) {
+            return default_value;
+        }
+        
+        if constexpr (std::same_as<T, std::vector<double>>) {
+            auto sequence = node[std::string(key)];
+            std::vector<double> result;
+            result.reserve(sequence.size());
+            
+            for (const auto& item : sequence) {
+                result.push_back(item.as<double>());
+            }
+            return result;
+        } else {
+            return node[std::string(key)].as<T>();
+        }
+    } catch (const YAML::Exception& e) {
+        throw core::ConfigurationError(
+            std::format("Failed to parse field '{}': {}", key, e.what())
+        );
+    }
+}
+
+template<typename EnumType>
+auto YamlParser::extract_enum(const YAML::Node& node, std::string_view key, 
+                              const std::unordered_map<std::string, EnumType>& mapping,
+                              EnumType default_value) const -> EnumType {
+    auto str_value = extract_value<std::string>(node, key, "");
+    
+    if (str_value.empty()) {
+        return default_value;
+    }
+    
+    std::ranges::transform(str_value, str_value.begin(), ::tolower);
+    
+    auto it = mapping.find(str_value);
+    if (it == mapping.end()) {
+        std::string valid_options;
+        for (const auto& [option, _] : mapping) {
+            valid_options += option + ", ";
+        }
+        valid_options = valid_options.substr(0, valid_options.length() - 2);
+        
+        throw core::ValidationError(
+            std::string(key),
+            std::format("Invalid value '{}'. Valid options: {}", str_value, valid_options)
+        );
+    }
+    
+    return it->second;
+}
+
+// Enum mappings
+namespace enum_mappings {
+
+inline const std::unordered_map<std::string, SimulationConfig::BodyType> body_types = {
+    {"axisymmetric", SimulationConfig::BodyType::Axisymmetric},
+    {"cone", SimulationConfig::BodyType::Cone},
+    {"twod", SimulationConfig::BodyType::TwoD},
+    {"2d", SimulationConfig::BodyType::TwoD},
+    {"flatplate", SimulationConfig::BodyType::FlatPlate},
+    {"flat_plate", SimulationConfig::BodyType::FlatPlate}
+};
+
+inline const std::unordered_map<std::string, SimulationConfig::DiffusionType> diffusion_types = {
+    {"ramshaw", SimulationConfig::DiffusionType::Ramshaw},
+    {"stefanmaxwell", SimulationConfig::DiffusionType::StefanMaxwell},
+    {"stefan_maxwell", SimulationConfig::DiffusionType::StefanMaxwell},
+    {"mpp", SimulationConfig::DiffusionType::MPP}
+};
+
+inline const std::unordered_map<std::string, MixtureConfig::Database> databases = {
+    {"rrho", MixtureConfig::Database::RRHO},
+    {"nasa7", MixtureConfig::Database::NASA7},
+    {"nasa-7", MixtureConfig::Database::NASA7},
+    {"nasa9", MixtureConfig::Database::NASA9},
+    {"nasa-9", MixtureConfig::Database::NASA9}
+};
+
+} // namespace enum_mappings
+
+}

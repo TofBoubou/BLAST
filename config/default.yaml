@@ -1,0 +1,52 @@
+simulation:
+  body_type: axisymmetric
+  only_stagnation_point: true
+  finite_thickness: false
+  diffusion_type: stefan_maxwell
+  consider_thermal_diffusion: true
+  chemical_non_equilibrium: true
+  catalysis: false
+
+numerical:
+  n_eta: 101
+  eta_max: 8.0
+  convergence_tolerance: 1.0e-6
+  max_iterations: 1000
+  under_relaxation: 0.5
+  step_control:
+    lower_bound: 10
+    upper_bound: 50
+  solvers:
+    h2t_tolerance: 1.0e-8
+    h2t_max_iterations: 100
+    stefan_tolerance: 1.0e-6
+    stefan_max_iterations: 50
+
+mixture:
+  name: air7
+  thermodynamic_database: NASA9
+  viscosity_algorithm: chapman_enskog_cg
+  reference_temperature: 0.0
+
+output:
+  x_stations: [0.0, 0.1, 0.2, 0.5, 1.0]
+  output_directory: BLAST_outputs
+  generate_lookup_table: false
+  lookup_table:
+    temperature_min: 300.0
+    temperature_max: 3000.0
+    temperature_step: 100.0
+
+initial_guess:
+  use_initial_guess: false
+
+outer_edge:
+  edge_points:
+    - {x: 0.0, radius: 1.0, velocity: 0.0, enthalpy: 1.0e6, pressure: 100.0, density: 1.0e-4, viscosity: 1.0e-5, species: [0.23, 0.77]}
+    - {x: 0.1, radius: 1.0, velocity: 1000.0, enthalpy: 1.0e6, pressure: 100.0, density: 1.0e-4, viscosity: 1.0e-5, species: [0.23, 0.77]}
+  velocity_gradient_stagnation: 1000.0
+  freestream_density: 1.225
+  freestream_velocity: 1000.0
+
+wall_parameters:
+  temperatures: [300.0]
