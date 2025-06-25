@@ -1,7 +1,7 @@
 ﻿
 #pragma once
-#include "../../../core/exceptions.hpp"
-#include "../../../io/config_types.hpp"
+#include "../../core/exceptions.hpp"
+#include "../../io/config_types.hpp"
 #include <vector>
 #include <span>
 #include <expected>

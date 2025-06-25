@@ -1,8 +1,8 @@
 ﻿
 #pragma once
-#include "../../../core/containers.hpp"
-#include "../../../core/exceptions.hpp"
-#include "../../../io/config_types.hpp"
+#include "../../core/containers.hpp"
+#include "../../core/exceptions.hpp"
+#include "../../io/config_types.hpp"
 #include "coordinate_transform.hpp"
 #include <vector>
 #include <span>
