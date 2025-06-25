@@ -49,8 +49,8 @@ auto compute_xi_from_integration(
                           | std::ranges::to<std::vector>(); // transform always return a std::range
     
     // Integration using Simpson's rule with named constants
-    auto xi = simpson_integrate(integrand_values, dx, 0.0);
-    
+    xi = simpson_integrate(integrand_values, dx, 0.0);
+
     return xi;
 }
 
