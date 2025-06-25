@@ -10,6 +10,7 @@
 #include <algorithm>
 
 namespace blast::boundary_layer::grid::coordinate_transform {
+using blast::core::TransformError;
 
 // Simpson integration constants (no more magic numbers!)
 namespace simpson_constants {

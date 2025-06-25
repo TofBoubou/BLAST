@@ -7,6 +7,7 @@
 #include <format>
 
 namespace blast::boundary_layer::grid::coordinate_transform {
+using blast::core::TransformError;
 
 template<PhysicalRange EdgeData>
 auto compute_xi_from_integration(
@@ -191,7 +192,7 @@ auto simpson_integrate(Values&& f_values, PhysicalQuantity auto dx, PhysicalQuan
     }
     
     // Simpson's rule for remaining points using modern range
-    for (auto i : std::views::iota(2uz, n)) {
+    for (auto i : std::views::iota(size_t{2}, n)) {
         result[i] = result[i-2] + (f_values[i-2] + coeff_3pt_2 * f_values[i-1] + 
                                   f_values[i]) * dx / divisor_3pt;
     }
