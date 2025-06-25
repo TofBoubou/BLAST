@@ -1,6 +1,7 @@
 #include "blast/boundary_layer/conditions/boundary_interpolator.hpp"
 #include <algorithm>
 #include <format>
+#include <expected>
 
 namespace blast::boundary_layer::conditions {
 
@@ -9,7 +10,6 @@ using blast::boundary_layer::grid::coordinate_transform::linear_interpolate;
 
 namespace {
     
-// Helper to interpolate a single property
 template<typename Container>
 [[nodiscard]] auto interpolate_property(
     const Container& values,
@@ -26,7 +26,6 @@ template<typename Container>
                              values[i1], values[i2]);
 }
 
-// Extract property values from edge points
 template<typename MemberPtr>
 [[nodiscard]] auto extract_edge_property(
     const std::vector<io::OuterEdgeConfig::EdgePoint>& points,
@@ -42,7 +41,7 @@ template<typename MemberPtr>
     return result;
 }
 
-} // anonymous namespace
+} 
 
 constexpr auto compute_beta(
     int station,
@@ -57,6 +56,7 @@ constexpr auto compute_beta(
             case io::SimulationConfig::BodyType::Axisymmetric:
                 return 0.5;
             case io::SimulationConfig::BodyType::Cone:
+                return 0.0;
             case io::SimulationConfig::BodyType::FlatPlate:
                 return 0.0;
             case io::SimulationConfig::BodyType::TwoD:
@@ -64,7 +64,6 @@ constexpr auto compute_beta(
         }
     }
     
-    // Downstream stations
     return 2.0 * xi * d_ue_dxi / ue;
 }
 
@@ -91,16 +90,15 @@ auto create_stagnation_conditions(
         .enthalpy = edge_point.enthalpy,
         .density = edge_point.density,
         .species_fractions = edge_point.species_fractions,
-        .d_xi_dx = edge_config.velocity_gradient_stagnation,  // Special case
+        .d_xi_dx = edge_config.velocity_gradient_stagnation,  
         .d_ue_dx = edge_config.velocity_gradient_stagnation,
-        .d_he_dx = 0.0,  // Placeholder for stagnation
+        .d_he_dx = 0.0,  
         .d_he_dxi = 0.0,
         .body_radius = edge_point.radius
     };
     
     WallConditions wall{
         .temperature = wall_config.wall_temperatures[0],
-        .catalycity = std::nullopt  // TODO: Add catalytic support
     };
     
     return BoundaryConditions{
@@ -154,7 +152,6 @@ auto interpolate_boundary_conditions(
     
     const auto [ix1, ix2] = x_interval_result.value();
     
-    // Helper lambda for property interpolation
     auto interp = [&](auto member_ptr) {
         auto values = extract_edge_property(edge_config.edge_points, member_ptr);
         return interpolate_property(values, ix1, ix2, x_grid, x_interp);
@@ -197,13 +194,12 @@ auto interpolate_boundary_conditions(
     );
     
     WallConditions wall{
-        .temperature = wall_temp,
-        .catalycity = std::nullopt  // TODO: Add catalytic support
+        .temperature = wall_temp
     };
     
-    // Compute derivatives (simplified for now)
+/*     // Compute derivatives (simplified for now)
     const double d_ue_dxi = edge.d_ue_dx / edge.d_xi_dx;
-    edge.d_he_dxi = edge.d_he_dx / edge.d_xi_dx;
+    edge.d_he_dxi = edge.d_he_dx / edge.d_xi_dx; */
     
     return BoundaryConditions{
         .edge = std::move(edge),

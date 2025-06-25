@@ -28,7 +28,7 @@ struct EdgeConditions {
 
 struct WallConditions {
     double temperature;
-    std::optional<std::vector<double>> catalycity;  // Only if catalytic
+    // std::optional<std::vector<double>> catalycity;  // Only if catalytic
 };
 
 struct BoundaryConditions {
@@ -56,12 +56,8 @@ struct BoundaryConditions {
         return edge.species_fractions; 
     }
     
-    [[nodiscard]] auto gamma_e() const noexcept -> std::optional<std::vector<double>> { 
-        return wall.catalycity; 
-    }
 };
 
-// Error type
 class BoundaryConditionError : public core::BlastException {
 public:
     explicit BoundaryConditionError(std::string_view message,
