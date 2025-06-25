@@ -44,7 +44,7 @@ public:
     [[nodiscard]] static constexpr auto create_stagnation_grid(
         NumericalConfig&& numerical_config, // different from io::NumericalConfig
         const io::OuterEdgeConfig& edge_config
-    ) -> std::expected<BoundaryLayerGrid, GridError>; // some kind of constructior, it's a factory
+    ) -> std::expected<BoundaryLayerGrid, GridError>; // some kind of constructor, it's a factory
     
     template<GridConfigType NumericalConfig>
     [[nodiscard]] static constexpr auto create_downstream_grid(
@@ -71,7 +71,13 @@ public:
         -> std::expected<double, GridError>;
 
 private:
-    explicit constexpr BoundaryLayerGrid(int n_eta, double eta_max) noexcept;
+    constexpr BoundaryLayerGrid::BoundaryLayerGrid(int n_eta, double eta_max) noexcept
+        : n_eta_(n_eta), eta_max_(eta_max), d_eta_(eta_max / static_cast<double>(n_eta - 1)) {
+        
+        xi_.reserve(constants::default_grid_reserve); // it would be created anyway but we reserve it
+        xi_output_.reserve(constants::default_grid_reserve);
+        eta_.reserve(n_eta_);
+    }
     
     constexpr auto generate_eta_distribution() noexcept -> void;
     auto generate_xi_distribution(const io::OuterEdgeConfig& edge_config) 

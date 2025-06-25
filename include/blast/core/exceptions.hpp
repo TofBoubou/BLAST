@@ -76,18 +76,18 @@ public:
     [[nodiscard]] auto field_name() const noexcept -> const std::string& { return field_name_; }
 };
 
-class GridError : public core::BlastException {
-public:
-    explicit GridError(std::string_view message, 
-                      std::source_location location = std::source_location::current()) noexcept
-        : BlastException(std::format("Grid Error: {}", message), location) {}
-};
-
 class TransformError : public core::BlastException {
 public:
     explicit TransformError(std::string_view message,
                            std::source_location location = std::source_location::current()) noexcept
         : BlastException(std::format("Transform Error: {}", message), location) {}
+};
+
+class GridError : public core::BlastException {
+public:
+    explicit GridError(std::string_view message, 
+                      std::source_location location = std::source_location::current()) noexcept
+        : BlastException(std::format("Grid Error: {}", message), location) {}
 };
 
 }

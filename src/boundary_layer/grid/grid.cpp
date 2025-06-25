@@ -6,14 +6,6 @@
 
 namespace blast::boundary_layer::grid {
 
-constexpr BoundaryLayerGrid::BoundaryLayerGrid(int n_eta, double eta_max) noexcept
-    : n_eta_(n_eta), eta_max_(eta_max), d_eta_(eta_max / static_cast<double>(n_eta - 1)) {
-    
-    xi_.reserve(constants::default_grid_reserve);
-    xi_output_.reserve(constants::default_grid_reserve);
-    eta_.reserve(n_eta_);
-}
-
 template<GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_stagnation_grid(
     NumericalConfig&& numerical_config,
@@ -60,8 +52,8 @@ constexpr auto BoundaryLayerGrid::generate_eta_distribution() noexcept -> void {
     eta_.clear();
     
     // Modern range-based generation
-    auto eta_indices = std::views::iota(0, n_eta_);
-    std::ranges::transform(eta_indices, std::back_inserter(eta_),
+    auto eta_indices = std::views::iota(0, n_eta_); // std::ranges::transform(input_range, output_iterator, lambda); lambda gives a result and then we do output_iterator* = result
+    std::ranges::transform(eta_indices, std::back_inserter(eta_),  // auto it = std::back_inserter(eta_); *it = 42; equals to eta_.push_back(42);
         [this](int i) constexpr { return static_cast<double>(i) * d_eta_; });
 }
 
@@ -74,9 +66,9 @@ auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge
     }
     
     // Extract data using modern transformations
-    auto extract_property = [&edge_config](auto member_ptr) {
+    auto extract_property = [&edge_config](auto member_ptr) { // double EdgePoint::* ptr_to_x = &EdgePoint::x; pointer to a member
         return edge_config.edge_points 
-             | std::views::transform([member_ptr](const auto& point) { return point.*member_ptr; })
+             | std::views::transform([member_ptr](const auto& point) { return point.*member_ptr; }) // output of transform is std::ranges
              | std::ranges::to<std::vector>();
     };
     
@@ -145,7 +137,7 @@ auto BoundaryLayerGrid::interpolate_x_from_xi(double xi_target, XGrid&& x_grid) 
         coordinate_transform::linear_interpolate(xi_target, xi_[i1], xi_[i2], x_grid[i1], x_grid[i2]);
 }
 
-constexpr auto compute_xi_step_size(
+constexpr auto compute_xi_step_size( // see if it can be better
     double current_xi, double d_xi, int iterations,
     const io::NumericalConfig::StepControl& step_control
 ) noexcept -> double {
