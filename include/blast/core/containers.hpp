@@ -1,9 +1,11 @@
 #pragma once
+#include <Eigen/Dense>
 #include <vector>
 #include <array>
 #include <span>
 #include <memory>
 #include <concepts>
+
 
 namespace blast::core{
 

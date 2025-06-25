@@ -109,11 +109,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         }
         // Sinon, use_initial_guess reste à false par défaut
         
-        // 8. Vérifier qu'il n'y a pas de sections inconnues (optionnel)
-        if (warn_unknown_sections_) {
-            check_unknown_sections();
-        }
-        
         return config;
         
     } catch (const YAML::Exception& e) {

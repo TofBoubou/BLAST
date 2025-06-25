@@ -2,6 +2,8 @@
 #include "config_types.hpp"
 #include "../core/exceptions.hpp"
 #include <yaml-cpp/yaml.h>
+#include <format>        
+#include <algorithm>    
 #include <expected>
 #include <concepts>
 #include <source_location>
@@ -126,6 +128,13 @@ inline const std::unordered_map<std::string, SimulationConfig::DiffusionType> di
     {"stefanmaxwell", SimulationConfig::DiffusionType::StefanMaxwell},
     {"stefan_maxwell", SimulationConfig::DiffusionType::StefanMaxwell},
     {"mpp", SimulationConfig::DiffusionType::MPP}
+};
+
+inline const std::unordered_map<std::string, MixtureConfig::ViscosityAlgorithm> viscosity_algorithms = {
+    {"chapman_enskog_cg", MixtureConfig::ViscosityAlgorithm::ChapmanEnskog_CG},
+    {"gupta_yos", MixtureConfig::ViscosityAlgorithm::GuptaYos},
+    {"chapman_enskog_ldlt", MixtureConfig::ViscosityAlgorithm::ChapmanEnskog_LDLT},
+    {"wilke", MixtureConfig::ViscosityAlgorithm::Wilke}
 };
 
 inline const std::unordered_map<std::string, MixtureConfig::Database> databases = {

@@ -29,7 +29,7 @@ namespace simpson_constants {
 // Modern concepts for type safety
 template<typename T>
 concept PhysicalQuantity = std::floating_point<T> && requires(T t) {
-    t >= T{0}; // Physical quantities should be non-negative
+    { t >= T{0} } -> std::convertible_to<bool>;
 };
 
 template<typename Range>

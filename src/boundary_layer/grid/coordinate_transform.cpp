@@ -4,6 +4,7 @@
 #include <cmath>
 #include <numeric>
 #include <ranges>
+#include <format>
 
 namespace blast::boundary_layer::grid::coordinate_transform {
 
