@@ -1,4 +1,5 @@
 #include "blast/io/config_manager.hpp"
+#include "blast/boundary_layer/grid/grid.hpp"
 #include <iostream>
 
 int main() {
@@ -9,6 +10,12 @@ int main() {
         return 1;
     }
     std::cout << "Configuration loaded successfully" << std::endl;
+
+    auto config = config_result.value();
+    auto stagnation_grid_result = create_stagnation_grid(config.numerical, config.outer_edge);
+
+
+
     return 0;
 }
 

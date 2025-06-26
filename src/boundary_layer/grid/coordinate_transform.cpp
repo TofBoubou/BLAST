@@ -40,8 +40,7 @@ auto compute_physical_y_from_eta(
         return std::unexpected(TransformError("Failed to compute rho integral"));
     }
     
-    constexpr auto is_stagnation = [](auto xi) constexpr { return xi == 0.0; };
-    const auto y_factor = is_stagnation(xi) ? // same thing as if else
+    const auto y_factor = (xi == 0.0) ? 
         compute_stagnation_y_factor(sim_config, d_ue_dx, rho_e, mu_e) :
         std::sqrt(2.0 * xi) / (u_e * r_body);
     

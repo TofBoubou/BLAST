@@ -29,7 +29,7 @@ mixture:
   reference_temperature: 0.0
 
 output:
-  x_stations: [0.0, 0.1, 0.2, 0.5, 1.0]
+  x_stations: [0.0]
   output_directory: BLAST_outputs
   generate_lookup_table: false
   lookup_table:
@@ -43,7 +43,6 @@ initial_guess:
 outer_edge:
   edge_points:
     - {x: 0.0, radius: 1.0, velocity: 0.0, enthalpy: 1.0e6, pressure: 100.0, density: 1.0e-4, viscosity: 1.0e-5, species: [0.23, 0.77]}
-    - {x: 0.1, radius: 1.0, velocity: 1000.0, enthalpy: 1.0e6, pressure: 100.0, density: 1.0e-4, viscosity: 1.0e-5, species: [0.23, 0.77]}
   velocity_gradient_stagnation: 1000.0
   freestream_density: 1.225
   freestream_velocity: 1000.0
