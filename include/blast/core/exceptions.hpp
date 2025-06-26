@@ -83,11 +83,4 @@ public:
         : BlastException(std::format("Transform Error: {}", message), location) {}
 };
 
-class GridError : public core::BlastException {
-public:
-    explicit GridError(std::string_view message, 
-                      std::source_location location = std::source_location::current()) noexcept
-        : BlastException(std::format("Grid Error: {}", message), location) {}
-};
-
 }

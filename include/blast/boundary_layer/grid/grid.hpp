@@ -12,6 +12,13 @@
 
 namespace blast::boundary_layer::grid {
 
+class GridError : public core::BlastException {
+public:
+    explicit GridError(std::string_view message, 
+                      std::source_location location = std::source_location::current()) noexcept
+        : BlastException(std::format("Grid Error: {}", message), location) {}
+};
+
 template<typename T>
 concept NumericRange = std::ranges::range<T> && // concept is like en exigeance. template<"Concept" T> then a function 
                       std::floating_point<std::ranges::range_value_t<T>>; // contain floats?
@@ -71,7 +78,7 @@ public:
         -> std::expected<double, GridError>;
 
 private:
-    constexpr BoundaryLayerGrid::BoundaryLayerGrid(int n_eta, double eta_max) noexcept
+    constexpr BoundaryLayerGrid(int n_eta, double eta_max) noexcept
         : n_eta_(n_eta), eta_max_(eta_max), d_eta_(eta_max / static_cast<double>(n_eta - 1)) {
         
         xi_.reserve(constants::default_grid_reserve); // it would be created anyway but we reserve it

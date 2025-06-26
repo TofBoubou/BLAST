@@ -197,9 +197,9 @@ auto interpolate_boundary_conditions(
         .temperature = wall_temp
     };
     
-/*     // Compute derivatives (simplified for now)
+    // Compute derivatives (simplified for now)
     const double d_ue_dxi = edge.d_ue_dx / edge.d_xi_dx;
-    edge.d_he_dxi = edge.d_he_dx / edge.d_xi_dx; */
+    edge.d_he_dxi = edge.d_he_dx / edge.d_xi_dx;
     
     return BoundaryConditions{
         .edge = std::move(edge),

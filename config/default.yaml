@@ -50,3 +50,4 @@ outer_edge:
 
 wall_parameters:
   temperatures: [300.0]
+  

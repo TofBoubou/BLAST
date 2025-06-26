@@ -120,7 +120,11 @@ auto BoundaryLayerGrid::generate_xi_output_distribution(
 
 auto BoundaryLayerGrid::find_xi_interval(double xi_target) const noexcept
     -> std::expected<std::pair<int, int>, GridError> {
-    return coordinate_transform::search_interval(xi_, xi_target);
+    auto result = coordinate_transform::search_interval(xi_, xi_target);
+    if (!result) {
+        return std::unexpected(GridError(result.error().message()));
+    }
+    return result.value();
 }
 
 template<NumericRange XGrid>
@@ -158,9 +162,5 @@ constexpr auto reduce_step_size(double current_xi, double& d_xi) noexcept -> dou
     d_xi *= constants::step_reduction_factor;
     return new_xi + d_xi;
 }
-
-// Explicit template instantiations for common types
-template auto BoundaryLayerGrid::create_stagnation_grid(const io::NumericalConfig&, const io::OuterEdgeConfig&);
-template auto BoundaryLayerGrid::create_downstream_grid(const io::NumericalConfig&, const io::OuterEdgeConfig&, const io::OutputConfig&);
 
 } // namespace blast::boundary_layer::grid
