@@ -7,21 +7,6 @@
 namespace blast::boundary_layer::grid {
 
 template<GridConfigType NumericalConfig>
-constexpr auto BoundaryLayerGrid::create_stagnation_grid(
-    NumericalConfig&& numerical_config,
-    const io::OuterEdgeConfig& edge_config
-) -> std::expected<BoundaryLayerGrid, GridError> {
-    
-    auto grid = BoundaryLayerGrid(numerical_config.n_eta, numerical_config.eta_max);
-    
-    grid.generate_eta_distribution();
-    grid.xi_.emplace_back(0.0);  // Stagnation point
-    grid.xi_output_.emplace_back(0.0);
-    
-    return grid;
-}
-
-template<GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_downstream_grid(
     NumericalConfig&& numerical_config,
     const io::OuterEdgeConfig& edge_config,
@@ -46,15 +31,6 @@ constexpr auto BoundaryLayerGrid::create_downstream_grid(
     }
     
     return grid;
-}
-
-constexpr auto BoundaryLayerGrid::generate_eta_distribution() noexcept -> void {
-    eta_.clear();
-    
-    // Modern range-based generation
-    auto eta_indices = std::views::iota(0, n_eta_); // std::ranges::transform(input_range, output_iterator, lambda); lambda gives a result and then we do output_iterator* = result
-    std::ranges::transform(eta_indices, std::back_inserter(eta_),  // auto it = std::back_inserter(eta_); *it = 42; equals to eta_.push_back(42);
-        [this](int i) constexpr { return static_cast<double>(i) * d_eta_; });
 }
 
 auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge_config) 

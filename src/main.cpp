@@ -12,7 +12,18 @@ int main() {
     std::cout << "Configuration loaded successfully" << std::endl;
 
     auto config = config_result.value();
-    auto stagnation_grid_result = create_stagnation_grid(config.numerical, config.outer_edge);
+    auto stagnation_grid_result = blast::boundary_layer::grid::BoundaryLayerGrid::create_stagnation_grid(config.numerical, config.outer_edge);
+
+    if (!stagnation_grid_result) {
+        std::cerr << "Failed to create a grid: " << stagnation_grid_result.error().message() << std::endl;
+        return 1;
+    }
+    std::cout << "Grid loaded successfully" << std::endl;
+
+    auto grid = stagnation_grid_result.value();
+    auto grid_eta = grid.eta_coordinates();
+    std::cout << grid_eta[50] << std::endl;
+
 
 
 
