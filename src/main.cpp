@@ -2,7 +2,6 @@
 #include <iostream>
 
 int main() {
-    std::cout << "ABCDEFG" << std::endl;
     blast::io::ConfigurationManager manager;
     auto config_result = manager.load("config/default.yaml");
     if (!config_result) {
@@ -13,16 +12,27 @@ int main() {
     return 0;
 }
 
+
+
+
+
+
+
+
+
+
 /* 
 $cppFiles = Get-ChildItem -Recurse -Filter *.cpp -Path src | ForEach-Object { $_.FullName }
->>
->> g++ -std=c++23 `
->>     -DYAML_CPP_STATIC_DEFINE `
->>     -Iinclude `
->>     -Ilibs/yaml-cpp/include `
->>     -Ilibs/eigen `
->>     -Llibs/yaml-cpp/build `
->>     $cppFiles `
->>     -lyaml-cpp `
->>     -o blast_main.exe
+
+g++ -std=c++23 `
+    -DYAML_CPP_STATIC_DEFINE `
+    -Iinclude `
+    -Ilibs/yaml-cpp/include `
+    -Ilibs/eigen `
+    -Llibs/yaml-cpp/build `
+    $cppFiles `
+    -lyaml-cpp `
+    -static-libgcc `
+    -static-libstdc++ `
+    -o blast_main.exe
  */
