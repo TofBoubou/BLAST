@@ -44,3 +44,4 @@ libs/*/.git
 libs/eigen/
 libs/googletest/
 libs/yaml-cpp/
+libs/mutationpp/
