@@ -26,8 +26,7 @@ struct SimulationConfig {
     bool consider_thermal_diffusion = false;
     bool chemical_non_equilibrium = true;
     bool catalysis = false;
-    
-    [[nodiscard]] auto validate() const -> std::expected<void, core::ValidationError>;
+
 };
 
 struct NumericalConfig {
@@ -49,7 +48,6 @@ struct NumericalConfig {
         int stefan_max_iterations = 50;
     } solvers;
     
-    [[nodiscard]] auto validate() const -> std::expected<void, core::ValidationError>;
 };
 
 struct MixtureConfig {
@@ -62,7 +60,6 @@ struct MixtureConfig {
     
     double reference_temperature = 0.0;
     
-    [[nodiscard]] auto validate() const -> std::expected<void, core::ValidationError>;
 };
 
 struct OutputConfig {
@@ -79,7 +76,6 @@ struct OutputConfig {
         double gamma_step = 0.1;
     } lookup_table;
     
-    [[nodiscard]] auto validate() const -> std::expected<void, core::ValidationError>;
 };
 
 
@@ -88,8 +84,7 @@ struct InitialGuessConfig {
     std::optional<std::vector<double>> temperature_profile;
     std::optional<std::vector<double>> enthalpy_profile;
     std::optional<std::vector<std::vector<double>>> species_profiles;
-    
-    [[nodiscard]] auto validate() const -> std::expected<void, core::ValidationError>;
+
 };
 
 
@@ -114,15 +109,12 @@ struct OuterEdgeConfig {
     std::optional<double> edge_normal_velocity;
     std::optional<double> d2_ue_dxdy;
     std::optional<double> boundary_layer_thickness;
-    
-    [[nodiscard]] auto validate() const -> std::expected<void, core::ValidationError>;
+
 };
 
 
 struct WallParametersConfig {
     std::vector<double> wall_temperatures;
-    
-    [[nodiscard]] auto validate() const -> std::expected<void, core::ValidationError>;
 };
 
 
@@ -137,11 +129,6 @@ struct Configuration {
 
 };
 
-
-template<typename T>
-concept Configurable = requires(const T& t) {
-    { t.validate() } -> std::same_as<std::expected<void, core::ValidationError>>;
-};
 
 template<typename T>
 concept DefaultApplicable = requires(T& t) {
