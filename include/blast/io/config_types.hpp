@@ -21,7 +21,6 @@ struct SimulationConfig {
     
     BodyType body_type = BodyType::Axisymmetric; // create a type that is BodyType that is an enum_class, we say to him that it's a constant and the constant is BodyType::Axisymmetric
     bool only_stagnation_point = true;
-    bool finite_thickness = false;
     DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
     bool consider_thermal_diffusion = false;
     bool chemical_non_equilibrium = true;

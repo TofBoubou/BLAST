@@ -144,10 +144,6 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
             node, "only_stagnation_point", true
         );
         
-        config.finite_thickness = extract_value<bool>(
-            node, "finite_thickness", false
-        );
-        
         config.diffusion_type = extract_enum(
             node, "diffusion_type",
             enum_mappings::diffusion_types,

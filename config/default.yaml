@@ -1,7 +1,6 @@
 simulation:
   body_type: axisymmetric
   only_stagnation_point: true
-  finite_thickness: false
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: true
   chemical_non_equilibrium: true
