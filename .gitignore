@@ -39,3 +39,9 @@ libs/*/.git
 
 # Cache spécifique
 .cache/
+
+# Ignorer les bibliothèques locales
+libs/eigen/
+libs/googletest/
+libs/yaml-cpp/
+
