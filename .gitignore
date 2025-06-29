@@ -1,0 +1,41 @@
+# Fichiers de compilation
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/Makefile
+/*.o
+/*.obj
+/*.so
+/*.a
+/*.dll
+/*.exe
+/*.out
+
+# Fichiers générés par CMake
+/install_manifest.txt
+/cmake_install.cmake
+
+# Fichiers de log et temporaires
+*.log
+*.tmp
+*.swp
+*~
+
+# Éditeurs
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (si tu as des scripts)
+__pycache__/
+*.pyc
+
+# Git submodules (on ignore leur .git interne si jamais)
+libs/*/.git
+
+# Cache spécifique
+.cache/
