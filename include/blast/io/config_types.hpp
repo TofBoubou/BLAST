@@ -103,11 +103,6 @@ struct OuterEdgeConfig {
     double velocity_gradient_stagnation;
     double freestream_density;
     double freestream_velocity;
-    
-    // Pour finite thickness
-    std::optional<double> edge_normal_velocity;
-    std::optional<double> d2_ue_dxdy;
-    std::optional<double> boundary_layer_thickness;
 
 };
 

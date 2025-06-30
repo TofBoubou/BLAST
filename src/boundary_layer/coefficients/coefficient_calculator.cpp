@@ -23,9 +23,6 @@ auto CoefficientCalculator::calculate(
     }
     coeffs.thermodynamic = std::move(thermo_result.value());
     
-    // 2. Override edge properties (as in original code)
-    // This is done in boundary_conditions now
-    
     // 3. Transport coefficients
     auto transport_result = calculate_transport_coefficients(inputs, coeffs.thermodynamic, bc);
     if (!transport_result) {
@@ -62,7 +59,7 @@ auto CoefficientCalculator::calculate(
     
     // 6. Thermal diffusion (if enabled)
     if (sim_config_.consider_thermal_diffusion || sim_config_.consider_dufour) {
-        auto tdr_result = calculate_thermal_diffusion(inputs, coeffs.thermodynamic);
+        auto tdr_result = calculate_thermal_diffusion(inputs, coeffs.thermodynamic, bc);
         if (!tdr_result) {
             return std::unexpected(tdr_result.error());
         }
@@ -70,7 +67,11 @@ auto CoefficientCalculator::calculate(
     }
     
     // 7. Wall properties
-    coeffs.wall = calculate_wall_properties(inputs, bc, coeffs.transport, coeffs.thermodynamic);
+    auto wall_result = calculate_wall_properties(inputs, bc, coeffs.transport, coeffs.thermodynamic);
+    if (!wall_result) {
+        return std::unexpected(wall_result.error());
+    }
+    coeffs.wall = std::move(wall_result.value());
     
     // 8. Species enthalpies
     auto enthalpy_result = calculate_species_enthalpies(inputs);
@@ -80,9 +81,6 @@ auto CoefficientCalculator::calculate(
     auto [h_sp, dh_sp_deta] = std::move(enthalpy_result.value());
     coeffs.h_species = std::move(h_sp);
     coeffs.dh_species_deta = std::move(dh_sp_deta);
-    
-    // 9. Initialize finite thickness with defaults (calculated separately if needed)
-    coeffs.finite_thickness = FiniteThicknessParameters{};
     
     return coeffs;
 }
@@ -117,6 +115,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
         thermo.MW.push_back(mw_result.value());
         
         // Compute density using ideal gas law: ρ = P·MW/(R·T)
+        // Always use edge pressure to avoid circular dependency
         thermo.rho.push_back(bc.P_e() * thermo.MW[i] / 
                             (inputs.T[i] * thermophysics::constants::R_universal));
     }
@@ -175,18 +174,13 @@ auto CoefficientCalculator::calculate_transport_coefficients(
             c_local[j] = inputs.c(j, i);
         }
         
-        // Compute local pressure using ideal gas law
-        double R_mix_local = 0.0;
-        for (std::size_t j = 0; j < n_species; ++j) {
-            double R_j = thermophysics::constants::R_universal / mixture_.species_molecular_weight(j);
-            R_mix_local += c_local[j] * R_j;
-        }
-        double P_local = thermo.rho[i] * R_mix_local * inputs.T[i];
+        // Use edge pressure consistently to avoid circular dependency
+        const double P_edge = bc.P_e();
         
         // Get transport properties
-        auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_local);
+        auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_edge);
         auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i]);
-        auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], P_local);
+        auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], P_edge);
         
         if (!mu_result || !cp_result || !k_result) {
             return std::unexpected(CoefficientError(
@@ -224,23 +218,13 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
     diff.Dij_bin = core::Matrix<double>(n_eta * n_species, n_species);
     diff.y.reserve(n_eta);
     
+    // Use edge pressure consistently
+    const double P_edge = bc.P_e();
+    
     // Calculate binary diffusion coefficients
     for (std::size_t i = 0; i < n_eta; ++i) {
-        // Compute local pressure
-        std::vector<double> c_local(n_species);
-        for (std::size_t j = 0; j < n_species; ++j) {
-            c_local[j] = inputs.c(j, i);
-        }
-        
-        double R_mix_local = 0.0;
-        for (std::size_t j = 0; j < n_species; ++j) {
-            double R_j = thermophysics::constants::R_universal / mixture_.species_molecular_weight(j);
-            R_mix_local += c_local[j] * R_j;
-        }
-        double P_local = inputs.T[i] * R_mix_local * bc.P_e() / (bc.he() * R_mix_local);
-        
-        // Get binary diffusion coefficients
-        auto dij_result = mixture_.binary_diffusion_coefficients(inputs.T[i], P_local);
+        // Get binary diffusion coefficients using edge pressure
+        auto dij_result = mixture_.binary_diffusion_coefficients(inputs.T[i], P_edge);
         if (!dij_result) {
             return std::unexpected(CoefficientError(
                 std::format("Failed to compute Dij at eta={}", i)
@@ -379,7 +363,8 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
 
 auto CoefficientCalculator::calculate_thermal_diffusion(
     const CoefficientInputs& inputs,
-    const ThermodynamicCoefficients& thermo
+    const ThermodynamicCoefficients& thermo,
+    const conditions::BoundaryConditions& bc
 ) const -> std::expected<ThermalDiffusionCoefficients, CoefficientError> {
     
     const auto n_eta = inputs.T.size();
@@ -388,6 +373,9 @@ auto CoefficientCalculator::calculate_thermal_diffusion(
     ThermalDiffusionCoefficients tdr;
     tdr.tdr = core::Matrix<double>(n_species, n_eta);
     
+    // Use edge pressure consistently
+    const double P_edge = bc.P_e();
+    
     // Calculate thermal diffusion ratios
     for (std::size_t i = 0; i < n_eta; ++i) {
         std::vector<double> c_local(n_species);
@@ -395,16 +383,8 @@ auto CoefficientCalculator::calculate_thermal_diffusion(
             c_local[j] = inputs.c(j, i);
         }
         
-        // Compute local pressure
-        double R_mix_local = 0.0;
-        for (std::size_t j = 0; j < n_species; ++j) {
-            double R_j = thermophysics::constants::R_universal / mixture_.species_molecular_weight(j);
-            R_mix_local += c_local[j] * R_j;
-        }
-        double P_local = thermo.rho[i] * R_mix_local * inputs.T[i];
-        
-        // Get thermal diffusion ratios
-        auto tdr_result = mixture_.thermal_diffusion_ratios(c_local, inputs.T[i], P_local);
+        // Get thermal diffusion ratios using edge pressure
+        auto tdr_result = mixture_.thermal_diffusion_ratios(c_local, inputs.T[i], P_edge);
         if (!tdr_result) {
             return std::unexpected(CoefficientError(
                 std::format("Failed to compute TDR at eta={}: {}", i, tdr_result.error())
@@ -427,23 +407,6 @@ auto CoefficientCalculator::calculate_thermal_diffusion(
         for (std::size_t i = 0; i < n_eta; ++i) {
             for (std::size_t j = 0; j < n_species; ++j) {
                 tdr.tdr_term(i, j) = tdr.tdr(j, i) / inputs.T[i] * dT_deta[i];
-            }
-        }
-    }
-    
-    // Compute derivatives for Dufour effect
-    if (sim_config_.consider_dufour) {
-        tdr.d_tdr_deta = core::Matrix<double>(n_species, n_eta);
-        
-        for (std::size_t j = 0; j < n_species; ++j) {
-            std::vector<double> tdr_row(n_eta);
-            for (std::size_t i = 0; i < n_eta; ++i) {
-                tdr_row[i] = tdr.tdr(j, i);
-            }
-            
-            auto dtdr = derivatives::compute_eta_derivative(tdr_row, d_eta_);
-            for (std::size_t i = 0; i < n_eta; ++i) {
-                tdr.d_tdr_deta(j, i) = dtdr[i];
             }
         }
     }
@@ -498,7 +461,7 @@ auto CoefficientCalculator::calculate_wall_properties(
     const conditions::BoundaryConditions& bc,
     const TransportCoefficients& transport,
     const ThermodynamicCoefficients& thermo
-) const -> WallProperties {
+) const -> std::expected<WallProperties, CoefficientError> {
     
     const auto n_species = inputs.c.rows();
     
@@ -508,57 +471,30 @@ auto CoefficientCalculator::calculate_wall_properties(
         c_wall[j] = inputs.c(j, 0);
     }
     
-    // Get wall transport properties
+    // Get wall transport properties using edge pressure
     auto k_result = mixture_.frozen_thermal_conductivity(c_wall, inputs.T[0], bc.P_e());
+    if (!k_result) {
+        return std::unexpected(CoefficientError("Failed to compute wall thermal conductivity"));
+    }
+    
     auto mu_result = mixture_.viscosity(c_wall, inputs.T[0], bc.P_e());
+    if (!mu_result) {
+        return std::unexpected(CoefficientError("Failed to compute wall viscosity"));
+    }
+    
     auto cp_result = mixture_.frozen_cp(c_wall, inputs.T[0]);
+    if (!cp_result) {
+        return std::unexpected(CoefficientError("Failed to compute wall specific heat"));
+    }
     
     WallProperties wall;
-    wall.k_wall = k_result.value_or(0.0);
-    wall.mu_wall = mu_result.value_or(0.0);
-    wall.Cp_wall = cp_result.value_or(0.0);
+    wall.k_wall = k_result.value();
+    wall.mu_wall = mu_result.value();
+    wall.Cp_wall = cp_result.value();
     wall.rho_wall = thermo.rho[0];
     wall.Pr_wall = (wall.k_wall > 0) ? wall.mu_wall * wall.Cp_wall / wall.k_wall : 0.72;
     
     return wall;
-}
-
-auto CoefficientCalculator::calculate_finite_thickness(
-    const conditions::BoundaryConditions& bc,
-    const ThermodynamicCoefficients& thermo,
-    const io::OuterEdgeConfig& outer_edge
-) const -> FiniteThicknessParameters {
-    
-    FiniteThicknessParameters params;
-    
-    if (!sim_config_.finite_thickness || bc.station != 0 ||
-        !outer_edge.edge_normal_velocity || 
-        !outer_edge.d2_ue_dxdy || 
-        !outer_edge.boundary_layer_thickness) {
-        return params; // Default values
-    }
-    
-    const double v_e = outer_edge.edge_normal_velocity.value();
-    const double d2_ue_dxdy = outer_edge.d2_ue_dxdy.value();
-    const double delta_bl = outer_edge.boundary_layer_thickness.value();
-    
-    // Finite thickness coefficient
-    params.coeff_finite_thickness = v_e * d2_ue_dxdy / (bc.d_ue_dx() * bc.d_ue_dx());
-    
-    // K_bl coefficient computation
-    std::vector<double> rho_inv;
-    rho_inv.reserve(thermo.rho.size());
-    std::ranges::transform(thermo.rho, std::back_inserter(rho_inv),
-                          [](double rho) { return 1.0 / rho; });
-    
-    auto integral = blast::boundary_layer::grid::coordinate_transform::simpson_integrate(
-        rho_inv, d_eta_, 0.0
-    );
-    
-    params.K_bl = std::sqrt(bc.rho_e() * bc.mu_e() / (2.0 * bc.d_ue_dx())) * 
-                  integral.back() / delta_bl;
-    
-    return params;
 }
 
 // Derivative computation implementations

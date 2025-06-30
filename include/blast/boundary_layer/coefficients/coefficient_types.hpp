@@ -8,8 +8,8 @@ namespace blast::boundary_layer::coefficients {
 
 // Transport coefficients (l0, l3 and derivatives)
 struct TransportCoefficients {
-    std::vector<double> l0;        // Momentum coefficient
-    std::vector<double> l3;        // Energy coefficient  
+    std::vector<double> l0;        
+    std::vector<double> l3;        
     std::vector<double> dl0_deta;  // Derivative of l0
     std::vector<double> dl3_deta;  // Derivative of l3
 };
@@ -38,7 +38,6 @@ struct ChemicalCoefficients {
 // Thermal diffusion ratios
 struct ThermalDiffusionCoefficients {
     core::Matrix<double> tdr;       // Thermal diffusion ratios [n_species x n_eta]
-    core::Matrix<double> d_tdr_deta; // TDR derivatives
     core::Matrix<double> tdr_term;   // TDR term for diffusion fluxes [n_eta x n_species]
 };
 
@@ -51,12 +50,6 @@ struct WallProperties {
     double Pr_wall;     // Wall Prandtl number
 };
 
-// Finite thickness parameters
-struct FiniteThicknessParameters {
-    double K_bl = 1.0;
-    double coeff_finite_thickness = 0.0;
-};
-
 // Complete coefficient set
 struct CoefficientSet {
     TransportCoefficients transport;
@@ -65,7 +58,6 @@ struct CoefficientSet {
     ChemicalCoefficients chemical;
     ThermalDiffusionCoefficients thermal_diffusion;
     WallProperties wall;
-    FiniteThicknessParameters finite_thickness;
     
     // Species enthalpy data
     core::Matrix<double> h_species;       // [n_species x n_eta]

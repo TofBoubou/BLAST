@@ -410,25 +410,12 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
             node, "freestream_velocity", 0.0
         );
         
-        // Finite thickness
-        if (node["edge_normal_velocity"]) {
-            config.edge_normal_velocity = extract_value<double>(
-                node, "edge_normal_velocity", 0.0
-            );
-        }
-        
         if (node["d2_ue_dxdy"]) {
             config.d2_ue_dxdy = extract_value<double>(
                 node, "d2_ue_dxdy", 0.0
             );
         }
-        
-        if (node["boundary_layer_thickness"]) {
-            config.boundary_layer_thickness = extract_value<double>(
-                node, "boundary_layer_thickness", 0.0
-            );
-        }
-        
+
         return config;
         
     } catch (const core::ConfigurationError& e) {

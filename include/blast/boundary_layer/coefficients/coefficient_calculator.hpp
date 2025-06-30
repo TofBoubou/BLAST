@@ -65,7 +65,7 @@ private:
         const conditions::BoundaryConditions& bc,
         const TransportCoefficients& transport,
         const ThermodynamicCoefficients& thermo
-    ) const -> WallProperties;
+    ) const -> std::expected<WallProperties, CoefficientError>;
     
     [[nodiscard]] auto calculate_species_enthalpies(
         const CoefficientInputs& inputs
@@ -87,13 +87,6 @@ public:
         const conditions::BoundaryConditions& bc,
         const XiDerivatives& xi_der
     ) const -> std::expected<CoefficientSet, CoefficientError>;
-    
-    // Finite thickness calculation (separate as it depends on outer edge)
-    [[nodiscard]] auto calculate_finite_thickness(
-        const conditions::BoundaryConditions& bc,
-        const ThermodynamicCoefficients& thermo,
-        const io::OuterEdgeConfig& outer_edge
-    ) const -> FiniteThicknessParameters;
 };
 
 } // namespace blast::boundary_layer::coefficients
