@@ -32,5 +32,4 @@ namespace blast::boundary_layer::conditions {
     const io::SimulationConfig& sim_config
 ) -> std::expected<BoundaryConditions, BoundaryConditionError>;
 
-
 } // namespace blast::boundary_layer::conditions

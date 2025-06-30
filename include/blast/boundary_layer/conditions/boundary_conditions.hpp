@@ -58,6 +58,12 @@ struct BoundaryConditions {
     
 };
 
+// Function to update edge properties based on mixture calculations
+[[nodiscard]] auto update_edge_properties(
+    BoundaryConditions& bc,
+    const thermophysics::MixtureInterface& mixture
+) -> std::expected<void, BoundaryConditionError>;
+
 class BoundaryConditionError : public core::BlastException {
 public:
     explicit BoundaryConditionError(std::string_view message,
