@@ -18,11 +18,6 @@ private:
     mutable std::vector<double> species_mw_;
     mutable std::vector<std::string> species_names_;
     
-    // Helper to validate species index
-    [[nodiscard]] constexpr auto is_valid_species_index(std::size_t index) const noexcept -> bool {
-        return index < n_species_;
-    }
-    
     // Helper to validate composition array
     [[nodiscard]] auto validate_composition(std::span<const double> fractions) const 
         -> std::expected<void, ThermophysicsError>;
@@ -47,8 +42,6 @@ public:
     [[nodiscard]] auto has_electrons() const noexcept -> bool override { 
         return has_electrons_; 
     }
-    
-    [[nodiscard]] auto species_name(std::size_t index) const noexcept -> std::string_view override;
     
     // Implement all virtual methods
     [[nodiscard]] auto mixture_molecular_weight(

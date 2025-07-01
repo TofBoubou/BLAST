@@ -121,15 +121,11 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
     return {};
 }
 
-auto MutationMixture::species_name(std::size_t index) const noexcept -> std::string_view {
-    return is_valid_species_index(index) ? species_names_[index] : "";
-}
-
 auto MutationMixture::mixture_molecular_weight(
     std::span<const double> mass_fractions
 ) const -> std::expected<double, ThermophysicsError> {
     
-    if (auto validation = validate_composition(mass_fractions); !validation) {
+    if (auto validation = validate_composition(mass_fractions); !validation) { // expected si ! means unexpected
         return std::unexpected(validation.error());
     }
     
@@ -144,10 +140,6 @@ auto MutationMixture::mixture_molecular_weight(
     }
     
     return 1.0 / sum;
-}
-
-auto MutationMixture::species_molecular_weight(std::size_t species_index) const noexcept -> double {
-    return is_valid_species_index(species_index) ? species_mw_[species_index] : 0.0;
 }
 
 auto MutationMixture::species_charges() const noexcept -> std::span<const double> {
