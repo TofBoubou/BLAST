@@ -295,9 +295,17 @@ auto MutationMixture::binary_diffusion_coefficients(
     }
     
     try {
-        // Set state with dummy composition (not needed for binary coefficients)
+/*         // Set state with dummy composition (not needed for binary coefficients)
         double vars[2] = {pressure, temperature};
         mixture_->setState(nullptr, vars, 2);
+        
+        core::Matrix<double> dij(n_species_, n_species_);
+        dij.setZero(); */
+        
+        // Create uniform composition for setState (required by Mutation++ even if not used)
+        std::vector<double> uniform_composition(n_species_, 1.0 / n_species_);
+        double vars[2] = {pressure, temperature};
+        mixture_->setState(uniform_composition.data(), vars, 2);
         
         core::Matrix<double> dij(n_species_, n_species_);
         dij.setZero();

@@ -41,7 +41,7 @@ initial_guess:
 
 outer_edge:
   edge_points:
-    - {x: 0.0, radius: 1.0, velocity: 0.0, enthalpy: 1.0e6, pressure: 100.0, density: 1.0e-4, viscosity: 1.0e-5, species: [0.767, 0.233, 0.0, 0.0, 0.0]}
+    - {x: 0.0, radius: 1.0, velocity: 0.0, enthalpy: 1.0e6, pressure: 100.0, density: 1.0e-4, viscosity: 1.0e-5, species: [0.0, 0.0, 0.0, 0.767, 0.233]}
   velocity_gradient_stagnation: 1000.0
   freestream_density: 1.225
   freestream_velocity: 1000.0

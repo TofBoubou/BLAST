@@ -3,6 +3,7 @@
 #include <cmath>
 #include <numeric>
 #include <ranges>
+#include <iostream>
 
 namespace blast::boundary_layer::coefficients {
 
@@ -205,6 +206,7 @@ auto CoefficientCalculator::calculate_transport_coefficients(
     return transport;
 }
 
+
 auto CoefficientCalculator::calculate_diffusion_coefficients(
     const CoefficientInputs& inputs,
     const conditions::BoundaryConditions& bc,
@@ -246,6 +248,7 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
     
     return diff;
 }
+
 
 auto CoefficientCalculator::calculate_chemical_coefficients(
     const CoefficientInputs& inputs,
