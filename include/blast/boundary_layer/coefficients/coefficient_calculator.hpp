@@ -31,8 +31,7 @@ private:
     const io::SimulationConfig& sim_config_;
     const io::NumericalConfig& num_config_;
     double d_eta_;
-    
-    // Private calculation methods
+
     [[nodiscard]] auto calculate_transport_coefficients(
         const CoefficientInputs& inputs,
         const ThermodynamicCoefficients& thermo,
@@ -52,12 +51,14 @@ private:
     
     [[nodiscard]] auto calculate_chemical_coefficients(
         const CoefficientInputs& inputs,
-        const ThermodynamicCoefficients& thermo
+        const ThermodynamicCoefficients& thermo,
+        const conditions::BoundaryConditions& bc
     ) const -> std::expected<ChemicalCoefficients, CoefficientError>;
     
     [[nodiscard]] auto calculate_thermal_diffusion(
         const CoefficientInputs& inputs,
-        const ThermodynamicCoefficients& thermo
+        const ThermodynamicCoefficients& thermo,
+        const conditions::BoundaryConditions& bc
     ) const -> std::expected<ThermalDiffusionCoefficients, CoefficientError>;
     
     [[nodiscard]] auto calculate_wall_properties(

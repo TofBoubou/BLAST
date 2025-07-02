@@ -39,7 +39,7 @@ auto CoefficientCalculator::calculate(
     
     // 5. Chemical coefficients (if non-equilibrium)
     if (sim_config_.chemical_non_equilibrium) {
-        auto chemical_result = calculate_chemical_coefficients(inputs, coeffs.thermodynamic);
+        auto chemical_result = calculate_chemical_coefficients(inputs, coeffs.thermodynamic, bc);
         if (!chemical_result) {
             return std::unexpected(chemical_result.error());
         }
@@ -109,7 +109,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
         auto mw_result = mixture_.mixture_molecular_weight(c_local);
         if (!mw_result) {
             return std::unexpected(CoefficientError(
-                std::format("Failed to compute MW at eta={}: {}", i, mw_result.error())
+                std::format("Failed to compute MW at eta={}: {}", i, mw_result.error().message())
             ));
         }
         thermo.MW.push_back(mw_result.value());
@@ -179,7 +179,7 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         
         // Get transport properties
         auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_edge);
-        auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i]);
+        auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i], P_edge);
         auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], P_edge);
         
         if (!mu_result || !cp_result || !k_result) {
@@ -249,11 +249,13 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
 
 auto CoefficientCalculator::calculate_chemical_coefficients(
     const CoefficientInputs& inputs,
-    const ThermodynamicCoefficients& thermo
+    const ThermodynamicCoefficients& thermo,
+    const conditions::BoundaryConditions& bc
 ) const -> std::expected<ChemicalCoefficients, CoefficientError> {
     
     const auto n_eta = inputs.T.size();
     const auto n_species = inputs.c.rows();
+    const double P_edge = bc.P_e();
     
     ChemicalCoefficients chem;
     chem.wi = core::Matrix<double>(n_eta, n_species);
@@ -277,10 +279,10 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
         }
         
         // Get production rates
-        auto wi_result = mixture_.production_rates(rho_species, inputs.T[i], thermo.rho[i]);
+        auto wi_result = mixture_.production_rates(rho_species, inputs.T[i]);
         if (!wi_result) {
             return std::unexpected(CoefficientError(
-                std::format("Failed to compute production rates at eta={}: {}", i, wi_result.error())
+                std::format("Failed to compute production rates at eta={}: {}", i, wi_result.error().message())
             ));
         }
         
@@ -291,10 +293,10 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
         }
         
         // Get Jacobian d(wi)/d(rho_j)
-        auto jac_result = mixture_.production_rate_jacobian(rho_species, inputs.T[i], thermo.rho[i]);
+        auto jac_result = mixture_.production_rate_jacobian(rho_species, inputs.T[i]);
         if (!jac_result) {
             return std::unexpected(CoefficientError(
-                std::format("Failed to compute Jacobian at eta={}: {}", i, jac_result.error())
+                std::format("Failed to compute Jacobian at eta={}: {}", i, jac_result.error().message())
             ));
         }
         
@@ -304,7 +306,7 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
         
         // Get species enthalpies and Cp for temperature derivative
         auto h_sp_result = mixture_.species_enthalpies(inputs.T[i]);
-        auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i]);
+        auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i], P_edge);
         
         if (!h_sp_result || !cp_result) {
             return std::unexpected(CoefficientError("Failed to get enthalpies or Cp"));
@@ -333,7 +335,7 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
         const double dT = eps * inputs.T[i];
         
         auto wi_pert_result = mixture_.production_rates(
-            rho_species, inputs.T[i] + dT, thermo.rho[i]
+            rho_species, inputs.T[i] + dT
         );
         if (!wi_pert_result) {
             return std::unexpected(CoefficientError("Failed to compute perturbed rates"));
@@ -387,7 +389,7 @@ auto CoefficientCalculator::calculate_thermal_diffusion(
         auto tdr_result = mixture_.thermal_diffusion_ratios(c_local, inputs.T[i], P_edge);
         if (!tdr_result) {
             return std::unexpected(CoefficientError(
-                std::format("Failed to compute TDR at eta={}: {}", i, tdr_result.error())
+                std::format("Failed to compute TDR at eta={}: {}", i, tdr_result.error().message())
             ));
         }
         
@@ -428,7 +430,7 @@ auto CoefficientCalculator::calculate_species_enthalpies(
         auto h_result = mixture_.species_enthalpies(inputs.T[i]);
         if (!h_result) {
             return std::unexpected(CoefficientError(
-                std::format("Failed to get species enthalpies at eta={}: {}", i, h_result.error())
+                std::format("Failed to get species enthalpies at eta={}: {}", i, h_result.error().message())
             ));
         }
         
@@ -482,7 +484,7 @@ auto CoefficientCalculator::calculate_wall_properties(
         return std::unexpected(CoefficientError("Failed to compute wall viscosity"));
     }
     
-    auto cp_result = mixture_.frozen_cp(c_wall, inputs.T[0]);
+    auto cp_result = mixture_.frozen_cp(c_wall, inputs.T[0], bc.P_e());
     if (!cp_result) {
         return std::unexpected(CoefficientError("Failed to compute wall specific heat"));
     }
