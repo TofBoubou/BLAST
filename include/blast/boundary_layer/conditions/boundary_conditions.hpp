@@ -1,6 +1,7 @@
 #pragma once
 #include "../../core/exceptions.hpp"
 #include "../../io/config_types.hpp"
+#include "../../thermophysics/mixture_interface.hpp"
 #include <vector>
 #include <optional>
 #include <expected>
@@ -57,12 +58,6 @@ struct BoundaryConditions {
     }
     
 };
-
-// Function to update edge properties based on mixture calculations
-[[nodiscard]] auto update_edge_properties(
-    BoundaryConditions& bc,
-    const thermophysics::MixtureInterface& mixture
-) -> std::expected<void, BoundaryConditionError>;
 
 class BoundaryConditionError : public core::BlastException {
 public:

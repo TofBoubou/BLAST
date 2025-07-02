@@ -210,39 +210,4 @@ auto interpolate_boundary_conditions(
     };
 }
 
-auto update_edge_properties(
-    BoundaryConditions& bc,
-    const thermophysics::MixtureInterface& mixture
-) -> std::expected<void, BoundaryConditionError> {
-    
-    // Calculate edge molecular weight
-    auto mw_result = mixture.mixture_molecular_weight(bc.edge.species_fractions);
-    if (!mw_result) {
-        return std::unexpected(BoundaryConditionError(
-            std::format("Failed to compute edge MW: {}", mw_result.error())
-        ));
-    }
-    
-    // Calculate edge temperature from enthalpy
-    auto cp_result = mixture.frozen_cp(bc.edge.species_fractions, 1000.0); // Initial guess
-    if (!cp_result) {
-        return std::unexpected(BoundaryConditionError("Failed to compute edge Cp"));
-    }
-    
-    // Simple estimation: T ≈ h/Cp (can be refined with iteration)
-    const double T_edge = bc.edge.enthalpy / cp_result.value();
-    
-    // Override density using ideal gas law
-    bc.edge.density = bc.edge.pressure * mw_result.value() / 
-                      (T_edge * thermophysics::constants::R_universal);
-    
-    // Override viscosity
-    auto mu_result = mixture.viscosity(bc.edge.species_fractions, T_edge, bc.edge.pressure);
-    if (mu_result) {
-        bc.edge.viscosity = mu_result.value();
-    }
-    
-    return {};
-}
-
 } // namespace blast::boundary_layer::conditions

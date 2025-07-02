@@ -60,5 +60,6 @@ public:
 
     [[nodiscard]] auto eigen() -> auto& {return data_;}
     [[nodiscard]] auto eigen() const -> auto& {return data_;}
+    void setZero() { data_.setZero(); }
 };
 }

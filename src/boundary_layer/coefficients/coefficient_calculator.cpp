@@ -38,7 +38,7 @@ auto CoefficientCalculator::calculate(
     coeffs.diffusion = std::move(diffusion_result.value());
     
     // 5. Chemical coefficients (if non-equilibrium)
-    if (sim_config_.chemical_non_equilibrium && !sim_config_.frozen_bl) {
+    if (sim_config_.chemical_non_equilibrium) {
         auto chemical_result = calculate_chemical_coefficients(inputs, coeffs.thermodynamic);
         if (!chemical_result) {
             return std::unexpected(chemical_result.error());
@@ -58,7 +58,7 @@ auto CoefficientCalculator::calculate(
     }
     
     // 6. Thermal diffusion (if enabled)
-    if (sim_config_.consider_thermal_diffusion || sim_config_.consider_dufour) {
+    if (sim_config_.consider_thermal_diffusion) {
         auto tdr_result = calculate_thermal_diffusion(inputs, coeffs.thermodynamic, bc);
         if (!tdr_result) {
             return std::unexpected(tdr_result.error());
