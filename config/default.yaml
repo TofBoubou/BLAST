@@ -22,7 +22,7 @@ numerical:
     stefan_max_iterations: 50
 
 mixture:
-  name: air7
+  name: air_5
   thermodynamic_database: NASA9
   viscosity_algorithm: chapman_enskog_cg
   reference_temperature: 0.0

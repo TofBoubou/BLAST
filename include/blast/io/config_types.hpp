@@ -54,8 +54,8 @@ struct MixtureConfig {
     enum class Database { RRHO, NASA7, NASA9 };
     Database thermodynamic_database = Database::NASA9;
     
-    enum class ViscosityAlgorithm { ChapmanEnskog_CG, GuptaYos, ChapmanEnskog_LDLT, Wilke };
-    ViscosityAlgorithm viscosity_algorithm = ViscosityAlgorithm::ChapmanEnskog_CG;
+    enum class ViscosityAlgorithm { chapmanEnskog_CG, GuptaYos, chapmanEnskog_LDLT, Wilke };
+    ViscosityAlgorithm viscosity_algorithm = ViscosityAlgorithm::chapmanEnskog_CG;
     
     double reference_temperature = 0.0;
     

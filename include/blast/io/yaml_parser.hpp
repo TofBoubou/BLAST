@@ -131,9 +131,9 @@ inline const std::unordered_map<std::string, SimulationConfig::DiffusionType> di
 };
 
 inline const std::unordered_map<std::string, MixtureConfig::ViscosityAlgorithm> viscosity_algorithms = {
-    {"chapman_enskog_cg", MixtureConfig::ViscosityAlgorithm::ChapmanEnskog_CG},
+    {"chapman_enskog_cg", MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG},
     {"gupta_yos", MixtureConfig::ViscosityAlgorithm::GuptaYos},
-    {"chapman_enskog_ldlt", MixtureConfig::ViscosityAlgorithm::ChapmanEnskog_LDLT},
+    {"chapman_enskog_ldlt", MixtureConfig::ViscosityAlgorithm::chapmanEnskog_LDLT},
     {"wilke", MixtureConfig::ViscosityAlgorithm::Wilke}
 };
 

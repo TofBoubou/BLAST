@@ -245,7 +245,7 @@ auto YamlParser::parse_mixture_config(const YAML::Node& node) const
         config.viscosity_algorithm = extract_enum(
             node, "viscosity_algorithm",
             enum_mappings::viscosity_algorithms,
-            MixtureConfig::ViscosityAlgorithm::ChapmanEnskog_CG
+            MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG
         );
         
         config.reference_temperature = extract_value<double>(

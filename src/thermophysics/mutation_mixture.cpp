@@ -19,16 +19,16 @@ namespace {
     
     [[nodiscard]] auto viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::string {
         switch (algo) {
-            case io::MixtureConfig::ViscosityAlgorithm::ChapmanEnskog_CG: 
-                return "Chapman-Enskog_CG";
+            case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG: 
+                return "Chapmann-Enskog_CG";
             case io::MixtureConfig::ViscosityAlgorithm::GuptaYos: 
                 return "Gupta-Yos";
-            case io::MixtureConfig::ViscosityAlgorithm::ChapmanEnskog_LDLT: 
-                return "Chapman-Enskog_LDLT";
+            case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_LDLT: 
+                return "Chapmann-Enskog_LDLT";
             case io::MixtureConfig::ViscosityAlgorithm::Wilke: 
                 return "Wilke";
         }
-        return "Chapman-Enskog_CG"; // Default
+        return "Chapmann-Enskog_CG"; // Default
     }
     
     [[nodiscard]] constexpr auto thermal_cond_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::string_view {
@@ -37,7 +37,7 @@ namespace {
             case io::MixtureConfig::ViscosityAlgorithm::Wilke: 
                 return "Wilke";
             default:
-                return "Chapman-Enskog_CG";
+                return "Chapmann-Enskog_CG";
         }
     }
 }
