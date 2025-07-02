@@ -142,6 +142,12 @@ auto MutationMixture::mixture_molecular_weight(
     return 1.0 / sum;
 }
 
+auto MutationMixture::species_molecular_weight(
+    std::size_t species_index
+) const noexcept -> double {
+    return species_mw_[species_index];
+}
+
 auto MutationMixture::species_charges() const noexcept -> std::span<const double> {
     return species_charges_;
 }

@@ -112,7 +112,6 @@ int main(int argc, char* argv[]) {
 
 
 /* 
-g++ -std=c++23 -Wall -Wextra -pedantic -fmax-errors=3 -I./include -I./libs/eigen -I./libs/yaml-cpp/include -I./libs/mutationpp/include src/main.cpp src/io/config_manager.cpp src/io/yaml_parser.cpp src/thermophysics/mutation_mixture.cpp src/boundary_layer/coefficients/coefficient_calculator.cpp src/boundary_layer/coefficients/xi_derivatives.cpp src/boundary_layer/conditions/boundary_interpolator.cpp src/boundary_layer/grid/coordinate_transform.cpp src/boundary_layer/grid/grid.cpp -L./libs/yaml-cpp/lib -L./libs/mutationpp/lib -lyaml-cpp -lmutation++ -o blast_test.exe
-
+g++ -std=c++23 -Wall -Wextra -pedantic -fmax-errors=3 -I./include -I./libs/eigen -I./libs/yaml-cpp/install/include -I./libs/mutationpp/install/include src/main.cpp src/io/config_manager.cpp src/io/yaml_parser.cpp src/thermophysics/mutation_mixture.cpp src/boundary_layer/coefficients/coefficient_calculator.cpp src/boundary_layer/coefficients/xi_derivatives.cpp src/boundary_layer/conditions/boundary_interpolator.cpp src/boundary_layer/grid/coordinate_transform.cpp src/boundary_layer/grid/grid.cpp -L./libs/yaml-cpp/install/lib -L./libs/mutationpp/install/lib -lyaml-cpp -lmutation++ -o blast_test
 
  */

@@ -31,10 +31,13 @@ auto compute_physical_y_from_eta(
         return std::unexpected(TransformError("Eta index out of bounds"));
     }
     
-    auto rho_inv_values = rho_eta | std::views::take(eta_index + 1)
-                        | std::views::transform([](auto rho) { return 1.0 / rho; })
-                        | std::ranges::to<std::vector>();
-    
+    auto rho_inv_range = rho_eta
+                    | std::views::take(eta_index + 1)
+                    | std::views::transform([](auto rho) { return 1.0 / rho; });
+
+    std::vector<double> rho_inv_values;
+    std::ranges::copy(rho_inv_range, std::back_inserter(rho_inv_values));
+ 
     auto integral_result = simpson_integrate(rho_inv_values, d_eta);
     if (integral_result.empty()) {
         return std::unexpected(TransformError("Failed to compute rho integral"));

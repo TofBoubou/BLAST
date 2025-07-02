@@ -105,12 +105,15 @@ auto compute_xi_from_integration(
     std::vector<double> xi(n_points);
     xi[0] = 0.0;
     
-    auto integrand_values = std::views::zip(rho_edge, mu_edge, u_edge, r_body)
-                          | std::views::transform([](const auto& tuple) {
-                              const auto [rho, mu, u, r] = tuple; // like multiple get at the same time
-                              return rho * mu * u * r * r;
-                          })
-                          | std::ranges::to<std::vector>(); // transform always return a std::range
+    auto integrand_range = std::views::zip(rho_edge, mu_edge, u_edge, r_body)
+                        | std::views::transform([](const auto& tuple) {
+                            const auto [rho, mu, u, r] = tuple;
+                            return rho * mu * u * r * r;
+                        });
+
+    std::vector<double> integrand_values;
+    std::ranges::copy(integrand_range, std::back_inserter(integrand_values));
+
     
     // Integration using Simpson's rule with named constants
     xi = simpson_integrate(integrand_values, dx, 0.0);

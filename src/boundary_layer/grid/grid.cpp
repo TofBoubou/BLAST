@@ -21,10 +21,11 @@ constexpr auto BoundaryLayerGrid::create_downstream_grid(
         return std::unexpected(xi_result.error());
     }
     
-    // Extract x coordinates using modern ranges
-    auto x_edge = edge_config.edge_points 
-                | std::views::transform([](const auto& point) { return point.x; })
-                | std::ranges::to<std::vector>();
+    auto x_edge_range = edge_config.edge_points
+                    | std::views::transform([](const auto& point) { return point.x; });
+
+    std::vector<double> x_edge;
+    std::ranges::copy(x_edge_range, std::back_inserter(x_edge));
     
     if (auto output_result = grid.generate_xi_output_distribution(output_config, x_edge); !output_result) {
         return std::unexpected(output_result.error());
@@ -41,13 +42,17 @@ auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge
         return std::unexpected(GridError("Need at least 2 edge points for downstream grid"));
     }
     
-    // Extract data using modern transformations
-    auto extract_property = [&edge_config](auto member_ptr) { // double EdgePoint::* ptr_to_x = &EdgePoint::x; pointer to a member
-        return edge_config.edge_points 
-             | std::views::transform([member_ptr](const auto& point) { return point.*member_ptr; }) // output of transform is std::ranges
-             | std::ranges::to<std::vector>();
+    auto extract_property = [&edge_config](auto member_ptr) {
+        auto range = edge_config.edge_points
+                | std::views::transform([member_ptr](const auto& point) {
+                    return point.*member_ptr;
+                    });
+
+        std::vector<double> result;
+        std::ranges::copy(range, std::back_inserter(result));
+        return result;
     };
-    
+ 
     auto x_edge = extract_property(&io::OuterEdgeConfig::EdgePoint::x);
     auto rho_edge = extract_property(&io::OuterEdgeConfig::EdgePoint::density);
     auto mu_edge = extract_property(&io::OuterEdgeConfig::EdgePoint::viscosity);
