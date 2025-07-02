@@ -1,6 +1,6 @@
 #pragma once
 #include "mixture_interface.hpp"
-#include <mutation++.h>
+#include <mutation++/mutation++.h>
 #include <memory>
 #include <vector>
 
@@ -41,6 +41,10 @@ public:
     
     [[nodiscard]] auto has_electrons() const noexcept -> bool override { 
         return has_electrons_; 
+    }
+
+    [[nodiscard]] auto species_name(std::size_t index) const noexcept -> std::string_view override {
+    return species_names_[index];
     }
     
     // Implement all virtual methods
