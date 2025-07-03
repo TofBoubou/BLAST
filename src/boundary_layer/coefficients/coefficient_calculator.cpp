@@ -1,4 +1,5 @@
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
+#include "blast/boundary_layer/coefficients/diffusion.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -82,6 +83,14 @@ auto CoefficientCalculator::calculate(
     auto [h_sp, dh_sp_deta] = std::move(enthalpy_result.value());
     coeffs.h_species = std::move(h_sp);
     coeffs.dh_species_deta = std::move(dh_sp_deta);
+
+    // 9. Compute diffusion fluxes
+    auto flux_result = diffusion::compute_stefan_maxwell_fluxes(
+        inputs, coeffs, bc, xi_der, sim_config_, mixture_, d_eta_
+    );
+    if (!flux_result) {
+        return std::unexpected(flux_result.error());
+    }
     
     return coeffs;
 }
@@ -249,7 +258,6 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
     return diff;
 }
 
-
 auto CoefficientCalculator::calculate_chemical_coefficients(
     const CoefficientInputs& inputs,
     const ThermodynamicCoefficients& thermo,
@@ -258,7 +266,6 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
     
     const auto n_eta = inputs.T.size();
     const auto n_species = inputs.c.rows();
-    const double P_edge = bc.P_e();
     
     ChemicalCoefficients chem;
     chem.wi = core::Matrix<double>(n_eta, n_species);
@@ -266,104 +273,194 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
     
     // Calculate production rates for each eta station
     for (std::size_t i = 0; i < n_eta; ++i) {
-        // Extract local composition and convert to partial densities
-        std::vector<double> c_local(n_species);
-        std::vector<double> rho_species(n_species);
-        
-        double sum_c = 0.0;
-        for (std::size_t j = 0; j < n_species; ++j) {
-            c_local[j] = inputs.c(j, i);
-            sum_c += c_local[j];
+        auto result = calculate_station_coefficients(i, inputs, thermo, bc);
+        if (!result) {
+            return std::unexpected(result.error());
         }
         
-        // Normalize and compute partial densities
-        for (std::size_t j = 0; j < n_species; ++j) {
-            rho_species[j] = thermo.rho[i] * c_local[j] / sum_c;
-        }
-        
-        // Get production rates
-        auto wi_result = mixture_.production_rates(rho_species, inputs.T[i]);
-        if (!wi_result) {
-            return std::unexpected(CoefficientError(
-                std::format("Failed to compute production rates at eta={}: {}", i, wi_result.error().message())
-            ));
-        }
-        
-        // Store production rates
-        const auto& wi_local = wi_result.value();
+        // Store results
+        const auto& [wi_local, dwi_dc] = result.value();
         for (std::size_t j = 0; j < n_species; ++j) {
             chem.wi(i, j) = wi_local[j];
         }
-        
-        // Get Jacobian d(wi)/d(rho_j)
-        auto jac_result = mixture_.production_rate_jacobian(rho_species, inputs.T[i]);
-        if (!jac_result) {
-            return std::unexpected(CoefficientError(
-                std::format("Failed to compute Jacobian at eta={}: {}", i, jac_result.error().message())
-            ));
-        }
-        
-        // Transform Jacobian from d(wi)/d(rho_j) to d(wi)/d(c_j)
-        core::Matrix<double> dwi_dc(n_species, n_species);
-        const auto& dwi_drho = jac_result.value();
-        
-        // Get species enthalpies and Cp for temperature derivative
-        auto h_sp_result = mixture_.species_enthalpies(inputs.T[i]);
-        auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i], P_edge);
-        
-        if (!h_sp_result || !cp_result) {
-            return std::unexpected(CoefficientError("Failed to get enthalpies or Cp"));
-        }
-        
-        const auto& h_species = h_sp_result.value();
-        const double Cp = cp_result.value();
-        
-        // Compute dT/dc_j = -h_j/Cp
-        std::vector<double> dT_dc(n_species);
-        for (std::size_t j = 0; j < n_species; ++j) {
-            dT_dc[j] = -h_species[j] / Cp;
-        }
-        
-        // Compute d(rho_k)/d(c_j)
-        core::Matrix<double> drho_dc(n_species, n_species);
-        for (std::size_t k = 0; k < n_species; ++k) {
-            for (std::size_t j = 0; j < n_species; ++j) {
-                drho_dc(k, j) = (k == j) ? thermo.rho[i] : 0.0;
-                drho_dc(k, j) -= rho_species[k] * thermo.MW[i] / mixture_.species_molecular_weight(j);
-            }
-        }
-        
-        // Compute d(wi)/dT using finite differences
-        constexpr double eps = 1e-6;
-        const double dT = eps * inputs.T[i];
-        
-        auto wi_pert_result = mixture_.production_rates(
-            rho_species, inputs.T[i] + dT
-        );
-        if (!wi_pert_result) {
-            return std::unexpected(CoefficientError("Failed to compute perturbed rates"));
-        }
-        
-        std::vector<double> dwi_dT(n_species);
-        for (std::size_t j = 0; j < n_species; ++j) {
-            dwi_dT[j] = (wi_pert_result.value()[j] - wi_local[j]) / dT;
-        }
-        
-        // Complete Jacobian: d(wi)/d(c_j) = Σ_k[d(wi)/d(rho_k) * d(rho_k)/d(c_j)] + d(wi)/dT * dT/d(c_j)
-        for (std::size_t ii = 0; ii < n_species; ++ii) {
-            for (std::size_t jj = 0; jj < n_species; ++jj) {
-                double sum = 0.0;
-                for (std::size_t k = 0; k < n_species; ++k) {
-                    sum += dwi_drho(ii, k) * drho_dc(k, jj);
-                }
-                dwi_dc(ii, jj) = sum + dwi_dT[ii] * dT_dc[jj];
-            }
-        }
-        
         chem.d_wi_dc.push_back(std::move(dwi_dc));
     }
     
     return chem;
+}
+
+auto CoefficientCalculator::calculate_station_coefficients(
+    std::size_t station_index,
+    const CoefficientInputs& inputs,
+    const ThermodynamicCoefficients& thermo,
+    const conditions::BoundaryConditions& bc
+) const -> std::expected<std::pair<std::vector<double>, core::Matrix<double>>, CoefficientError> {
+    
+    const auto n_species = inputs.c.rows();
+    
+    // Extract and normalize composition
+    auto [c_local, rho_species] = extract_local_composition(
+        station_index, inputs.c, thermo.rho[station_index]
+    );
+    
+    // Get production rates
+    auto wi_result = mixture_.production_rates(rho_species, inputs.T[station_index]);
+    if (!wi_result) {
+        return std::unexpected(CoefficientError(
+            std::format("Failed to compute production rates at eta={}: {}", 
+                       station_index, wi_result.error().message())
+        ));
+    }
+    const auto& wi_local = wi_result.value();
+    
+    // Get Jacobian d(wi)/d(rho_j)
+    auto jac_result = mixture_.production_rate_jacobian(rho_species, inputs.T[station_index]);
+    if (!jac_result) {
+        return std::unexpected(CoefficientError(
+            std::format("Failed to compute Jacobian at eta={}: {}", 
+                       station_index, jac_result.error().message())
+        ));
+    }
+    
+    // Transform Jacobian from d(wi)/d(rho_j) to d(wi)/d(c_j)
+    auto dwi_dc_result = transform_jacobian(
+        station_index, inputs, thermo, bc, 
+        c_local, rho_species, wi_local, jac_result.value()
+    );
+    
+    if (!dwi_dc_result) {
+        return std::unexpected(dwi_dc_result.error());
+    }
+    
+    return std::make_pair(wi_local, dwi_dc_result.value());
+}
+
+auto CoefficientCalculator::extract_local_composition(
+    std::size_t station_index,
+    const core::Matrix<double>& c,
+    double rho_total
+) const -> std::pair<std::vector<double>, std::vector<double>> {
+    
+    const auto n_species = c.rows();
+    std::vector<double> c_local(n_species);
+    std::vector<double> rho_species(n_species);
+    
+    double sum_c = 0.0;
+    for (std::size_t j = 0; j < n_species; ++j) {
+        c_local[j] = c(j, station_index);
+        sum_c += c_local[j];
+    }
+    
+    // Normalize and compute partial densities
+    for (std::size_t j = 0; j < n_species; ++j) {
+        rho_species[j] = rho_total * c_local[j] / sum_c;
+    }
+    
+    return {c_local, rho_species};
+}
+
+auto CoefficientCalculator::transform_jacobian(
+    std::size_t station_index,
+    const CoefficientInputs& inputs,
+    const ThermodynamicCoefficients& thermo,
+    const conditions::BoundaryConditions& bc,
+    const std::vector<double>& c_local,
+    const std::vector<double>& rho_species,
+    const std::vector<double>& wi_local,
+    const core::Matrix<double>& dwi_drho
+) const -> std::expected<core::Matrix<double>, CoefficientError> {
+    
+    const auto n_species = c_local.size();
+    const double T = inputs.T[station_index];
+    const double P_edge = bc.P_e();
+    
+    // Get species enthalpies and Cp
+    auto h_sp_result = mixture_.species_enthalpies(T);
+    auto cp_result = mixture_.frozen_cp(c_local, T, P_edge);
+    
+    if (!h_sp_result || !cp_result) {
+        return std::unexpected(CoefficientError("Failed to get enthalpies or Cp"));
+    }
+    
+    const auto& h_species = h_sp_result.value();
+    const double Cp = cp_result.value();
+    
+    // Compute dT/dc_j = -h_j/Cp
+    std::vector<double> dT_dc(n_species);
+    for (std::size_t j = 0; j < n_species; ++j) {
+        dT_dc[j] = -h_species[j] / Cp;
+    }
+    
+    // Compute d(rho_k)/d(c_j)
+    auto drho_dc = compute_density_derivatives(
+        rho_species, thermo.rho[station_index], thermo.MW[station_index]
+    );
+    
+    // Compute d(wi)/dT
+    auto dwi_dT_result = compute_temperature_derivatives(
+        rho_species, T, wi_local
+    );
+    if (!dwi_dT_result) {
+        return std::unexpected(CoefficientError("Failed to compute temperature derivatives"));
+    }
+    const auto& dwi_dT = dwi_dT_result.value();
+    
+    // Assemble complete Jacobian
+    core::Matrix<double> dwi_dc(n_species, n_species);
+    for (std::size_t i = 0; i < n_species; ++i) {
+        for (std::size_t j = 0; j < n_species; ++j) {
+            double sum = 0.0;
+            for (std::size_t k = 0; k < n_species; ++k) {
+                sum += dwi_drho(i, k) * drho_dc(k, j);
+            }
+            dwi_dc(i, j) = sum + dwi_dT[i] * dT_dc[j];
+        }
+    }
+    
+    return dwi_dc;
+}
+
+auto CoefficientCalculator::compute_density_derivatives(
+    const std::vector<double>& rho_species,
+    double rho_total,
+    double MW_mixture
+) const -> core::Matrix<double> {
+    
+    const auto n_species = rho_species.size();
+    core::Matrix<double> drho_dc(n_species, n_species);
+    
+    for (std::size_t k = 0; k < n_species; ++k) {
+        for (std::size_t j = 0; j < n_species; ++j) {
+            drho_dc(k, j) = (k == j) ? rho_total : 0.0;
+            drho_dc(k, j) -= rho_species[k] * MW_mixture / mixture_.species_molecular_weight(j);
+        }
+    }
+    
+    return drho_dc;
+}
+
+auto CoefficientCalculator::compute_temperature_derivatives(
+    const std::vector<double>& rho_species,
+    double T,
+    const std::vector<double>& wi_base
+) const -> std::expected<std::vector<double>, CoefficientError> {
+    
+    constexpr double eps = 1e-6;
+    const double dT = eps * T;
+    
+    auto wi_pert_result = mixture_.production_rates(rho_species, T + dT);
+    if (!wi_pert_result) {
+        return std::unexpected(CoefficientError("Failed to compute perturbed rates"));
+    }
+    
+    const auto& wi_pert = wi_pert_result.value();
+    std::vector<double> dwi_dT(wi_base.size());
+    
+    for (std::size_t j = 0; j < wi_base.size(); ++j) {
+        dwi_dT[j] = (wi_pert[j] - wi_base[j]) / dT;
+    }
+    
+    return dwi_dT;
 }
 
 auto CoefficientCalculator::calculate_thermal_diffusion(

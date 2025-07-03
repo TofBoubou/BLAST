@@ -27,6 +27,8 @@ struct ThermodynamicCoefficients {
 struct DiffusionCoefficients {
     core::Matrix<double> Dij_bin;   // Binary diffusion coefficients [n_eta x n_species x n_species]
     std::vector<double> y;          // Transformed coordinate for continuity
+    core::Matrix<double> J;         // Diffusion fluxes [n_species x n_eta]
+    core::Matrix<double> dJ_deta;   // Flux derivatives [n_species x n_eta]
 };
 
 // Chemical production rates

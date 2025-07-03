@@ -36,8 +36,7 @@ public:
         std::span<const double> enthalpy_field,
         const core::Matrix<double>& composition,
         const conditions::BoundaryConditions& bc,
-        std::span<const double> initial_temperatures,
-        int thermal_bc_type = 0
+        std::span<const double> initial_temperatures
     ) const -> std::expected<TemperatureField, ThermodynamicSolverError>;
 };
 

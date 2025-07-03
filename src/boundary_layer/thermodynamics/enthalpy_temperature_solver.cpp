@@ -132,49 +132,43 @@ auto EnthalpyTemperatureSolver::solve(
     std::span<const double> enthalpy_field,
     const core::Matrix<double>& composition,
     const conditions::BoundaryConditions& bc,
-    std::span<const double> initial_temperatures,
-    int thermal_bc_type
+    std::span<const double> initial_temperatures
 ) const -> std::expected<TemperatureField, ThermodynamicSolverError> {
     
     const auto n_points = enthalpy_field.size();
-    
+
     if (composition.rows() != mixture_.n_species()) {
         return std::unexpected(ThermodynamicSolverError(
             "Composition matrix has {} species, expected {}", 
             std::source_location::current(), composition.rows(), mixture_.n_species()));
     }
-    
+
     if (composition.cols() != n_points) {
         return std::unexpected(ThermodynamicSolverError(
             "Composition matrix has {} points, expected {}", 
             std::source_location::current(), composition.cols(), n_points));
     }
-    
+
     if (initial_temperatures.size() != n_points) {
         return std::unexpected(ThermodynamicSolverError(
             "Initial temperature array has {} points, expected {}", 
             std::source_location::current(), initial_temperatures.size(), n_points));
     }
-    
+
     TemperatureField result;
     result.temperatures.resize(n_points);
-    
-    std::size_t start_index = 0;
-    
-    // Handle wall boundary condition
-    if (thermal_bc_type == 0) {  // Fixed wall temperature
-        result.temperatures[0] = bc.Tw();
-        start_index = 1;
-    }
-    
-    // Solve for each point
-    for (std::size_t i = start_index; i < n_points; ++i) {
+
+    // Fix wall temperature at index 0
+    result.temperatures[0] = bc.Tw();
+
+    // Solve for interior points (starting from index 1)
+    for (std::size_t i = 1; i < n_points; ++i) {
         // Extract composition for this point
         std::vector<double> point_composition(mixture_.n_species());
         for (std::size_t j = 0; j < mixture_.n_species(); ++j) {
             point_composition[j] = composition(j, i);
         }
-        
+
         // Solve for temperature
         auto temp_result = solve_single_point(
             point_composition,
@@ -182,22 +176,19 @@ auto EnthalpyTemperatureSolver::solve(
             bc.P_e(),
             initial_temperatures[i]
         );
-        
+
         if (!temp_result) {
             return std::unexpected(ThermodynamicSolverError(
-                "Failed to solve temperature at point {}: {}", std::source_location::current(), i, temp_result.error().message()));
+                "Failed to solve temperature at point {}: {}", 
+                std::source_location::current(), i, temp_result.error().message()));
         }
-        
-        result.temperatures[i] = *temp_result;
+
+        result.temperatures[i] = temp_result.value();
     }
-    
-    // Handle adiabatic wall boundary condition
-    if (thermal_bc_type == 1) {  // Adiabatic wall
-        result.adiabatic_wall_updated = true;
-        result.updated_wall_temperature = result.temperatures[0];
-    }
-    
+
     return result;
 }
+
+
 
 } // namespace blast::boundary_layer::thermodynamics

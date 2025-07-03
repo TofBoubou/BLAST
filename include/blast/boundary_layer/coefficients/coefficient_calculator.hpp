@@ -72,6 +72,43 @@ private:
         const CoefficientInputs& inputs
     ) const -> std::expected<std::pair<core::Matrix<double>, core::Matrix<double>>, CoefficientError>;
 
+    // Helper functions for chemical coefficients calculation
+    [[nodiscard]] auto calculate_station_coefficients(
+        std::size_t station_index,
+        const CoefficientInputs& inputs,
+        const ThermodynamicCoefficients& thermo,
+        const conditions::BoundaryConditions& bc
+    ) const -> std::expected<std::pair<std::vector<double>, core::Matrix<double>>, CoefficientError>;
+    
+    [[nodiscard]] auto extract_local_composition(
+        std::size_t station_index,
+        const core::Matrix<double>& c,
+        double rho_total
+    ) const -> std::pair<std::vector<double>, std::vector<double>>;
+    
+    [[nodiscard]] auto transform_jacobian(
+        std::size_t station_index,
+        const CoefficientInputs& inputs,
+        const ThermodynamicCoefficients& thermo,
+        const conditions::BoundaryConditions& bc,
+        const std::vector<double>& c_local,
+        const std::vector<double>& rho_species,
+        const std::vector<double>& wi_local,
+        const core::Matrix<double>& dwi_drho
+    ) const -> std::expected<core::Matrix<double>, CoefficientError>;
+    
+    [[nodiscard]] auto compute_density_derivatives(
+        const std::vector<double>& rho_species,
+        double rho_total,
+        double MW_mixture
+    ) const -> core::Matrix<double>;
+    
+    [[nodiscard]] auto compute_temperature_derivatives(
+        const std::vector<double>& rho_species,
+        double T,
+        const std::vector<double>& wi_base
+    ) const -> std::expected<std::vector<double>, CoefficientError>;
+
 public:
     CoefficientCalculator(
         const thermophysics::MixtureInterface& mixture,

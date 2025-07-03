@@ -8,6 +8,7 @@ namespace blast::boundary_layer::coefficients {
 // Structure to manage xi derivatives for finite difference approximations
 class XiDerivatives {
 private:
+    int station_ = 0;
     // Xi values at current and previous stations
     double xi_current_ = 0.0;
     double xi_minus_1_ = 0.0;
@@ -70,6 +71,7 @@ public:
                                   core::Matrix<double>& c);
     
     // Accessors
+    [[nodiscard]] constexpr auto station() const noexcept { return station_; }
     [[nodiscard]] constexpr auto lambda0() const noexcept { return lambda0_; }
     [[nodiscard]] constexpr auto lambda1() const noexcept { return lambda1_; }
     [[nodiscard]] constexpr auto lambda2() const noexcept { return lambda2_; }

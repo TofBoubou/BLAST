@@ -7,6 +7,8 @@ void XiDerivatives::update_station(int station, double xi,
                                   std::span<const double> F,
                                   std::span<const double> g,
                                   const core::Matrix<double>& c) {
+    station_ = station;
+    
     if (station == 0) {
         // Stagnation point
         xi_current_ = xi;
@@ -63,6 +65,8 @@ void XiDerivatives::update_failed_convergence(int station, double xi,
                                              std::span<double> F,
                                              std::span<double> g,
                                              core::Matrix<double>& c) {
+    station_ = station;
+    
     // Restore previous solution
     std::ranges::copy(F_minus_1_, F.begin());
     std::ranges::copy(g_minus_1_, g.begin());
