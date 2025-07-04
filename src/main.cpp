@@ -259,6 +259,21 @@ int main(int argc, char* argv[]) {
         std::cout << "l0 coefficient range: [" << *l0_min << ", " << *l0_max << "]\n";
         std::cout << "l3 coefficient range: [" << *l3_min << ", " << *l3_max << "]\n";
         
+        // Test case: Display diffusion coefficient values
+        std::cout << "\n=== DIFFUSION TEST CASE ===" << std::endl;
+        std::cout << "Binary diffusion coefficients (first eta point):\n";
+        for (std::size_t i = 0; i < n_species; ++i) {
+            for (std::size_t j = 0; j < n_species; ++j) {
+                double dij = coeffs.diffusion.Dij_bin(i, j);
+                std::cout << "  D[" << mixture.species_name(i) << "][" << mixture.species_name(j) << "] = " << dij << " m²/s\n";
+            }
+        }
+        
+        std::cout << "\nY coordinate values:\n";
+        for (std::size_t i = 0; i < std::min(n_eta, static_cast<std::size_t>(5)); ++i) {
+            std::cout << "  y[" << i << "] = " << coeffs.diffusion.y[i] << "\n";
+        }
+        
         return 0;
         
     } catch (const std::exception& e) {

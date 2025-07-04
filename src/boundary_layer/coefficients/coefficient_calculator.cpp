@@ -647,6 +647,7 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::vector<double>
 template auto compute_eta_derivative(std::span<const double>&&, double) -> std::vector<double>;
 template auto compute_eta_derivative(const std::vector<double>&, double) -> std::vector<double>;
 template auto compute_eta_derivative(std::vector<double>&&, double) -> std::vector<double>;
+template auto compute_eta_derivative(std::span<double>&&, double) -> std::vector<double>;
 
 } // namespace derivatives
 
