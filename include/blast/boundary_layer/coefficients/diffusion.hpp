@@ -11,7 +11,7 @@ namespace blast::boundary_layer::coefficients::diffusion {
 // Calculate Stefan-Maxwell diffusion fluxes and derivatives
 [[nodiscard]] auto compute_stefan_maxwell_fluxes(
     const CoefficientInputs& inputs,
-    const CoefficientSet& coeffs,
+    CoefficientSet& coeffs,  // <-- Enlever const ici
     const conditions::BoundaryConditions& bc,
     const XiDerivatives& xi_der,
     const io::SimulationConfig& sim_config,

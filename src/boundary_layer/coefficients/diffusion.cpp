@@ -33,6 +33,19 @@ constexpr auto compute_derivative_factor(
     return 1.0;
 }
 
+// Compute average diffusion coefficient D_im
+inline auto compute_average_diffusion_coefficient(
+    std::span<const double> x,
+    const Eigen::MatrixXd& D_bin,
+    std::size_t species_idx
+) noexcept -> double {
+    double sum = 0.0;
+    for (std::size_t j = 0; j < x.size(); ++j) {
+        sum += x[j] / D_bin(species_idx, j);
+    }
+    return 1.0 / sum;
+}
+
 // Stefan-Maxwell flux calculation for single eta point
 auto calculate_stefan_maxwell_at_point(
     std::span<const double> c,
@@ -45,83 +58,77 @@ auto calculate_stefan_maxwell_at_point(
     double dMW_deta,
     std::span<const double> tdr_term,
     double der_fact,
-    double K_bl,
     const thermophysics::MixtureInterface& mixture
 ) -> std::vector<double> {
     
     const auto n_species = c.size();
-    const double full_der_fact = der_fact * rho * K_bl;
-    
-    double sum_c = std::accumulate(c.begin(), c.end(), 0.0);
+    const double full_der_fact = der_fact * rho;
+    const double sum_c = std::accumulate(c.begin(), c.end(), 0.0);
     
     // Use Eigen through the wrapper
-    auto& D_bin_eigen = D_bin_local.eigen();
-    Eigen::VectorXd d(n_species), p1(n_species), p2(n_species);
+    auto& D_bin = D_bin_local.eigen();
+    
+    // Initialize vectors
+    Eigen::VectorXd driving_force(n_species);
+    Eigen::VectorXd diffusion_flux(n_species);
+    Eigen::VectorXd mass_weight(n_species);
     Eigen::MatrixXd A = Eigen::MatrixXd::Identity(n_species, n_species);
     
-    // Build system
+    // Build Stefan-Maxwell system
     for (std::size_t i = 0; i < n_species; ++i) {
-        // Driving force
-        d[i] = MW / mixture.species_molecular_weight(i) * dc_deta[i] + 
-               c[i] / mixture.species_molecular_weight(i) * dMW_deta;
+        const double MW_i = mixture.species_molecular_weight(i);
         
+        // Driving force: concentration gradient + molecular weight gradient + thermal diffusion
+        driving_force[i] = MW / MW_i * dc_deta[i] + c[i] / MW_i * dMW_deta;
         if (!tdr_term.empty()) {
-            d[i] += tdr_term[i];
+            driving_force[i] += tdr_term[i];
         }
         
         // Average diffusion coefficient
-        double sum = 0.0;
-        for (std::size_t j = 0; j < n_species; ++j) {
-            sum += x[j] / D_bin_eigen(i, j);
-        }
-        double D_im = 1.0 / sum;
+        const double D_im = compute_average_diffusion_coefficient(x, D_bin, i);
         
-        p1[i] = -rho * mixture.species_molecular_weight(i) / MW * D_im * d[i] * full_der_fact;
-        p2[i] = c[i] * D_im * MW;
+        // Flux and mass weight terms
+        diffusion_flux[i] = -rho * MW_i / MW * D_im * driving_force[i] * full_der_fact;
+        mass_weight[i] = c[i] * D_im * MW;
         
-        // Build matrix
+        // Build matrix row
         for (std::size_t j = 0; j < n_species; ++j) {
-            A(i, j) -= p2[i] / (mixture.species_molecular_weight(j) * D_bin_eigen(i, j));
+            A(i, j) -= mass_weight[i] / (mixture.species_molecular_weight(j) * D_bin(i, j));
         }
     }
     
-    // Mass conservation constraint
+    // Apply mass conservation constraint (last row)
     A.row(n_species - 1).setConstant(c[n_species - 1] / sum_c);
-    p1[n_species - 1] = 0.0;
+    diffusion_flux[n_species - 1] = 0.0;
     
-    // Solve
-    Eigen::VectorXd J_vec = A.lu().solve(p1);
+    // Solve linear system
+    Eigen::VectorXd J_vec = A.lu().solve(diffusion_flux);
     
-    // Ambipolar electric field
+    // Apply ambipolar electric field correction for ionized mixtures
     if (mixture.has_electrons()) {
         auto charges = mixture.species_charges();
-        Eigen::VectorXd p3(n_species);
+        Eigen::VectorXd electric_mobility(n_species);
         
         for (std::size_t i = 0; i < n_species; ++i) {
-            double sum = 0.0;
-            for (std::size_t j = 0; j < n_species; ++j) {
-                sum += x[j] / D_bin_eigen(i, j);
-            }
-            double D_im = 1.0 / sum;
-            p3[i] = rho / P * D_im * mixture.species_molecular_weight(i) / MW * 
-                    charges[i] * rho * c[i];
+            const double D_im = compute_average_diffusion_coefficient(x, D_bin, i);
+            electric_mobility[i] = rho / P * D_im * mixture.species_molecular_weight(i) / MW * 
+                                 charges[i] * rho * c[i];
         }
         
-        double t1 = 0.0, t2 = 0.0, t3 = 0.0;
-        for (std::size_t i = 0; i < n_species; ++i) {
-            t1 += charges[i] * p1[i];
-            t2 += charges[i] * J_vec[i];
-            t3 += charges[i] * p3[i];
-        }
+        // Calculate electric field strength - Convert span to Eigen vector for dot product
+        Eigen::VectorXd charges_vec = Eigen::Map<const Eigen::VectorXd>(charges.data(), charges.size());
+        const double charge_flux = charges_vec.dot(diffusion_flux);
+        const double current_flux = charges_vec.dot(J_vec);
+        const double charge_mobility = charges_vec.dot(electric_mobility);
         
-        if (std::abs(t3) > 1e-30) {
-            double E = -(t1 + t2) / t3;
-            J_vec += E * p3;
+        if (std::abs(charge_mobility) > 1e-30) {
+            const double E_field = -(charge_flux + current_flux) / charge_mobility;
+            J_vec += E_field * electric_mobility;
         }
     }
     
-    // Mass conservation correction
-    double sum_J = J_vec.sum();
+    // Apply mass conservation correction
+    const double sum_J = J_vec.sum();
     std::vector<double> J_result(n_species);
     for (std::size_t i = 0; i < n_species; ++i) {
         J_result[i] = J_vec[i] - c[i] / sum_c * sum_J;
@@ -134,7 +141,7 @@ auto calculate_stefan_maxwell_at_point(
 
 auto compute_stefan_maxwell_fluxes(
     const CoefficientInputs& inputs,
-    const CoefficientSet& coeffs,
+    CoefficientSet& coeffs,  // Changed from const to allow modification
     const conditions::BoundaryConditions& bc,
     const XiDerivatives& xi_der,
     const io::SimulationConfig& sim_config,
@@ -145,11 +152,11 @@ auto compute_stefan_maxwell_fluxes(
     const auto n_species = inputs.c.rows();
     const auto n_eta = inputs.T.size();
     
-    // Access J and dJ_deta from DiffusionCoefficients (they're mutable through const_cast)
-    auto& J = const_cast<core::Matrix<double>&>(coeffs.diffusion.J);
-    auto& dJ_deta = const_cast<core::Matrix<double>&>(coeffs.diffusion.dJ_deta);
+    // Access J and dJ_deta directly (no const_cast needed)
+    auto& J = coeffs.diffusion.J;
+    auto& dJ_deta = coeffs.diffusion.dJ_deta;
     
-    // Single species case
+    // Single species case - no diffusion
     if (n_species == 1) {
         J.setZero();
         dJ_deta.setZero();
@@ -161,41 +168,37 @@ auto compute_stefan_maxwell_fluxes(
         return std::unexpected(CoefficientError("Only Stefan-Maxwell diffusion is implemented"));
     }
     
-    // Get station from xi_der
+    // Get station and compute derivative factor
     const int station = xi_der.station();
-    
-    // Compute derivative factor
     const double der_fact = compute_derivative_factor(station, inputs.xi, bc, sim_config);
-    const double K_bl = 1.0; // TODO: Get from proper source
+    
+    // Pre-allocate work arrays
+    std::vector<double> c_local(n_species);
+    std::vector<double> dc_deta_local(n_species);
+    std::vector<double> x_local(n_species);
+    core::Matrix<double> D_bin_local(n_species, n_species);
     
     // Process each eta point
     for (std::size_t i = 0; i < n_eta; ++i) {
         // Extract local values
-        std::vector<double> c_local(n_species);
-        std::vector<double> dc_deta_local(n_species);
-        std::vector<double> x_local(n_species);
-        
         for (std::size_t j = 0; j < n_species; ++j) {
             c_local[j] = inputs.c(j, i);
             dc_deta_local[j] = inputs.dc_deta(j, i);
             x_local[j] = c_local[j] * coeffs.thermodynamic.MW[i] / mixture.species_molecular_weight(j);
         }
         
-        // Extract D_bin for this station
-        core::Matrix<double> D_bin_local(n_species, n_species);
+        // Extract binary diffusion coefficients for this eta point
         for (std::size_t j = 0; j < n_species; ++j) {
             for (std::size_t k = 0; k < n_species; ++k) {
                 D_bin_local(j, k) = coeffs.diffusion.Dij_bin(i * n_species + j, k);
             }
         }
         
-        // TDR term if thermal diffusion is considered
-        std::vector<double> tdr_term_local;
-        if (sim_config.consider_thermal_diffusion) {
-            tdr_term_local.resize(n_species);
-            for (std::size_t j = 0; j < n_species; ++j) {
-                tdr_term_local[j] = coeffs.thermal_diffusion.tdr_term(i, j);
-            }
+        // Get thermal diffusion terms if enabled
+        std::span<const double> tdr_span;
+        if (sim_config.consider_thermal_diffusion && i < coeffs.thermal_diffusion.tdr_term.rows()) {
+            auto tdr_row = coeffs.thermal_diffusion.tdr_term.eigen().row(i);
+            tdr_span = std::span(tdr_row.data(), n_species);
         }
         
         // Calculate fluxes
@@ -205,28 +208,26 @@ auto compute_stefan_maxwell_fluxes(
                 coeffs.thermodynamic.rho[i], bc.P_e(),
                 D_bin_local, coeffs.thermodynamic.MW[i],
                 coeffs.thermodynamic.d_MW_deta[i],
-                tdr_term_local, der_fact, K_bl, mixture
+                tdr_span, der_fact, mixture
             );
             
-            // Store
+            // Store results
             for (std::size_t j = 0; j < n_species; ++j) {
                 J(j, i) = J_local[j];
             }
         } catch (const std::exception& e) {
             return std::unexpected(CoefficientError(
-                std::format("Stefan-Maxwell calculation failed at eta={}: {}", i, e.what())
+                std::format("Stefan-Maxwell calculation failed at eta[{}]: {}", i, e.what())
             ));
         }
     }
     
-    // Compute derivatives
+    // Compute eta derivatives of fluxes
     for (std::size_t j = 0; j < n_species; ++j) {
-        std::vector<double> J_row(n_eta);
-        for (std::size_t i = 0; i < n_eta; ++i) {
-            J_row[i] = J(j, i);
-        }
-        
-        auto dJ = derivatives::compute_eta_derivative(J_row, d_eta);
+        auto J_row = J.eigen().row(j);
+        auto dJ = derivatives::compute_eta_derivative(
+            std::span(J_row.data(), n_eta), d_eta
+        );
         
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_deta(j, i) = dJ[i];
