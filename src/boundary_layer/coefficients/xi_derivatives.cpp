@@ -11,25 +11,17 @@ void XiDerivatives::update_station(int station, double xi,
     station_ = station;
     
     if (station == 0) {
-        // Stagnation point
-        lambda0_ = 0.0;
-        lambda1_ = 0.0;
-        lambda2_ = 0.0;
-        
-        // Save current solution
-        std::ranges::copy(F, F_minus_1_.begin());
-        std::ranges::copy(g, g_minus_1_.begin());
-        c_minus_1_ = c;
-        
-        // Compute derivatives using backward difference
-        for (std::size_t i = 0; i < n_eta_; ++i) {
-            F_xi_der_[i] = lambda1_ * F_minus_1_[i];
-            g_xi_der_[i] = lambda1_ * g_minus_1_[i];
-            
-            for (std::size_t j = 0; j < n_species_; ++j) {
-                c_xi_der_(j, i) = lambda1_ * c_minus_1_(j, i);
-            }
-        }
+    // Stagnation point
+    lambda0_ = lambda1_ = lambda2_ = 0.0;
+
+    std::ranges::copy(F, F_minus_1_.begin());
+    std::ranges::copy(g, g_minus_1_.begin());
+    c_minus_1_ = c;
+
+    std::fill(F_xi_der_.begin(), F_xi_der_.end(), 0.0);
+    std::fill(g_xi_der_.begin(), g_xi_der_.end(), 0.0);
+    c_xi_der_.setZero();
+
     } else {
         // Downstream station
         xi_minus_2_ = xi_minus_1_;
