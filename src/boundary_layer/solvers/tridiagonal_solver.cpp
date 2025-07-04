@@ -12,15 +12,39 @@ namespace {
     };
     
     // Compute collocation coefficients for a given eta point
+    // This function now exactly matches the original C code formulas
     [[nodiscard]] auto compute_collocation_coeffs(
         double a, double b, double c, double t
     ) noexcept -> CollocationCoeffs {
         CollocationCoeffs coeffs;
-        coeffs.p1 = a + t * b + (0.5 * t * t - 0.5) * c;
-        coeffs.z = -2.0 * a + c;
-        coeffs.m1 = a - t * b + (0.5 * t * t - 0.5) * c;
-        coeffs.a = 2.0 * t * a + (t * t - 1.0) * b;
-        coeffs.b = 2.0 * a + 2.0 * t * b + (t * t - 1.0) * c;
+        
+        if (t == -1.0) {
+            // Formulas for t = -1 (from original C code)
+            coeffs.p1 = a - 0.5 * b;
+            coeffs.z = -2.0 * a + 2.0 * b;
+            coeffs.m1 = a - 1.5 * b + c;
+            coeffs.a = 6.0 * a - 2.0 * b;
+            coeffs.b = -10.0 * a + 2.0 * b;
+        } else if (t == 0.0) {
+            // Formulas for t = 0 (from original C code)
+            coeffs.p1 = a + 0.5 * b;
+            coeffs.z = -2.0 * a + c;
+            coeffs.m1 = a - 0.5 * b;
+            coeffs.a = b;
+            coeffs.b = 2.0 * a;
+        } else if (t == 1.0) {
+            // Formulas for t = 1 (from original C code)
+            coeffs.p1 = a + 1.5 * b + c;
+            coeffs.z = -2.0 * a - 2.0 * b;
+            coeffs.m1 = a + 0.5 * b;
+            coeffs.a = -6.0 * a - 2.0 * b;
+            coeffs.b = -10.0 * a - 2.0 * b;
+        } else {
+            // This should not happen in the tridiagonal solver context
+            // where only t = -1, 0, 1 are used
+            std::terminate(); // Or handle error appropriately
+        }
+        
         return coeffs;
     }
 }
@@ -219,20 +243,19 @@ auto solve_species_block_tridiagonal(
     
     // Make block matrix truly tridiagonal
     // Handle top boundary condition
-    if (A[1].eigen().determinant() != 0) {
-        auto A1_inv = A[1].eigen().inverse();
-        B[0] = (R0 - R2 * A1_inv * C[1]).eigen();
-        A[0] = (R1 - R2 * A1_inv * B[1]).eigen();
+
+    Eigen::PartialPivLU<Eigen::MatrixXd> lu_A1(A[1].eigen());
+    B[0] = (R0 - R2 * lu_A1.solve(C[1].eigen())).eval();
+    A[0] = (R1 - R2 * lu_A1.solve(B[1].eigen())).eval();
         
-        Eigen::VectorXd D1(n_heavy);
-        for (int j = 0; j < n_heavy; ++j) {
-            D1[j] = D(1, j + start_idx);
-        }
-        Eigen::VectorXd temp = R2.eigen() * A1_inv * D1;
+    Eigen::VectorXd D1(n_heavy);
+    for (int j = 0; j < n_heavy; ++j) {
+        D1[j] = D(1, j + start_idx);
+    }
+    Eigen::VectorXd temp = R2.eigen() * lu_A1.solve(D1);
         
-        for (int j = 0; j < n_heavy; ++j) {
-            D(0, j + start_idx) = R[j] - temp[j];
-        }
+    for (int j = 0; j < n_heavy; ++j) {
+        D(0, j + start_idx) = R[j] - temp[j];
     }
     
     // Handle bottom boundary
@@ -290,11 +313,10 @@ void block_thomas_algorithm(
     
     // Forward elimination
     for (std::size_t i = 1; i < n_eta - 1; ++i) {
-        if (main_blocks[i-1].eigen().determinant() != 0) {
-            auto B_inv = main_blocks[i-1].eigen().inverse();
-            upper_blocks[i-1] = (B_inv * upper_blocks[i-1].eigen()).eigen();
-            main_blocks[i] = (main_blocks[i].eigen() - 
-                             lower_blocks[i].eigen() * upper_blocks[i-1].eigen()).eigen();
+            Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[i-1].eigen());
+            upper_blocks[i-1] = (lu_B.solve(upper_blocks[i-1].eigen())).eval();
+            main_blocks[i] = (main_blocks[i].eigen() -
+                            lower_blocks[i].eigen() * upper_blocks[i-1].eigen()).eval();
             
             // Update RHS
             for (int j = 0; j < n_heavy; ++j) {
@@ -304,20 +326,18 @@ void block_thomas_algorithm(
                 }
                 rhs(i, j + start_species) -= temp;
             }
-        }
     }
     
     // Back substitution
     // Last interior point
-    if (main_blocks[n_eta-2].eigen().determinant() != 0) {
-        auto B_inv = main_blocks[n_eta-2].eigen().inverse();
-        for (int j = 0; j < n_heavy; ++j) {
-            double sum = 0.0;
-            for (int k = 0; k < n_heavy; ++k) {
-                sum += B_inv(j, k) * rhs(n_eta-2, k + start_species);
-            }
-            solution(j + start_species, n_eta-2) = sum;
-        }
+    Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[n_eta - 2].eigen());
+    Eigen::VectorXd rhs_vec(n_heavy);
+    for (int k = 0; k < n_heavy; ++k) {
+        rhs_vec[k] = rhs(n_eta - 2, k + start_species);
+    }
+    Eigen::VectorXd sol = lu_B.solve(rhs_vec);
+    for (int j = 0; j < n_heavy; ++j) {
+        solution(j + start_species, n_eta - 2) = sol[j];
     }
     
     // Remaining points
