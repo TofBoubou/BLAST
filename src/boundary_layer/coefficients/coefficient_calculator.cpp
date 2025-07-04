@@ -215,7 +215,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(
     return transport;
 }
 
-
 auto CoefficientCalculator::calculate_diffusion_coefficients(
     const CoefficientInputs& inputs,
     const conditions::BoundaryConditions& bc,
@@ -244,6 +243,7 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
         
         // Store in matrix (row i*n_species to (i+1)*n_species)
         const auto& dij_local = dij_result.value();
+
         for (std::size_t j = 0; j < n_species; ++j) {
             for (std::size_t k = 0; k < n_species; ++k) {
                 diff.Dij_bin(i * n_species + j, k) = dij_local(j, k);

@@ -1,5 +1,6 @@
 #include "blast/boundary_layer/coefficients/xi_derivatives.hpp"
 #include <algorithm>
+#include <iostream>
 
 namespace blast::boundary_layer::coefficients {
 
@@ -11,10 +12,8 @@ void XiDerivatives::update_station(int station, double xi,
     
     if (station == 0) {
         // Stagnation point
-        xi_current_ = xi;
-        const double d_xi = xi;
-        lambda0_ = 1.0 / d_xi;
-        lambda1_ = -1.0 / d_xi;
+        lambda0_ = 0.0;
+        lambda1_ = 0.0;
         lambda2_ = 0.0;
         
         // Save current solution
