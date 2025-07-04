@@ -12,37 +12,31 @@ namespace {
     };
     
     // Compute collocation coefficients for a given eta point
-    // This function now exactly matches the original C code formulas
     [[nodiscard]] auto compute_collocation_coeffs(
         double a, double b, double c, double t
     ) noexcept -> CollocationCoeffs {
         CollocationCoeffs coeffs;
         
         if (t == -1.0) {
-            // Formulas for t = -1 (from original C code)
             coeffs.p1 = a - 0.5 * b;
             coeffs.z = -2.0 * a + 2.0 * b;
             coeffs.m1 = a - 1.5 * b + c;
             coeffs.a = 6.0 * a - 2.0 * b;
             coeffs.b = -10.0 * a + 2.0 * b;
         } else if (t == 0.0) {
-            // Formulas for t = 0 (from original C code)
             coeffs.p1 = a + 0.5 * b;
             coeffs.z = -2.0 * a + c;
             coeffs.m1 = a - 0.5 * b;
             coeffs.a = b;
             coeffs.b = 2.0 * a;
         } else if (t == 1.0) {
-            // Formulas for t = 1 (from original C code)
             coeffs.p1 = a + 1.5 * b + c;
             coeffs.z = -2.0 * a - 2.0 * b;
             coeffs.m1 = a + 0.5 * b;
             coeffs.a = -6.0 * a - 2.0 * b;
             coeffs.b = -10.0 * a - 2.0 * b;
         } else {
-            // This should not happen in the tridiagonal solver context
-            // where only t = -1, 0, 1 are used
-            std::terminate(); // Or handle error appropriately
+            std::terminate();
         }
         
         return coeffs;
@@ -145,8 +139,8 @@ auto solve_species_block_tridiagonal(
         return std::unexpected(SolverError("Need at least 3 eta points"));
     }
     
-    const int start_idx = has_electrons ? 1 : 0;
-    const int n_heavy = n_species - start_idx;
+    const std::size_t start_idx = has_electrons ? 1 : 0;
+    const std::size_t n_heavy = n_species - start_idx;
     
     // Allocate block matrices
     std::vector<core::Matrix<double>> A(n_eta), B(n_eta), C(n_eta);
@@ -167,7 +161,7 @@ auto solve_species_block_tridiagonal(
         C[i].setZero();
         
         // Process each species equation
-        for (int j = start_idx; j < n_species; ++j) {
+        for (std::size_t j = start_idx; j < n_species; ++j) {
             const int jh = j - start_idx;  // Heavy species index
             
             // Collocation coefficients
@@ -207,7 +201,7 @@ auto solve_species_block_tridiagonal(
     R1.setZero();
     R2.setZero();
     
-    for (int j = start_idx; j < n_species; ++j) {
+    for (std::size_t j = start_idx; j < n_species; ++j) {
         const int jh = j - start_idx;
         
         // BC collocation
@@ -245,21 +239,24 @@ auto solve_species_block_tridiagonal(
     // Handle top boundary condition
 
     Eigen::PartialPivLU<Eigen::MatrixXd> lu_A1(A[1].eigen());
-    B[0] = (R0 - R2 * lu_A1.solve(C[1].eigen())).eval();
-    A[0] = (R1 - R2 * lu_A1.solve(B[1].eigen())).eval();
-        
+    auto temp_solve_C = lu_A1.solve(C[1].eigen());
+    auto temp_solve_B = lu_A1.solve(B[1].eigen());
+
+    B[0].eigen() = (R0.eigen() - R2.eigen() * temp_solve_C).eval();
+    A[0].eigen() = (R1.eigen() - R2.eigen() * temp_solve_B).eval();
+ 
     Eigen::VectorXd D1(n_heavy);
-    for (int j = 0; j < n_heavy; ++j) {
+    for (std::size_t j = 0; j < n_heavy; ++j) {
         D1[j] = D(1, j + start_idx);
     }
     Eigen::VectorXd temp = R2.eigen() * lu_A1.solve(D1);
         
-    for (int j = 0; j < n_heavy; ++j) {
+    for (std::size_t j = 0; j < n_heavy; ++j) {
         D(0, j + start_idx) = R[j] - temp[j];
     }
     
     // Handle bottom boundary
-    for (int j = start_idx; j < n_species; ++j) {
+    for (std::size_t j = start_idx; j < n_species; ++j) {
         D(n_eta-2, j) -= A[n_eta-2](j-start_idx, j-start_idx) * prev_solution(j, n_eta-1);
     }
     A[n_eta-2].setZero();
@@ -314,14 +311,14 @@ void block_thomas_algorithm(
     // Forward elimination
     for (std::size_t i = 1; i < n_eta - 1; ++i) {
             Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[i-1].eigen());
-            upper_blocks[i-1] = (lu_B.solve(upper_blocks[i-1].eigen())).eval();
-            main_blocks[i] = (main_blocks[i].eigen() -
-                            lower_blocks[i].eigen() * upper_blocks[i-1].eigen()).eval();
+            upper_blocks[i-1].eigen() = (lu_B.solve(upper_blocks[i-1].eigen())).eval();
+            main_blocks[i].eigen() = (main_blocks[i].eigen() - lower_blocks[i].eigen() * upper_blocks[i-1].eigen()).eval();
+
             
             // Update RHS
-            for (int j = 0; j < n_heavy; ++j) {
+            for (std::size_t j = 0; j < n_heavy; ++j) {
                 double temp = 0.0;
-                for (int k = 0; k < n_heavy; ++k) {
+                for (std::size_t k = 0; k < n_heavy; ++k) {
                     temp += lower_blocks[i](j, k) * rhs(i-1, k + start_species);
                 }
                 rhs(i, j + start_species) -= temp;
@@ -332,19 +329,19 @@ void block_thomas_algorithm(
     // Last interior point
     Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[n_eta - 2].eigen());
     Eigen::VectorXd rhs_vec(n_heavy);
-    for (int k = 0; k < n_heavy; ++k) {
+    for (std::size_t k = 0; k < n_heavy; ++k) {
         rhs_vec[k] = rhs(n_eta - 2, k + start_species);
     }
     Eigen::VectorXd sol = lu_B.solve(rhs_vec);
-    for (int j = 0; j < n_heavy; ++j) {
+    for (std::size_t j = 0; j < n_heavy; ++j) {
         solution(j + start_species, n_eta - 2) = sol[j];
     }
     
     // Remaining points
-    for (int i = n_eta - 3; i >= 0; --i) {
-        for (int j = 0; j < n_heavy; ++j) {
+    for (std::ptrdiff_t i = static_cast<std::ptrdiff_t>(n_eta) - 3; i >= 0; --i) {
+        for (std::size_t j = 0; j < n_heavy; ++j) {
             solution(j + start_species, i) = rhs(i, j + start_species);
-            for (int k = 0; k < n_heavy; ++k) {
+            for (std::size_t k = 0; k < n_heavy; ++k) {
                 solution(j + start_species, i) -= 
                     upper_blocks[i](j, k) * solution(k + start_species, i+1);
             }
