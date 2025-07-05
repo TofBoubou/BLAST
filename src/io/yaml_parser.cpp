@@ -204,6 +204,9 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
             config.solvers.h2t_max_iterations = extract_value<int>(
                 solv_node, "h2t_max_iterations", 100
             );
+            config.solvers.h2t_max_bracket_expansions = extract_value<int>(
+                solv_node, "h2t_max_bracket_expansions", 10
+            );
             config.solvers.stefan_tolerance = extract_value<double>(
                 solv_node, "stefan_tolerance", 1e-6
             );

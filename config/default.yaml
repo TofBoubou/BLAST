@@ -17,6 +17,7 @@ numerical:
   solvers:
     h2t_tolerance: 1.0e-6
     h2t_max_iterations: 50
+    h2t_max_bracket_expansions: 10
     stefan_tolerance: 1.0e-6
     stefan_max_iterations: 50
 

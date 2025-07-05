@@ -42,6 +42,7 @@ struct NumericalConfig {
     struct Solvers {
         double h2t_tolerance = 1e-8;
         int h2t_max_iterations = 100;
+        int h2t_max_bracket_expansions = 10;
         double stefan_tolerance = 1e-6;
         int stefan_max_iterations = 50;
     } solvers;

@@ -44,7 +44,8 @@ BoundaryLayerSolver::BoundaryLayerSolver(
     // Create enthalpy-temperature solver
     thermodynamics::EnthalpyTemperatureSolverConfig h2t_config{
         .tolerance = config_.numerical.solvers.h2t_tolerance,
-        .max_iterations = config_.numerical.solvers.h2t_max_iterations
+        .max_iterations = config_.numerical.solvers.h2t_max_iterations,
+        .max_bracket_expansions = config_.numerical.solvers.h2t_max_bracket_expansions
     };
     h2t_solver_ = std::make_unique<thermodynamics::EnthalpyTemperatureSolver>(
         mixture_, h2t_config
