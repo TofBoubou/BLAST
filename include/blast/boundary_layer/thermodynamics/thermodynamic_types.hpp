@@ -12,6 +12,7 @@ struct EnthalpyTemperatureSolverConfig {
     double relaxation_factor = 1.0;
     double min_temperature = 300.0;
     double max_temperature = 10000.0;
+    int max_bracket_expansions = 10;
 };
 
 struct TemperatureField {
