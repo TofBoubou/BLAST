@@ -458,6 +458,24 @@ auto BoundaryLayerSolver::create_initial_guess(
     
     equations::SolutionState guess(n_eta, n_species);
     
+    // Get wall composition from boundary conditions
+    std::vector<double> c_wall(n_species);
+    for (std::size_t j = 0; j < n_species; ++j) {
+        c_wall[j] = (j < bc.c_e().size()) ? bc.c_e()[j] : 0.0;
+    }
+    
+    // Compute wall enthalpy
+    auto h_wall_result = mixture_.mixture_enthalpy(c_wall, bc.Tw(), bc.P_e());
+    if (!h_wall_result) {
+        return std::unexpected(SolverError(
+            "Failed to compute wall enthalpy for initial guess: {}", 
+            std::source_location::current(), h_wall_result.error().message()
+        ));
+    }
+    const double h_wall = h_wall_result.value();
+    const double g_wall = h_wall / bc.he();  // Dimensionless wall enthalpy
+    const double g_edge = 1.0;               // Dimensionless edge enthalpy (h_e/h_e = 1)
+    
     // Initialize with reasonable profiles
     for (std::size_t i = 0; i < n_eta; ++i) {
         const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
@@ -466,11 +484,11 @@ auto BoundaryLayerSolver::create_initial_guess(
         // Boundary layer-like profiles
         guess.V[i] = 0.0; // Will be computed from continuity
         guess.F[i] = eta_norm * (2.0 - eta_norm); // Smooth profile
-        guess.g[i] = bc.Tw() / bc.he() + eta_norm * (1.0 - bc.Tw() / bc.he()); // Linear enthalpy
+        guess.g[i] = g_wall + eta_norm * (g_edge - g_wall); // Linear dimensionless enthalpy
         
         // Species from boundary conditions
         for (std::size_t j = 0; j < n_species; ++j) {
-            guess.c(j, i) = (j < bc.c_e().size()) ? bc.c_e()[j] : 0.0;
+            guess.c(j, i) = c_wall[j];  // Use consistent composition
         }
     }
     

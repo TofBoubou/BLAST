@@ -2,21 +2,21 @@ simulation:
   body_type: axisymmetric
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
-  consider_thermal_diffusion: true
-  chemical_non_equilibrium: true
+  consider_thermal_diffusion: false
+  chemical_non_equilibrium: false  
 
 numerical:
-  n_eta: 101
-  eta_max: 8.0
-  convergence_tolerance: 1.0e-6
-  max_iterations: 1000
-  under_relaxation: 0.5
+  n_eta: 51                       
+  eta_max: 6.0
+  convergence_tolerance: 1.0e-4    
+  max_iterations: 100
+  under_relaxation: 0.7
   step_control:
-    lower_bound: 10
-    upper_bound: 50
+    lower_bound: 5
+    upper_bound: 20
   solvers:
-    h2t_tolerance: 1.0e-8
-    h2t_max_iterations: 100
+    h2t_tolerance: 1.0e-6
+    h2t_max_iterations: 50
     stefan_tolerance: 1.0e-6
     stefan_max_iterations: 50
 
@@ -28,23 +28,22 @@ mixture:
 
 output:
   x_stations: [0.0]
-  output_directory: BLAST_outputs
+  output_directory: test_outputs
   generate_lookup_table: false
-  lookup_table:
-    temperature_min: 300.0
-    temperature_max: 3000.0
-    temperature_step: 100.0
-
-initial_guess:
-  use_initial_guess: false
 
 outer_edge:
   edge_points:
-    - {x: 0.0, radius: 1.0, velocity: 0.0, enthalpy: 1.0e6, pressure: 100.0, density: 1.0e-4, viscosity: 1.0e-5, species: [0.0, 0.0, 0.0, 0.767, 0.233]}
-  velocity_gradient_stagnation: 1000.0
-  freestream_density: 1.225
-  freestream_velocity: 1000.0
+    - x: 0.0
+      radius: 1.0
+      velocity: 0.0
+      enthalpy: 800000.0     # 800 kJ/kg - reasonable for hypersonic flow
+      pressure: 1000.0       # 1 kPa - typical for high altitude
+      density: 0.01          # kg/m³ - low density
+      viscosity: 2.0e-5      # Pa·s
+      species: [0.0, 0.0, 0.0, 0.767, 0.233]  # Air: mostly N2 and O2
+  velocity_gradient_stagnation: 100000.0  # 1/s - reasonable stagnation gradient
+  freestream_density: 0.01
+  freestream_velocity: 3000.0  # m/s - hypersonic
 
 wall_parameters:
-  temperatures: [300.0]
-  
+  temperatures: [500.0]  # K - hot wall temperature

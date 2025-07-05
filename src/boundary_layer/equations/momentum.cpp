@@ -104,4 +104,15 @@ auto build_momentum_coefficients(
 
 } // namespace detail
 
+// Explicit instantiations for common use cases
+template auto solve_momentum<double, double>(
+    std::span<const double> F_previous,
+    const coefficients::CoefficientSet& coeffs,
+    const conditions::BoundaryConditions& bc,
+    const coefficients::XiDerivatives& xi_der,
+    std::span<const double> V_field,
+    double xi,
+    double d_eta
+) -> std::expected<std::vector<double>, EquationError>;
+
 } // namespace blast::boundary_layer::equations

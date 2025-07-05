@@ -144,4 +144,11 @@ constexpr auto reduce_step_size(double current_xi, double& d_xi) noexcept -> dou
     return new_xi + d_xi;
 }
 
+// Explicit instantiations for common use cases
+template auto BoundaryLayerGrid::create_downstream_grid<const io::NumericalConfig&>(
+    const io::NumericalConfig& numerical_config,
+    const io::OuterEdgeConfig& edge_config,
+    const io::OutputConfig& output_config
+) -> std::expected<BoundaryLayerGrid, GridError>;
+
 } // namespace blast::boundary_layer::grid

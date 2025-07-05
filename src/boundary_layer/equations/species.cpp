@@ -347,4 +347,19 @@ auto compute_equilibrium_wall(
 
 } // namespace detail
 
+// Explicit instantiations for common use cases
+template auto solve_species<double>(
+    const core::Matrix<double>& c_previous,
+    const coefficients::CoefficientInputs& inputs,
+    const coefficients::CoefficientSet& coeffs,
+    const conditions::BoundaryConditions& bc,
+    const coefficients::XiDerivatives& xi_der,
+    const thermophysics::MixtureInterface& mixture,
+    const io::SimulationConfig& sim_config,
+    std::span<const double> F_field,
+    std::span<const double> V_field,
+    int station,
+    double d_eta
+) -> std::expected<core::Matrix<double>, EquationError>;
+
 } // namespace blast::boundary_layer::equations

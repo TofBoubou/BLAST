@@ -10,7 +10,7 @@ struct EnthalpyTemperatureSolverConfig {
     double tolerance = 1e-8;
     int max_iterations = 100;
     double relaxation_factor = 1.0;
-    double min_temperature = 1.0;
+    double min_temperature = 300.0;
     double max_temperature = 10000.0;
 };
 

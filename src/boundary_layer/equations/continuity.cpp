@@ -20,5 +20,6 @@ requires std::ranges::sized_range<VField> {
 
 // Explicit instantiations for common use cases
 template auto solve_continuity(std::span<const double>&&, double, double) noexcept -> std::vector<double>;
+template auto solve_continuity(std::vector<double>&, double, double) noexcept -> std::vector<double>;
 
 } // namespace blast::boundary_layer::equations
