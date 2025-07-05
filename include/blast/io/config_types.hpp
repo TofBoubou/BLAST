@@ -24,7 +24,6 @@ struct SimulationConfig {
     DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
     bool consider_thermal_diffusion = false;
     bool chemical_non_equilibrium = true;
-    bool catalysis = false;
 
 };
 

@@ -118,11 +118,7 @@ public:
         double temperature,
         double pressure
     ) const -> std::expected<std::vector<double>, ThermophysicsError> override;
-    
-    [[nodiscard]] auto surface_reaction_rates(
-        std::span<const double> partial_densities,
-        double wall_temperature
-    ) const -> std::expected<std::vector<double>, ThermophysicsError> override;
+
 };
 
 } // namespace blast::thermophysics

@@ -84,18 +84,17 @@ auto build_momentum_coefficients(
     coeffs_out.d.reserve(n_eta);
     
     for (std::size_t i = 0; i < n_eta; ++i) {
-        // a[i] = l0[i] * K_bl² / (d_eta²) --> K_bl = 1, so a[i] = l0[i] / d_eta²
+        // a[i] = l0[i] / d_eta²
         coeffs_out.a.push_back(coeffs.transport.l0[i] / d_eta_sq);
         
-        // b[i] = (dl0_deta[i] * K_bl² - V[i]) / d_eta --> K_bl = 1
+        // b[i] = (dl0_deta[i] - V[i]) / d_eta 
         coeffs_out.b.push_back((coeffs.transport.dl0_deta[i] - V_field[i]) / d_eta);
         
         // c[i] = -2*xi*lambda0*F[i]
         coeffs_out.c.push_back(-2.0 * xi * lambda0 * F_previous[i]);
         
-        // d[i] = -beta*rho_e/rho[i] + 2*xi*F[i]*F_der[i] - coeff_finite_thickness*0.5*rho_e/rho[i]
-        // Note: coeff_finite_thickness option not implemented yet, so skip that term
-        const double d_term = -bc.beta * bc.rho_e() / coeffs.thermodynamic.rho[i] + 
+        // d[i] = -beta*(rho_e/rho[i] - F[i]^2) + 2*xi*F[i]*F_der[i]
+        const double d_term = -bc.beta * (bc.rho_e() / coeffs.thermodynamic.rho[i] - F_previous[i] * F_previous[i]) + 
                              2.0 * xi * F_previous[i] * F_derivatives[i];
         coeffs_out.d.push_back(d_term);
     }

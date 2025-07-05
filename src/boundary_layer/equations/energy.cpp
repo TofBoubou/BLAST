@@ -96,10 +96,10 @@ auto build_energy_coefficients(
     
     for (std::size_t i = 0; i < n_eta; ++i) {
         
-        // a[i] = l3[i] * K_bl² / d_eta² --> K_bl = 1
+        // a[i] = l3[i] / d_eta²
         energy_coeffs.a.push_back(coeffs.transport.l3[i] / d_eta_sq);
         
-        // b[i] = (dl3_deta[i] * K_bl² - V[i]) / d_eta --> K_bl = 1
+        // b[i] = (dl3_deta[i] - V[i]) / d_eta
         energy_coeffs.b.push_back((coeffs.transport.dl3_deta[i] - V_field[i]) / d_eta);
         
         // c[i] = -2*xi*F[i]*d_he_dxi/he - 2*xi*F[i]*lambda0
@@ -108,19 +108,18 @@ auto build_energy_coefficients(
         energy_coeffs.c.push_back(c_term);
         
         // Compute species enthalpy terms
-        auto [tmp1, tmp2, tmp3] = compute_species_enthalpy_terms(
+        auto [tmp1, tmp2] = compute_species_enthalpy_terms(
             inputs, coeffs, bc, J_fact, i
         );
         
-        // d[i] = -ue²/he * [l0[i]*dF_deta[i]² * K_bl² - beta*rho_e/rho[i]*F[i]] + 
-        //        2*xi*F[i]*g_der[i] + tmp1*K_bl² + tmp2*K_bl + tmp3*K_bl
-        // With K_bl = 1:
+        // d[i] = -ue²/he * [l0[i]*dF_deta[i]² - beta*rho_e/rho[i]*F[i]] + 
+        //        2*xi*F[i]*g_der[i] + tmp1 + tmp2
         const double d_term = 
             -bc.ue() * bc.ue() / bc.he() * 
                 (coeffs.transport.l0[i] * dF_deta[i] * dF_deta[i] - 
                  bc.beta * bc.rho_e() / coeffs.thermodynamic.rho[i] * F_field[i]) +
             2.0 * xi * F_field[i] * g_derivatives[i] + 
-            tmp1 + tmp2 + tmp3;
+            tmp1 + tmp2;
         
         energy_coeffs.d.push_back(d_term);
     }
@@ -165,17 +164,15 @@ auto compute_species_enthalpy_terms(
     const conditions::BoundaryConditions& bc,
     double J_fact,
     std::size_t eta_index
-) -> std::tuple<double, double, double> {
+) -> std::tuple<double, double> {
     
     const auto n_species = inputs.c.rows();
     double tmp1 = 0.0;
     double tmp2 = 0.0;
-    double tmp3 = 0.0;
     
     for (std::size_t j = 0; j < n_species; ++j) {
         
         // tmp1: concentration and enthalpy derivative terms
-        // Note: dc_deta2 not available in new structure, so we skip that term
         const double dc_deta_j = inputs.dc_deta(j, eta_index);
         const double h_sp_j = coeffs.h_species(j, eta_index);
         const double dh_sp_deta_j = coeffs.dh_species_deta(j, eta_index);
@@ -190,27 +187,12 @@ auto compute_species_enthalpy_terms(
         const double dJ_deta_j = coeffs.diffusion.dJ_deta(j, eta_index);
         
         tmp2 += J_j * dh_sp_deta_j / bc.he() + dJ_deta_j * h_sp_j / bc.he();
-        
-        // tmp3: Dufour effect (thermal diffusion contribution)
-        // Only if consider_thermal_diffusion is enabled
-        if (coeffs.thermal_diffusion.tdr.rows() > 0) {
-            const double c_j = inputs.c(j, eta_index);
-            const double rho = coeffs.thermodynamic.rho[eta_index];
-            const double d_rho_deta = coeffs.thermodynamic.d_rho_deta[eta_index];
-            const double tdr_j = coeffs.thermal_diffusion.tdr(j, eta_index);
-            
-            // Simplified Dufour term (missing d_tdr_deta in new structure)
-            tmp3 += bc.P_e() / bc.he() * (tdr_j / (rho * c_j) * dJ_deta_j +
-                    tdr_j * J_j / (-std::pow(rho * c_j, 2)) * 
-                    (d_rho_deta * c_j + rho * dc_deta_j));
-        }
     }
     
     // Apply multiplication factors
     tmp2 *= J_fact;
-    tmp3 *= J_fact;
-    
-    return {tmp1, tmp2, tmp3};
+
+    return {tmp1, tmp2};
 }
 
 } // namespace detail

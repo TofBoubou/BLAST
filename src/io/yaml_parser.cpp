@@ -158,10 +158,6 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
             node, "chemical_non_equilibrium", true
         );
         
-        config.catalysis = extract_value<bool>(
-            node, "catalysis", false
-        );
-        
         return config;
         
     } catch (const core::ConfigurationError& e) {

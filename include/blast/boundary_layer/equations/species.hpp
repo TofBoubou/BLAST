@@ -13,7 +13,7 @@ namespace blast::boundary_layer::equations {
 
 // Solve species continuity equations: block tridiagonal system for c (mass fractions)
 // Equations: d/dη[J_j] + chemistry_terms = 0 for each species j
-// Boundary conditions: equilibrium wall or catalytic wall
+// Boundary conditions: equilibrium wall
 [[nodiscard]] auto solve_species(
     const core::Matrix<double>& c_previous,
     const coefficients::CoefficientInputs& inputs,

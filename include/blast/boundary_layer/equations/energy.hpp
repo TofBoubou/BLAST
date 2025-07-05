@@ -73,7 +73,7 @@ namespace detail {
         const conditions::BoundaryConditions& bc,
         double J_fact,
         std::size_t eta_index
-    ) -> std::tuple<double, double, double>;  // Returns {tmp1, tmp2, tmp3}
+    ) -> std::tuple<double, double>;  // Returns {tmp1, tmp2}
     
 } // namespace detail
 

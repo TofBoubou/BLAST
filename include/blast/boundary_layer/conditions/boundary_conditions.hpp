@@ -29,7 +29,6 @@ struct EdgeConditions {
 
 struct WallConditions {
     double temperature;
-    // std::optional<std::vector<double>> catalycity;  // Only if catalytic
 };
 
 struct BoundaryConditions {

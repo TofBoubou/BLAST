@@ -11,7 +11,7 @@
 namespace blast::boundary_layer::equations {
 
 // Solve momentum equation: tridiagonal system for F (dimensionless stream function)
-// Equation: d/dη[l0 * dF/dη] - V * dF/dη - 2ξλ₀F + d[i] = 0
+// Equation: d/dη[l0 * dF/dη] - V * dF/dη - 2ξλ₀FdF/dξ + d[i] = 0
 // Boundary condition: F(0) = 0 (no-slip wall)
 [[nodiscard]] auto solve_momentum(
     std::span<const double> F_previous,
@@ -45,9 +45,9 @@ namespace detail {
     
     // Momentum-specific boundary conditions
     struct MomentumBoundaryConditions {
-        double f_bc = 0.0;  // f coefficient: F(0) = 0
-        double g_bc = 1.0;  // g coefficient: F(0) = 0  
-        double h_bc = 0.0;  // h coefficient: F(0) = 0
+        double f_bc = 0.0; 
+        double g_bc = 1.0;  
+        double h_bc = 0.0;
     };
     
     [[nodiscard]] constexpr auto get_momentum_boundary_conditions() noexcept 

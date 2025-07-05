@@ -78,7 +78,6 @@ auto solve_species(
     
     auto result = solution_result.value();
     
-    // Apply charge neutrality if electrons are present
     if (mixture.has_electrons()) {
         apply_charge_neutrality(result, mixture);
     }
@@ -187,17 +186,16 @@ auto build_species_coefficients(
     for (std::size_t i = 0; i < n_eta; ++i) {
         for (std::size_t j = 0; j < n_species; ++j) {
             
-            // a[i][j] = -l0[i]*Le/Pr * K_bl² / d_eta² --> K_bl = 1
+            // a[i][j] = -l0[i]*Le/Pr / d_eta²
             species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr / d_eta_sq;
             
-            // b[i][j] = (V[i] - Le/Pr*dl0_deta[i] * K_bl²) / d_eta --> K_bl = 1
+            // b[i][j] = (V[i] - Le/Pr*dl0_deta[i]) / d_eta
             species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i]) / d_eta;
             
             // c[i][j] = 2*xi*F[i]*lambda0
             species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0;
             
-            // d[i][j] = -dJ_fake_deta[j][i] * K_bl² - dJ_deta[j][i]*J_fact*K_bl - 2*xi*c_der[j][i]*F[i]
-            // With K_bl = 1:
+            // d[i][j] = -dJ_fake_deta[j][i] - dJ_deta[j][i]*J_fact*K_bl - 2*xi*c_der[j][i]*F[i]
             const double d_term = 
                 -dJ_fake_deta(j, i) - 
                 coeffs.diffusion.dJ_deta(j, i) * factors.J_fact - 
@@ -242,31 +240,19 @@ auto build_species_boundary_conditions(
     // default to equilibrium wall
     const bool is_equilibrium_wall = true;  // Default
     
-    if (is_equilibrium_wall) {
-        // Equilibrium wall boundary conditions
-        for (std::size_t i = 0; i < n_species; ++i) {
-            boundary_conds.f_bc[i] = 0.0;
-            boundary_conds.g_bc[i] = 1.0;
-        }
-        
-        // Compute equilibrium composition at wall
-        auto eq_wall_result = compute_equilibrium_wall(bc, mixture);
-        if (!eq_wall_result) {
-            return std::unexpected(eq_wall_result.error());
-        }
-        
-        boundary_conds.h_bc = eq_wall_result.value();
-        
-    } else {
-        // Catalytic wall would be implemented here
-        // For now, use equilibrium wall as fallback
-        for (std::size_t i = 0; i < n_species; ++i) {
-            boundary_conds.f_bc[i] = 0.0;
-            boundary_conds.g_bc[i] = 1.0;
-            boundary_conds.h_bc[i] = c_wall(i, 0);  // Use current wall composition
-        }
+
+    for (std::size_t i = 0; i < n_species; ++i) {
+        boundary_conds.f_bc[i] = 0.0;
+        boundary_conds.g_bc[i] = 1.0;
     }
     
+    auto eq_wall_result = compute_equilibrium_wall(bc, mixture);
+    if (!eq_wall_result) {
+        return std::unexpected(eq_wall_result.error());
+    }
+    
+    boundary_conds.h_bc = eq_wall_result.value();
+        
     // Apply molecular weight normalization
     for (std::size_t i = 0; i < n_species; ++i) {
         const double Mw_i = mixture.species_molecular_weight(i);

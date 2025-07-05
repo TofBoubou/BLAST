@@ -4,7 +4,6 @@ simulation:
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: true
   chemical_non_equilibrium: true
-  catalysis: false
 
 numerical:
   n_eta: 101

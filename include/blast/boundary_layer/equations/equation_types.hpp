@@ -56,17 +56,6 @@ public:
                           Args&&... args) 
         : BlastException(std::format("Equation Error: {}", 
                         std::vformat(format_str, std::make_format_args(args...))), location) {}
-
-private:
-    template<typename... Args>
-    static std::string format_error_message(std::string_view format_str, Args&&... args) {
-        try {
-            return std::format("Equation Error: {}", 
-                             std::vformat(format_str, std::make_format_args(args...)));
-        } catch (...) {
-            return "Equation Error: Exception formatting failed";
-        }
-    }
 };
 
 } // namespace blast::boundary_layer::equations

@@ -465,39 +465,6 @@ auto MutationMixture::equilibrium_composition(
     }
 }
 
-auto MutationMixture::surface_reaction_rates(
-    std::span<const double> partial_densities,
-    double wall_temperature
-) const -> std::expected<std::vector<double>, ThermophysicsError> {
-    
-    if (partial_densities.size() != n_species_) {
-        return std::unexpected(ThermophysicsError("Invalid partial densities size"));
-    }
-    
-    if (wall_temperature <= 0.0) {
-        return std::unexpected(ThermophysicsError("Invalid wall temperature"));
-    }
-    
-    try {
-        // Set surface state
-        std::vector<double> rho_vec(partial_densities.begin(), partial_densities.end());
-        mixture_->setSurfaceState(rho_vec.data(), &wall_temperature, 1);
-        
-        std::vector<double> cat_flux(n_species_);
-        mixture_->surfaceReactionRates(cat_flux.data());
-        
-        // Change sign convention (production is positive in our interface)
-        std::ranges::transform(cat_flux, cat_flux.begin(), std::negate{});
-        
-        return cat_flux;
-        
-    } catch (const std::exception& e) {
-        return std::unexpected(ThermophysicsError(
-            std::format("Failed to compute surface rates: {}", e.what())
-        ));
-    }
-}
-
 // Factory function implementation
 auto create_mixture(const io::MixtureConfig& config) 
     -> std::expected<std::unique_ptr<MixtureInterface>, ThermophysicsError> {
