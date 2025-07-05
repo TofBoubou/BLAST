@@ -260,12 +260,11 @@ auto BoundaryLayerSolver::iterate_station(
         auto c_new = c_result.value();
         
         // 11. Apply relaxation
-        equations::SolutionState solution_new{
-            .V = solution.V, // Already updated
-            .F = std::move(F_new),
-            .g = std::move(g_new),
-            .c = std::move(c_new)
-        };
+        equations::SolutionState solution_new(n_eta, n_species);
+        solution_new.V = solution.V;
+        solution_new.F = std::move(F_new);
+        solution_new.g = std::move(g_new);
+        solution_new.c = std::move(c_new);
         
         solution = apply_relaxation(solution_old, solution_new, config_.numerical.under_relaxation);
         
@@ -285,15 +284,26 @@ auto BoundaryLayerSolver::solve_continuity_equation(
     const equations::SolutionState& solution
 ) -> std::expected<std::vector<double>, SolverError> {
     
-    // Compute y = -(2ξλ₀ + 1)F - 2ξ∂F/∂ξ (from diffusion.y calculation)
-    // For simplicity, use diffusion.y if available, otherwise compute
     const auto n_eta = grid_->n_eta();
     const double d_eta = grid_->d_eta();
     
-    // Simple y calculation for now - would use actual diffusion.y in real implementation
-    std::vector<double> y_field(n_eta, 0.0);
+    // Get current xi value and lambda0 from xi_derivatives
+    const double xi = (xi_derivatives_->station() == 0) ? 0.0 : 
+                      grid_->xi_coordinates()[xi_derivatives_->station()];
+    const double lambda0 = xi_derivatives_->lambda0();
+    const auto F_derivatives = xi_derivatives_->F_derivative();
+    
+    // Compute y field according to the formula:
+    // y[i] = -(2ξλ₀ + 1)F[i] - 2ξ∂F/∂ξ
+    std::vector<double> y_field(n_eta);
+    
+    for (std::size_t i = 0; i < n_eta; ++i) {
+        y_field[i] = -(2.0 * xi * lambda0 + 1.0) * solution.F[i] - 
+                      2.0 * xi * F_derivatives[i];
+    }
     
     // Integrate dV/dη = -y to get V
+    // Note: The negative sign is handled in the continuity equation solver
     return equations::solve_continuity(y_field, d_eta, 0.0);
 }
 
