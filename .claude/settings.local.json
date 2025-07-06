@@ -3,7 +3,13 @@
     "allow": [
       "Bash(cd:*)",
       "Bash(mkdir:*)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)",
+      "Bash(rg:*)",
+      "Bash(cd:*)"
     ],
     "deny": []
   }

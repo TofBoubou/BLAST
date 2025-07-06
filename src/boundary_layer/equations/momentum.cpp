@@ -94,7 +94,7 @@ auto build_momentum_coefficients(
         coeffs_out.c.push_back(-2.0 * xi * lambda0 * F_previous[i]);
         
         // d[i] = -beta*(rho_e/rho[i] - F[i]^2) + 2*xi*F[i]*F_der[i]
-        const double d_term = -bc.beta * (bc.rho_e() / coeffs.thermodynamic.rho[i] - F_previous[i] * F_previous[i]) + 
+        const double d_term = - bc.beta * (bc.rho_e() / coeffs.thermodynamic.rho[i] - F_previous[i] * F_previous[i]) + 
                              2.0 * xi * F_previous[i] * F_derivatives[i];
         coeffs_out.d.push_back(d_term);
     }

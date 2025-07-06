@@ -113,6 +113,9 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
         std::vector<double> c_local(n_species);
         for (std::size_t j = 0; j < n_species; ++j) {
             c_local[j] = inputs.c(j, i);
+            if (std::isnan(c_local[j]) || !std::isfinite(c_local[j])) {
+                std::cout << "NaN/Inf detected at eta=" << i << " species=" << j << " c=" << c_local[j] << std::endl;
+            }
         }
         
         // Get molecular weight

@@ -3,6 +3,7 @@
 #include <numeric>
 #include <cmath>
 #include <format>
+#include <iostream>
 
 namespace blast::thermophysics {
 
@@ -133,6 +134,7 @@ auto MutationMixture::mixture_molecular_weight(
     double sum = 0.0;
     for (std::size_t i = 0; i < n_species_; ++i) {
         sum += mass_fractions[i] / species_mw_[i];
+        // std::cout << sum << std::endl;
     }
     
     if (sum <= 0.0 || !std::isfinite(sum)) {

@@ -3,6 +3,7 @@
 #include "../conditions/boundary_conditions.hpp"
 #include "../../io/config_types.hpp"
 #include <cmath>
+#include <iostream>
 
 namespace blast::boundary_layer::equations {
 
@@ -18,11 +19,16 @@ namespace blast::boundary_layer::equations {
         // Stagnation point - factors depend on body type
         switch (sim_config.body_type) {
             case io::SimulationConfig::BodyType::Axisymmetric: {
-                const double sqrt_term = std::sqrt(2.0 * bc.rho_e() * bc.mu_e() * bc.d_ue_dx());
+                const double d_ue_dx_val = bc.d_ue_dx();
+                std::cout << "d_ue_dx = " << d_ue_dx_val << std::endl;
+                if (d_ue_dx_val == 0.0) {
+                    std::cout << "ERROR: d_ue_dx is zero!" << std::endl;
+                }
+                const double sqrt_term = std::sqrt(2.0 * bc.rho_e() * bc.mu_e() * d_ue_dx_val);
                 return GeometryFactors(
                     1.0 / sqrt_term,                    // Diffusion flux factor
-                    1.0 / (2.0 * bc.d_ue_dx()),        // Chemical production factor (missing /rho)
-                    std::sqrt(bc.rho_e() * bc.mu_e() / (2.0 * bc.d_ue_dx()))  // BC factor
+                    1.0 / (2.0 * d_ue_dx_val),        // Chemical production factor (missing /rho)
+                    std::sqrt(bc.rho_e() * bc.mu_e() / (2.0 * d_ue_dx_val))  // BC factor
                 );
             }
             case io::SimulationConfig::BodyType::TwoD: {

@@ -202,12 +202,15 @@ auto build_species_coefficients(
                 2.0 * xi * c_derivatives(j, i) * F_field[i];
             
             // Add chemical production terms if non-equilibrium
-            if (sim_config.chemical_non_equilibrium && coeffs.chemical.wi.rows() > 0) {
+/*             if (sim_config.chemical_non_equilibrium && coeffs.chemical.wi.rows() > 0) {
                 const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
                 species_coeffs.d(i, j) = d_term + wi_term;
             } else {
                 species_coeffs.d(i, j) = d_term;
-            }
+            } */
+
+            const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
+            species_coeffs.d(i, j) = d_term + wi_term;
             
             // Apply molecular weight normalization
             const double Mw_j = mixture.species_molecular_weight(j);
@@ -236,11 +239,6 @@ auto build_species_boundary_conditions(
     boundary_conds.g_bc.resize(n_species);
     boundary_conds.h_bc.resize(n_species);
     
-    // Check boundary condition type - since species_bc option not in new config,
-    // default to equilibrium wall
-    const bool is_equilibrium_wall = true;  // Default
-    
-
     for (std::size_t i = 0; i < n_species; ++i) {
         boundary_conds.f_bc[i] = 0.0;
         boundary_conds.g_bc[i] = 1.0;

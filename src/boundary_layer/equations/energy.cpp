@@ -139,8 +139,7 @@ auto build_energy_boundary_conditions(
         return EnergyBoundaryConditions{
             .f_bc = 0.0,
             .g_bc = 1.0, 
-            // .h_bc = coeffs.thermodynamic.h_wall / bc.he()
-            .h_bc = 1
+            .h_bc = coeffs.thermodynamic.h_wall / bc.he()
         };
 }
 

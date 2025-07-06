@@ -58,6 +58,7 @@ namespace detail {
         core::Matrix<double>& solution,
         int start_species
     );
+
 }
 
 } // namespace blast::boundary_layer::solvers
