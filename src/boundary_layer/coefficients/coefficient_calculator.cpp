@@ -643,11 +643,74 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::vector<double>
     return derivatives;
 }
 
+template<std::ranges::sized_range Range>
+auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<double> {
+    const auto n = std::ranges::size(values);
+    std::vector<double> second_derivatives(n);
+    
+    if (n < 5) {
+        // Simple finite differences for small arrays
+        if (n >= 3) {
+            second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / (d_eta * d_eta);
+            for (std::size_t i = 1; i < n - 1; ++i) {
+                second_derivatives[i] = (values[i-1] - 2.0 * values[i] + values[i+1]) / (d_eta * d_eta);
+            }
+            second_derivatives[n-1] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / (d_eta * d_eta);
+        }
+        return second_derivatives;
+    }
+    
+    // 5-point stencil for higher accuracy: f''(x) = [-f(x-2h) + 16f(x-h) - 30f(x) + 16f(x+h) - f(x+2h)]/(12h²)
+    const double dx2_12 = 12.0 * d_eta * d_eta;
+    
+    // Forward difference at boundaries
+    second_derivatives[0] = (2.0 * values[0] - 5.0 * values[1] + 4.0 * values[2] - values[3]) / (d_eta * d_eta);
+    second_derivatives[1] = (values[0] - 2.0 * values[1] + values[2]) / (d_eta * d_eta);
+    
+    // Central differences with 5-point stencil
+    for (std::size_t i = 2; i < n - 2; ++i) {
+        second_derivatives[i] = (-values[i-2] + 16.0 * values[i-1] - 30.0 * values[i] + 
+                               16.0 * values[i+1] - values[i+2]) / dx2_12;
+    }
+    
+    // Backward difference at boundaries
+    second_derivatives[n-2] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / (d_eta * d_eta);
+    second_derivatives[n-1] = (2.0 * values[n-1] - 5.0 * values[n-2] + 4.0 * values[n-3] - values[n-4]) / (d_eta * d_eta);
+    
+    return second_derivatives;
+}
+
+template<typename Matrix>
+auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) -> Matrix {
+    const auto n_rows = values.rows();
+    const auto n_cols = values.cols();
+    Matrix result(n_rows, n_cols);
+    
+    for (std::size_t i = 0; i < n_rows; ++i) {
+        std::vector<double> row_values(n_cols);
+        for (std::size_t j = 0; j < n_cols; ++j) {
+            row_values[j] = values(i, j);
+        }
+        auto row_derivatives = compute_eta_second_derivative(row_values, d_eta);
+        for (std::size_t j = 0; j < n_cols; ++j) {
+            result(i, j) = row_derivatives[j];
+        }
+    }
+    
+    return result;
+}
+
 // Explicit instantiations
 template auto compute_eta_derivative(std::span<const double>&&, double) -> std::vector<double>;
 template auto compute_eta_derivative(const std::vector<double>&, double) -> std::vector<double>;
 template auto compute_eta_derivative(std::vector<double>&&, double) -> std::vector<double>;
 template auto compute_eta_derivative(std::span<double>&&, double) -> std::vector<double>;
+
+template auto compute_eta_second_derivative(std::span<const double>&&, double) -> std::vector<double>;
+template auto compute_eta_second_derivative(const std::vector<double>&, double) -> std::vector<double>;
+template auto compute_eta_second_derivative(std::vector<double>&&, double) -> std::vector<double>;
+template auto compute_eta_second_derivative(std::vector<double>&, double) -> std::vector<double>;
+template auto compute_eta_second_derivative(std::span<double>&&, double) -> std::vector<double>;
 
 } // namespace derivatives
 

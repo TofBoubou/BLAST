@@ -70,9 +70,10 @@ struct CoefficientSet {
 struct CoefficientInputs {
     double xi;
     std::span<const double> F;
-    const core::Matrix<double>& c;       // Species concentrations [n_species x n_eta]
-    const core::Matrix<double>& dc_deta; // Concentration derivatives
-    std::span<const double> T;           // Temperature field
+    const core::Matrix<double>& c;        // Species concentrations [n_species x n_eta]
+    const core::Matrix<double>& dc_deta;  // First concentration derivatives
+    const core::Matrix<double>& dc_deta2; // Second concentration derivatives
+    std::span<const double> T;            // Temperature field
 };
 
 // Error type for coefficient calculations

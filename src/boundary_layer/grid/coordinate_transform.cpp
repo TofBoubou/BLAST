@@ -14,7 +14,6 @@ auto compute_physical_y_from_eta(
     PhysicalQuantity auto eta, // after a concept we need auto
     PhysicalQuantity auto xi,
     PhysicalQuantity auto rho_wall,
-    PhysicalQuantity auto K_bl,
     RhoData&& rho_eta,
     PhysicalQuantity auto d_eta,
     const io::SimulationConfig& sim_config,
@@ -47,7 +46,7 @@ auto compute_physical_y_from_eta(
         compute_stagnation_y_factor(sim_config, d_ue_dx, rho_e, mu_e) :
         std::sqrt(2.0 * xi) / (u_e * r_body);
     
-    return integral_result[eta_index] * y_factor / K_bl;
+    return integral_result[eta_index] * y_factor;
 }
 
 constexpr auto compute_derivative_factor(

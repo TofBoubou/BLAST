@@ -18,8 +18,20 @@ namespace derivatives {
         double d_eta
     ) -> std::vector<double>;
     
+    template<std::ranges::sized_range Range>
+    [[nodiscard]] auto compute_eta_second_derivative(
+        Range&& values,
+        double d_eta
+    ) -> std::vector<double>;
+    
     template<typename Matrix>
     [[nodiscard]] auto compute_matrix_eta_derivative(
+        const Matrix& values,
+        double d_eta
+    ) -> Matrix;
+    
+    template<typename Matrix>
+    [[nodiscard]] auto compute_matrix_eta_second_derivative(
         const Matrix& values,
         double d_eta
     ) -> Matrix;

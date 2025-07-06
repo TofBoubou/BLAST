@@ -136,26 +136,12 @@ auto build_energy_boundary_conditions(
     PhysicalQuantity auto d_eta
 ) -> EnergyBoundaryConditions {
     
-    // Check if thermal boundary condition option exists
-    // Since thermal_bc option is not in the new config, default to specified temperature
-    const bool is_adiabatic_wall = false;  // Default: specified temperature
-    
-    if (!is_adiabatic_wall) {
-        // Specified temperature at wall
-        return EnergyBoundaryConditions{
-            .f_bc = 0.0,
-            .g_bc = 1.0,
-            .h_bc = coeffs.thermodynamic.h_wall / bc.he()
-        };
-    } else {
-        // Adiabatic wall - this would need implementation
-        // For now, return specified temperature case
         return EnergyBoundaryConditions{
             .f_bc = 0.0,
             .g_bc = 1.0, 
-            .h_bc = coeffs.thermodynamic.h_wall / bc.he()
+            // .h_bc = coeffs.thermodynamic.h_wall / bc.he()
+            .h_bc = 1
         };
-    }
 }
 
 auto compute_species_enthalpy_terms(
@@ -174,12 +160,14 @@ auto compute_species_enthalpy_terms(
         
         // tmp1: concentration and enthalpy derivative terms
         const double dc_deta_j = inputs.dc_deta(j, eta_index);
+        const double dc_deta2_j = inputs.dc_deta2(j, eta_index);
         const double h_sp_j = coeffs.h_species(j, eta_index);
         const double dh_sp_deta_j = coeffs.dh_species_deta(j, eta_index);
         const double dl3_deta = coeffs.transport.dl3_deta[eta_index];
         const double l3 = coeffs.transport.l3[eta_index];
         
         tmp1 += dc_deta_j * h_sp_j / bc.he() * dl3_deta + 
+                l3 * h_sp_j / bc.he() * dc_deta2_j +                    // Missing term from original BLAST
                 l3 * dc_deta_j * dh_sp_deta_j / bc.he();
         
         // tmp2: diffusion flux terms

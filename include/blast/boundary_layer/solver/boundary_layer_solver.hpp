@@ -13,6 +13,15 @@
 
 namespace blast::boundary_layer::solver {
 
+// Structure to hold both first and second derivatives
+struct DerivativeState {
+    core::Matrix<double> dc_deta;   // First derivatives [n_species x n_eta]
+    core::Matrix<double> dc_deta2;  // Second derivatives [n_species x n_eta]
+    
+    DerivativeState(std::size_t n_species, std::size_t n_eta) 
+        : dc_deta(n_species, n_eta), dc_deta2(n_species, n_eta) {}
+};
+
 // Complete solution data for all stations
 struct SolutionResult {
     std::vector<equations::SolutionState> stations;
@@ -149,6 +158,16 @@ private:
     [[nodiscard]] auto compute_eta_derivatives(
         const equations::SolutionState& solution
     ) const -> std::expected<equations::SolutionState, SolverError>;
+    
+    [[nodiscard]] auto compute_concentration_derivatives(
+        const equations::SolutionState& solution
+    ) const -> std::expected<DerivativeState, SolverError>;
+    
+    // Enforce edge boundary conditions (critical for convergence)
+    auto enforce_edge_boundary_conditions(
+        equations::SolutionState& solution,
+        const conditions::BoundaryConditions& bc
+    ) const -> void;
 };
 
 } // namespace blast::boundary_layer::solver

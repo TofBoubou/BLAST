@@ -1,6 +1,7 @@
 #include "blast/boundary_layer/thermodynamics/enthalpy_temperature_solver.hpp"
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 namespace blast::boundary_layer::thermodynamics {
 
@@ -43,6 +44,8 @@ auto EnthalpyTemperatureSolver::brent_method(
         }
         return *h - target_enthalpy;
     };
+
+    // DEBUG: std::cout << target_enthalpy << std::endl;
     
     double a = temp_min;
     double b = temp_max;

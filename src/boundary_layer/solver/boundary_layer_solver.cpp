@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <iostream>
 
 namespace blast::boundary_layer::solver {
 
@@ -202,12 +203,20 @@ auto BoundaryLayerSolver::iterate_station(
         }
         auto solution_with_derivatives = derivatives_result.value();
         
+        // 2b. Compute concentration derivatives (first and second)
+        auto conc_derivatives_result = compute_concentration_derivatives(solution);
+        if (!conc_derivatives_result) {
+            return std::unexpected(conc_derivatives_result.error());
+        }
+        auto concentration_derivatives = conc_derivatives_result.value();
+        
         // 3. Create coefficient inputs
         coefficients::CoefficientInputs inputs{
             .xi = xi,
             .F = solution.F,
             .c = solution.c,
-            .dc_deta = solution_with_derivatives.c, // derivatives stored here temporarily
+            .dc_deta = concentration_derivatives.dc_deta,
+            .dc_deta2 = concentration_derivatives.dc_deta2,
             .T = temperature_field
         };
         
@@ -228,12 +237,22 @@ auto BoundaryLayerSolver::iterate_station(
         }
         auto F_new = F_result.value();
         
+        // 5.5. CRITICAL: Force F[edge] = 1.0 immediately after momentum solve
+        if (!F_new.empty()) {
+            F_new.back() = 1.0;  // Force dimensionless velocity = 1 at edge
+        }
+        
         // 6. Solve energy equation  
         auto g_result = solve_energy_equation(solution, inputs, coeffs, bc, station);
         if (!g_result) {
             return std::unexpected(g_result.error());
         }
         auto g_new = g_result.value();
+        
+        // 6.5. CRITICAL: Force boundary conditions BEFORE temperature update
+        if (!g_new.empty()) {
+            g_new.back() = 1.0;  // Force dimensionless enthalpy = 1 at edge
+        }
         
         // 7. Update temperature from enthalpy
         auto T_result = update_temperature_field(g_new, solution.c, bc, temperature_field);
@@ -259,13 +278,18 @@ auto BoundaryLayerSolver::iterate_station(
         }
         auto c_new = c_result.value();
         
-        // 11. Apply relaxation
+        // 11. Build new solution state
         equations::SolutionState solution_new(n_eta, n_species);
         solution_new.V = solution.V;
         solution_new.F = std::move(F_new);
         solution_new.g = std::move(g_new);
         solution_new.c = std::move(c_new);
         
+        // 11.5. CRITICAL: Enforce boundary conditions BEFORE relaxation (like old BLAST)
+        // This ensures the forced values are not corrupted by relaxation
+        enforce_edge_boundary_conditions(solution_new, bc);
+        
+        // 12. Apply relaxation AFTER enforcing boundary conditions
         solution = apply_relaxation(solution_old, solution_new, config_.numerical.under_relaxation);
         
         // 12. Check convergence
@@ -440,6 +464,8 @@ auto BoundaryLayerSolver::check_convergence(
         }
     }
     info.residual_c = std::sqrt(c_sum / c_count);
+
+    std::cout << info.residual_F << std::endl;
     
     info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
     
@@ -458,37 +484,35 @@ auto BoundaryLayerSolver::create_initial_guess(
     
     equations::SolutionState guess(n_eta, n_species);
     
-    // Get wall composition from boundary conditions
-    std::vector<double> c_wall(n_species);
-    for (std::size_t j = 0; j < n_species; ++j) {
-        c_wall[j] = (j < bc.c_e().size()) ? bc.c_e()[j] : 0.0;
+    // 🔥 CRITICAL: Use OLD BLAST initialization strategy for better convergence
+    
+    // Get equilibrium composition at wall conditions (like old BLAST)
+    std::vector<double> c_wall_equilibrium(n_species);
+    auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
+    if (!equilibrium_result) {
+        // Fallback to edge composition if equilibrium fails
+        for (std::size_t j = 0; j < n_species; ++j) {
+            c_wall_equilibrium[j] = (j < bc.c_e().size()) ? bc.c_e()[j] : 0.0;
+        }
+    } else {
+        c_wall_equilibrium = equilibrium_result.value();
     }
     
-    // Compute wall enthalpy
-    auto h_wall_result = mixture_.mixture_enthalpy(c_wall, bc.Tw(), bc.P_e());
-    if (!h_wall_result) {
-        return std::unexpected(SolverError(
-            "Failed to compute wall enthalpy for initial guess: {}", 
-            std::source_location::current(), h_wall_result.error().message()
-        ));
-    }
-    const double h_wall = h_wall_result.value();
-    const double g_wall = h_wall / bc.he();  // Dimensionless wall enthalpy
-    const double g_edge = 1.0;               // Dimensionless edge enthalpy (h_e/h_e = 1)
-    
-    // Initialize with reasonable profiles
+    // Initialize with OLD BLAST strategy (uniform profiles like old code when used=false)
     for (std::size_t i = 0; i < n_eta; ++i) {
         const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
         const double eta_norm = static_cast<double>(i) / (n_eta - 1);
         
-        // Boundary layer-like profiles
-        guess.V[i] = 0.0; // Will be computed from continuity
-        guess.F[i] = eta_norm * (2.0 - eta_norm); // Smooth profile
-        guess.g[i] = g_wall + eta_norm * (g_edge - g_wall); // Linear dimensionless enthalpy
+        // Boundary layer-like profiles  
+        // NOTE: V not initialized (like old BLAST) - will be computed from continuity
+        guess.F[i] = eta_norm * (2.0 - eta_norm); // Same as old BLAST
         
-        // Species from boundary conditions
+        // 🔥 LIKE OLD BLAST: Uniform enthalpy = 1.0 everywhere (not linear profile!)
+        guess.g[i] = 1.0;  // g = 1 everywhere, like old BLAST when used=false
+        
+        // 🔥 LIKE OLD BLAST: Uniform equilibrium composition everywhere
         for (std::size_t j = 0; j < n_species; ++j) {
-            guess.c(j, i) = c_wall[j];  // Use consistent composition
+            guess.c(j, i) = c_wall_equilibrium[j];  // Equilibrium composition everywhere
         }
     }
     
@@ -575,20 +599,93 @@ auto BoundaryLayerSolver::compute_eta_derivatives(
     derivatives.g = compute_derivative(solution.g);
     derivatives.V = compute_derivative(solution.V);
     
-    // Species derivatives
+    // Species derivatives - use the high-order derivative functions
+    using namespace coefficients::derivatives;
     for (std::size_t j = 0; j < n_species; ++j) {
         std::vector<double> c_row(n_eta);
         for (std::size_t i = 0; i < n_eta; ++i) {
             c_row[i] = solution.c(j, i);
         }
         
-        auto dc_deta = compute_derivative(c_row);
+        auto dc_deta = compute_eta_derivative(c_row, d_eta);
         for (std::size_t i = 0; i < n_eta; ++i) {
             derivatives.c(j, i) = dc_deta[i];
         }
     }
     
     return derivatives;
+}
+
+auto BoundaryLayerSolver::compute_concentration_derivatives(
+    const equations::SolutionState& solution
+) const -> std::expected<DerivativeState, SolverError> {
+    
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+    const double d_eta = grid_->d_eta();
+    
+    DerivativeState derivatives(n_species, n_eta);
+    
+    // Use high-order finite difference schemes for both first and second derivatives
+    using namespace coefficients::derivatives;
+    
+    for (std::size_t j = 0; j < n_species; ++j) {
+        std::vector<double> c_row(n_eta);
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            c_row[i] = solution.c(j, i);
+        }
+        
+        // Compute first derivatives
+        auto dc_deta = compute_eta_derivative(c_row, d_eta);
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            derivatives.dc_deta(j, i) = dc_deta[i];
+        }
+        
+        // Compute second derivatives
+        auto dc_deta2 = compute_eta_second_derivative(c_row, d_eta);
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            derivatives.dc_deta2(j, i) = dc_deta2[i];
+        }
+    }
+    
+    return derivatives;
+}
+
+auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
+    equations::SolutionState& solution,
+    const conditions::BoundaryConditions& bc
+) const -> void {
+    
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+    
+    if (n_eta == 0) return;
+    
+    const std::size_t edge_idx = n_eta - 1;  // Last eta point is the edge
+    
+    // 🔥 CRITICAL: Force edge boundary conditions like in old BLAST
+    // This ensures F = 1 and g = 1 at the edge, which is essential for convergence
+    solution.F[edge_idx] = 1.0;  // Dimensionless velocity must be 1 at edge
+    solution.g[edge_idx] = 1.0;  // Dimensionless enthalpy must be 1 at edge
+    
+    // Force species composition at edge
+    const auto& edge_composition = bc.c_e();
+    for (std::size_t j = 0; j < n_species && j < edge_composition.size(); ++j) {
+        solution.c(j, edge_idx) = edge_composition[j];
+    }
+    
+    // Ensure species mass conservation (normalize if needed)
+    double total_mass_fraction = 0.0;
+    for (std::size_t j = 0; j < n_species; ++j) {
+        total_mass_fraction += solution.c(j, edge_idx);
+    }
+    
+    // Normalize if total is significantly different from 1.0
+    if (std::abs(total_mass_fraction - 1.0) > 1e-12 && total_mass_fraction > 1e-12) {
+        for (std::size_t j = 0; j < n_species; ++j) {
+            solution.c(j, edge_idx) /= total_mass_fraction;
+        }
+    }
 }
 
 } // namespace blast::boundary_layer::solver

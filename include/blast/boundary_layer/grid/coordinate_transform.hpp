@@ -126,7 +126,6 @@ template<PhysicalRange RhoData>
     PhysicalQuantity auto eta,
     PhysicalQuantity auto xi,
     PhysicalQuantity auto rho_wall,
-    PhysicalQuantity auto K_bl,
     RhoData&& rho_eta,
     PhysicalQuantity auto d_eta,
     const io::SimulationConfig& sim_config,

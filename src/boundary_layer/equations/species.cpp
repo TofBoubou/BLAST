@@ -195,7 +195,7 @@ auto build_species_coefficients(
             // c[i][j] = 2*xi*F[i]*lambda0
             species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0;
             
-            // d[i][j] = -dJ_fake_deta[j][i] - dJ_deta[j][i]*J_fact*K_bl - 2*xi*c_der[j][i]*F[i]
+            // d[i][j] = -dJ_fake_deta[j][i] - dJ_deta[j][i]*J_fact - 2*xi*c_der[j][i]*F[i]
             const double d_term = 
                 -dJ_fake_deta(j, i) - 
                 coeffs.diffusion.dJ_deta(j, i) * factors.J_fact - 
