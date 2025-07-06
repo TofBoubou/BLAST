@@ -49,18 +49,38 @@ auto EnthalpyTemperatureSolver::brent_method(
     
     double a = temp_min;
     double b = temp_max;
-    
+
     auto fa_result = enthalpy_residual(a);
     if (!fa_result) return std::unexpected(fa_result.error());
     double fa = *fa_result;
-    
+
     auto fb_result = enthalpy_residual(b);
     if (!fb_result) return std::unexpected(fb_result.error());
     double fb = *fb_result;
-    
+
     if (fa * fb > 0) {
-        return std::unexpected(ThermodynamicSolverError(
-            "Root not bracketed: f({})={}, f({})={}", std::source_location::current(), a, fa, b, fb));
+        // Attempt to expand the bracketing interval
+        for (int i = 0; i < config_.max_bracket_expansions && fa * fb > 0; ++i) {
+            if (fa > 0 && fb > 0) {
+                // Root lies below the current lower bound
+                a = std::max(1.0, a * 0.5);
+                auto fa_res = enthalpy_residual(a);
+                if (!fa_res) return std::unexpected(fa_res.error());
+                fa = *fa_res;
+            } else if (fa < 0 && fb < 0) {
+                // Root lies above the current upper bound
+                b *= 2.0;
+                auto fb_res = enthalpy_residual(b);
+                if (!fb_res) return std::unexpected(fb_res.error());
+                fb = *fb_res;
+            }
+        }
+
+        if (fa * fb > 0) {
+            return std::unexpected(ThermodynamicSolverError(
+                "Root not bracketed: f({})={}, f({})={}",
+                std::source_location::current(), a, fa, b, fb));
+        }
     }
     
     bool mflag = true;
