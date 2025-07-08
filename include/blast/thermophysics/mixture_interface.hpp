@@ -11,7 +11,8 @@
 namespace blast::thermophysics {
 
 namespace constants {
-    inline constexpr double R_universal = 8314.46261815324; // J/(kmol·K)
+    inline constexpr double R_universal = 8.31446261815324; // J/(kmol·K)
+    // inline constexpr double R_universal = 0; // J/(kmol·K)
     inline constexpr double k_Boltzmann = 1.380649e-23;     // J/K
     inline constexpr double N_Avogadro = 6.02214076e23;     // 1/mol
     inline constexpr double Pi = 3.14159265358979323846;
