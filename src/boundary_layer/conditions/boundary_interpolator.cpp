@@ -1,4 +1,5 @@
 #include "blast/boundary_layer/conditions/boundary_interpolator.hpp"
+#include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include <algorithm>
 #include <format>
 #include <expected>
@@ -7,6 +8,7 @@ namespace blast::boundary_layer::conditions {
 
 using blast::boundary_layer::grid::coordinate_transform::search_interval;
 using blast::boundary_layer::grid::coordinate_transform::linear_interpolate;
+using blast::boundary_layer::grid::coordinate_transform::hermite_interpolate;
 
 namespace {
     
@@ -26,6 +28,26 @@ template<typename Container>
                              values[i1], values[i2]);
 }
 
+// Overload with optional derivatives for Hermite interpolation
+template<typename Container>
+[[nodiscard]] auto interpolate_property(
+    const Container& values,
+    std::size_t i1,
+    std::size_t i2,
+    const std::vector<double>& x_grid,
+    double x_target,
+    const Container& derivatives
+) -> double {
+    
+    if (i1 == i2) return values[i1];
+    
+    // Use Hermite interpolation when derivatives are available
+    return hermite_interpolate(x_target,
+                              x_grid[i1], x_grid[i2],
+                              values[i1], values[i2],
+                              derivatives[i1], derivatives[i2]);
+}
+
 template<typename MemberPtr>
 [[nodiscard]] auto extract_edge_property(
     const std::vector<io::OuterEdgeConfig::EdgePoint>& points,
@@ -39,6 +61,59 @@ template<typename MemberPtr>
         [member_ptr](const auto& point) { return point.*member_ptr; });
     
     return result;
+}
+
+// Compute derivatives reusing existing high-order function
+[[nodiscard]] auto compute_property_derivatives(
+    const std::vector<double>& values,
+    const std::vector<double>& x_grid
+) -> std::vector<double> {
+    
+    if (values.size() != x_grid.size() || values.size() < 2) {
+        std::vector<double> derivatives(values.size(), 0.0);
+        return derivatives;
+    }
+    
+    // Check if grid is uniform (within tolerance)
+    constexpr double tolerance = 1e-12;
+    bool is_uniform = true;
+    const double dx_first = x_grid[1] - x_grid[0];
+    
+    for (std::size_t i = 2; i < x_grid.size(); ++i) {
+        const double dx_current = x_grid[i] - x_grid[i-1];
+        if (std::abs(dx_current - dx_first) > tolerance) {
+            is_uniform = false;
+            break;
+        }
+    }
+    
+    if (is_uniform) {
+        // Reuse existing high-order O(h^4) function for uniform grids
+        return coefficients::derivatives::compute_eta_derivative(values, dx_first);
+    } else {
+        // Handle non-uniform grids with weighted central differences
+        const auto n = values.size();
+        std::vector<double> derivatives(n);
+        
+        // Forward difference at start
+        derivatives[0] = (values[1] - values[0]) / (x_grid[1] - x_grid[0]);
+        
+        // Central differences in interior
+        for (std::size_t i = 1; i < n - 1; ++i) {
+            const double dx_left = x_grid[i] - x_grid[i-1];
+            const double dx_right = x_grid[i+1] - x_grid[i];
+            const double dx_total = x_grid[i+1] - x_grid[i-1];
+            
+            // Weighted central difference for non-uniform grids
+            derivatives[i] = ((values[i+1] - values[i]) / dx_right * dx_left +
+                             (values[i] - values[i-1]) / dx_left * dx_right) / dx_total;
+        }
+        
+        // Backward difference at end
+        derivatives[n-1] = (values[n-1] - values[n-2]) / (x_grid[n-1] - x_grid[n-2]);
+        
+        return derivatives;
+    }
 }
 
 } 
@@ -152,24 +227,33 @@ auto interpolate_boundary_conditions(
     
     const auto [ix1, ix2] = x_interval_result.value();
     
-    auto interp = [&](auto member_ptr) {
+    // Lambda for standard linear interpolation
+    auto interp_linear = [&](auto member_ptr) {
         auto values = extract_edge_property(edge_config.edge_points, member_ptr);
         return interpolate_property(values, ix1, ix2, x_grid, x_interp);
     };
     
-    // Interpolate all edge properties
+    // Lambda for high-accuracy Hermite interpolation (for critical properties)
+    auto interp_hermite = [&](auto member_ptr) {
+        auto values = extract_edge_property(edge_config.edge_points, member_ptr);
+        auto derivatives = compute_property_derivatives(values, x_grid);
+        return interpolate_property(values, ix1, ix2, x_grid, x_interp, derivatives);
+    };
+    
+    // Interpolate edge properties with appropriate method
+    // Use Hermite for critical properties with strong gradients
     EdgeConditions edge{
-        .pressure = interp(&io::OuterEdgeConfig::EdgePoint::pressure),
-        .viscosity = interp(&io::OuterEdgeConfig::EdgePoint::viscosity),
-        .velocity = interp(&io::OuterEdgeConfig::EdgePoint::velocity),
-        .enthalpy = interp(&io::OuterEdgeConfig::EdgePoint::enthalpy),
-        .density = interp(&io::OuterEdgeConfig::EdgePoint::density),
-        .species_fractions = {}, // Handle separately
+        .pressure = interp_hermite(&io::OuterEdgeConfig::EdgePoint::pressure),    // Critical: strong gradients
+        .viscosity = interp_linear(&io::OuterEdgeConfig::EdgePoint::viscosity),   // Linear sufficient
+        .velocity = interp_hermite(&io::OuterEdgeConfig::EdgePoint::velocity),    // Critical: momentum boundary layer
+        .enthalpy = interp_hermite(&io::OuterEdgeConfig::EdgePoint::enthalpy),    // Critical: energy boundary layer
+        .density = interp_hermite(&io::OuterEdgeConfig::EdgePoint::density),      // Critical: compressible flow
+        .species_fractions = {}, // Handle separately with Hermite below
         .d_xi_dx = 0.0,  // TODO: Compute from grid
-        .d_ue_dx = 0.0,  // TODO: Compute derivative
-        .d_he_dx = 0.0,  // TODO: Compute derivative
+        .d_ue_dx = 0.0,  // TODO: Compute derivative with Hermite
+        .d_he_dx = 0.0,  // TODO: Compute derivative with Hermite
         .d_he_dxi = 0.0,
-        .body_radius = interp(&io::OuterEdgeConfig::EdgePoint::radius)
+        .body_radius = interp_linear(&io::OuterEdgeConfig::EdgePoint::radius)     // Linear sufficient
     };
     
     // Handle species interpolation
@@ -182,15 +266,18 @@ auto interpolate_boundary_conditions(
             for (const auto& point : edge_config.edge_points) {
                 species_values.push_back(point.species_fractions[s]);
             }
+            // Use Hermite for species fractions (critical for chemical accuracy)
+            auto species_derivatives = compute_property_derivatives(species_values, x_grid);
             edge.species_fractions[s] = interpolate_property(
-                species_values, ix1, ix2, x_grid, x_interp
+                species_values, ix1, ix2, x_grid, x_interp, species_derivatives
             );
         }
     }
     
-    // Interpolate wall temperature
+    // Interpolate wall temperature using Hermite (critical for thermal boundary layer)
+    auto wall_temp_derivatives = compute_property_derivatives(wall_config.wall_temperatures, x_grid);
     const double wall_temp = interpolate_property(
-        wall_config.wall_temperatures, ix1, ix2, x_grid, x_interp
+        wall_config.wall_temperatures, ix1, ix2, x_grid, x_interp, wall_temp_derivatives
     );
     
     WallConditions wall{

@@ -158,6 +158,37 @@ template<PhysicalRange RhoData>
     return (std::abs(x2 - x1) < epsilon) ? y1 : y1 + (y2 - y1) * (x - x1) / (x2 - x1);
 }
 
+// Hermite interpolation with derivatives for higher accuracy O(h^4)
+[[nodiscard]] constexpr auto hermite_interpolate(
+    std::floating_point auto x,
+    std::floating_point auto x1,
+    std::floating_point auto x2,
+    std::floating_point auto y1,
+    std::floating_point auto y2,
+    std::floating_point auto dy1,  // derivative at x1
+    std::floating_point auto dy2   // derivative at x2
+) noexcept -> double {
+    constexpr auto epsilon = 1e-15;
+    
+    // Handle degenerate case
+    if (std::abs(x2 - x1) < epsilon) {
+        return y1;
+    }
+    
+    const double h = x2 - x1;
+    const double t = (x - x1) / h;
+    const double t2 = t * t;
+    const double t3 = t2 * t;
+    
+    // Hermite basis functions
+    const double h00 = 2.0 * t3 - 3.0 * t2 + 1.0;      // (1,0) at x1
+    const double h10 = t3 - 2.0 * t2 + t;               // (0,1) at x1
+    const double h01 = -2.0 * t3 + 3.0 * t2;            // (1,0) at x2
+    const double h11 = t3 - t2;                          // (0,1) at x2
+    
+    return h00 * y1 + h10 * h * dy1 + h01 * y2 + h11 * h * dy2;
+}
+
 
 template<std::ranges::random_access_range Grid>
 [[nodiscard]] auto search_interval(Grid&& grid, std::floating_point auto target) noexcept

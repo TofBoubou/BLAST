@@ -1,10 +1,66 @@
 ﻿
 #include "blast/boundary_layer/grid/grid.hpp"
+#include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include <algorithm>
 #include <numeric>
 #include <ranges>
 
 namespace blast::boundary_layer::grid {
+
+namespace {
+    // Helper function to compute coordinate derivatives for Hermite interpolation
+    template<typename CoordGrid>
+    [[nodiscard]] auto compute_coordinate_derivatives(
+        const CoordGrid& coord_values,
+        const std::vector<double>& grid_spacing
+    ) -> std::vector<double> {
+        
+        if (coord_values.size() != grid_spacing.size() || coord_values.size() < 2) {
+            return std::vector<double>(coord_values.size(), 0.0);
+        }
+        
+        // Check if grid spacing is uniform
+        constexpr double tolerance = 1e-12;
+        bool is_uniform = true;
+        const double dx_first = grid_spacing[1] - grid_spacing[0];
+        
+        for (std::size_t i = 2; i < grid_spacing.size(); ++i) {
+            const double dx_current = grid_spacing[i] - grid_spacing[i-1];
+            if (std::abs(dx_current - dx_first) > tolerance) {
+                is_uniform = false;
+                break;
+            }
+        }
+        
+        if (is_uniform) {
+            // Reuse high-order function for uniform grids
+            return coefficients::derivatives::compute_eta_derivative(coord_values, dx_first);
+        } else {
+            // Handle non-uniform grids
+            const auto n = coord_values.size();
+            std::vector<double> derivatives(n);
+            
+            // Forward difference at start
+            derivatives[0] = (coord_values[1] - coord_values[0]) / (grid_spacing[1] - grid_spacing[0]);
+            
+            // Central differences in interior
+            for (std::size_t i = 1; i < n - 1; ++i) {
+                const double dx_left = grid_spacing[i] - grid_spacing[i-1];
+                const double dx_right = grid_spacing[i+1] - grid_spacing[i];
+                const double dx_total = grid_spacing[i+1] - grid_spacing[i-1];
+                
+                derivatives[i] = ((coord_values[i+1] - coord_values[i]) / dx_right * dx_left +
+                                 (coord_values[i] - coord_values[i-1]) / dx_left * dx_right) / dx_total;
+            }
+            
+            // Backward difference at end
+            derivatives[n-1] = (coord_values[n-1] - coord_values[n-2]) / 
+                              (grid_spacing[n-1] - grid_spacing[n-2]);
+            
+            return derivatives;
+        }
+    }
+}
 
 template<GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_downstream_grid(
@@ -90,8 +146,20 @@ auto BoundaryLayerGrid::generate_xi_output_distribution(
         }
         
         const auto [i1, i2] = interval_result.value();
-        const auto xi_out = (i1 == i2) ? xi_[i1] : 
-            coordinate_transform::linear_interpolate(x_out, x_edge[i1], x_edge[i2], xi_[i1], xi_[i2]);
+        
+        // Use Hermite interpolation for coordinate transformation (higher geometric accuracy)
+        const auto xi_out = [&]() -> double {
+            if (i1 == i2) return xi_[i1];
+            
+            // Compute derivatives for Hermite interpolation
+            std::vector<double> x_edge_vec(x_edge.begin(), x_edge.end());
+            auto xi_derivatives = compute_coordinate_derivatives(xi_, x_edge_vec);
+            
+            return coordinate_transform::hermite_interpolate(
+                x_out, x_edge[i1], x_edge[i2], xi_[i1], xi_[i2],
+                xi_derivatives[i1], xi_derivatives[i2]
+            );
+        }();
         
         xi_output_.emplace_back(xi_out);
     }
@@ -118,8 +186,19 @@ auto BoundaryLayerGrid::interpolate_x_from_xi(double xi_target, XGrid&& x_grid) 
     }
     
     const auto [i1, i2] = interval_result.value();
-    return (i1 == i2) ? x_grid[i1] : 
-        coordinate_transform::linear_interpolate(xi_target, xi_[i1], xi_[i2], x_grid[i1], x_grid[i2]);
+    
+    // Use Hermite interpolation for coordinate transformation (higher geometric accuracy)
+    if (i1 == i2) return x_grid[i1];
+    
+    // Compute derivatives for Hermite interpolation
+    std::vector<double> x_values(x_grid.size());
+    std::copy(x_grid.begin(), x_grid.end(), x_values.begin());
+    auto x_derivatives = compute_coordinate_derivatives(x_values, xi_);
+    
+    return coordinate_transform::hermite_interpolate(
+        xi_target, xi_[i1], xi_[i2], x_grid[i1], x_grid[i2],
+        x_derivatives[i1], x_derivatives[i2]
+    );
 }
 
 constexpr auto compute_xi_step_size( // see if it can be better
