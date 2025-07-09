@@ -6,11 +6,11 @@ simulation:
   chemical_non_equilibrium: false  
 
 numerical:
-  n_eta: 200                       
+  n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-8    
-  max_iterations: 100000
-  under_relaxation: 0.1
+  max_iterations: 1000
+  under_relaxation: 1
   step_control:
     lower_bound: 5
     upper_bound: 20

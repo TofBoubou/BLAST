@@ -56,6 +56,15 @@ struct BoundaryConditions {
         return edge.species_fractions; 
     }
     
+    // Dynamic update methods for thermodynamic consistency
+    void update_edge_density(double new_density) noexcept {
+        edge.density = new_density;
+    }
+    
+    void update_edge_viscosity(double new_viscosity) noexcept {
+        edge.viscosity = new_viscosity;
+    }
+    
 };
 
 class BoundaryConditionError : public core::BlastException {

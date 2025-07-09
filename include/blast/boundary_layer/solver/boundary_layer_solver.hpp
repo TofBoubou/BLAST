@@ -168,6 +168,13 @@ private:
         equations::SolutionState& solution,
         const conditions::BoundaryConditions& bc
     ) const -> void;
+    
+    // Dynamic edge properties update for thermodynamic consistency
+    auto update_edge_properties(
+        conditions::BoundaryConditions& bc,
+        const coefficients::CoefficientInputs& inputs,
+        const core::Matrix<double>& species_matrix
+    ) const -> void;
 };
 
 } // namespace blast::boundary_layer::solver

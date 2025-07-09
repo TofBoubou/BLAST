@@ -209,11 +209,15 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         // Compute coefficients
         transport.l0.push_back(thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()));
         transport.l3.push_back(transport.l0[i] / Pr);
+
+        // std::cout << transport.l0[i] << std::endl;
     }
     
     // Compute derivatives
     transport.dl0_deta = derivatives::compute_eta_derivative(transport.l0, d_eta_);
     transport.dl3_deta = derivatives::compute_eta_derivative(transport.l3, d_eta_);
+
+    
     
     return transport;
 }

@@ -178,8 +178,11 @@ auto BoundaryLayerSolver::iterate_station(
     const auto n_species = mixture_.n_species();
     std::vector<double> temperature_field(n_eta);
     
+    // Create a mutable copy of boundary conditions for dynamic updates
+    auto bc_dynamic = bc;
+    
     // Initialize temperature field from wall temperature
-    std::ranges::fill(temperature_field, bc.Tw());
+    std::ranges::fill(temperature_field, bc_dynamic.Tw());
     
     ConvergenceInfo conv_info;
     
@@ -221,7 +224,7 @@ auto BoundaryLayerSolver::iterate_station(
         };
         
         // 4. Calculate all coefficients
-        auto coeffs_result = coeff_calculator_->calculate(inputs, bc, *xi_derivatives_);
+        auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
         if (!coeffs_result) {
             return std::unexpected(SolverError(
                 "Coefficient calculation failed at station {} iteration {}: {}", 
@@ -231,7 +234,7 @@ auto BoundaryLayerSolver::iterate_station(
         auto coeffs = coeffs_result.value();
         
         // 5. Solve momentum equation
-        auto F_result = solve_momentum_equation(solution, coeffs, bc, xi);
+        auto F_result = solve_momentum_equation(solution, coeffs, bc_dynamic, xi);
         if (!F_result) {
             return std::unexpected(F_result.error());
         }
@@ -243,7 +246,7 @@ auto BoundaryLayerSolver::iterate_station(
         }
         
         // 6. Solve energy equation  
-        auto g_result = solve_energy_equation(solution, inputs, coeffs, bc, station);
+        auto g_result = solve_energy_equation(solution, inputs, coeffs, bc_dynamic, station);
         if (!g_result) {
             return std::unexpected(g_result.error());
         }
@@ -255,7 +258,7 @@ auto BoundaryLayerSolver::iterate_station(
         }
         
         // 7. Update temperature from enthalpy
-        auto T_result = update_temperature_field(g_new, solution.c, bc, temperature_field);
+        auto T_result = update_temperature_field(g_new, solution.c, bc_dynamic, temperature_field);
         if (!T_result) {
             return std::unexpected(T_result.error());
         }
@@ -264,15 +267,18 @@ auto BoundaryLayerSolver::iterate_station(
         // 8. Update inputs with new temperature
         inputs.T = temperature_field;
         
+        // 8.5. Update edge properties dynamically for thermodynamic consistency
+        update_edge_properties(bc_dynamic, inputs, solution.c);
+        
         // 9. Recalculate coefficients with updated temperature
-        auto coeffs_updated_result = coeff_calculator_->calculate(inputs, bc, *xi_derivatives_);
+        auto coeffs_updated_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
         if (!coeffs_updated_result) {
             return std::unexpected(SolverError("Coefficient recalculation failed"));
         }
         coeffs = coeffs_updated_result.value();
         
         // 10. Solve species equations
-        auto c_result = solve_species_equations(solution, inputs, coeffs, bc, station);
+        auto c_result = solve_species_equations(solution, inputs, coeffs, bc_dynamic, station);
         if (!c_result) {
             return std::unexpected(c_result.error());
         }
@@ -287,7 +293,7 @@ auto BoundaryLayerSolver::iterate_station(
         
         // 11.5. CRITICAL: Enforce boundary conditions BEFORE relaxation (like old BLAST)
         // This ensures the forced values are not corrupted by relaxation
-        enforce_edge_boundary_conditions(solution_new, bc);
+        enforce_edge_boundary_conditions(solution_new, bc_dynamic);
         
         // 12. Apply relaxation AFTER enforcing boundary conditions
         solution = apply_relaxation(solution_old, solution_new, config_.numerical.under_relaxation);
@@ -686,6 +692,51 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
             solution.c(j, edge_idx) /= total_mass_fraction;
         }
     }
+}
+
+auto BoundaryLayerSolver::update_edge_properties(
+    conditions::BoundaryConditions& bc,
+    const coefficients::CoefficientInputs& inputs,
+    const core::Matrix<double>& species_matrix
+) const -> void {
+    
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+    
+    if (n_eta == 0 || inputs.T.empty()) {
+        return; // No data to update
+    }
+    
+    // Get edge conditions (last point in eta grid)
+    const auto edge_idx = n_eta - 1;
+    const double T_edge = inputs.T[edge_idx];
+    const double P_edge = bc.P_e(); // Pressure remains constant
+    
+    // Get edge composition
+    std::vector<double> edge_composition(n_species);
+    for (std::size_t j = 0; j < n_species; ++j) {
+        edge_composition[j] = species_matrix(j, edge_idx);
+    }
+    
+    // Calculate new edge density using equation of state
+    auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
+    if (!MW_result) {
+        return; // Keep current values if calculation fails
+    }
+    const double MW_edge = MW_result.value();
+    const double rho_e_new = P_edge * MW_edge / 
+                            (T_edge * thermophysics::constants::R_universal);
+    
+    // Calculate new edge viscosity using mixture properties
+    auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);
+    if (!mu_result) {
+        return; // Keep current values if calculation fails
+    }
+    const double mu_e_new = mu_result.value();
+    
+    // Update boundary conditions with new values
+    bc.update_edge_density(rho_e_new);
+    bc.update_edge_viscosity(mu_e_new);
 }
 
 } // namespace blast::boundary_layer::solver
