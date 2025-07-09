@@ -291,7 +291,7 @@ auto BoundaryLayerSolver::iterate_station(
         solution_new.g = std::move(g_new);
         solution_new.c = std::move(c_new);
         
-        // 11.5. CRITICAL: Enforce boundary conditions BEFORE relaxation (like old BLAST)
+        // 11.5. CRITICAL: Enforce boundary conditions BEFORE relaxation
         // This ensures the forced values are not corrupted by relaxation
         enforce_edge_boundary_conditions(solution_new, bc_dynamic);
         
@@ -490,7 +490,7 @@ auto BoundaryLayerSolver::create_initial_guess(
     
     equations::SolutionState guess(n_eta, n_species);
     
-    // Get equilibrium composition at wall conditions (like old BLAST)
+    // Get equilibrium composition at wall conditions
     std::vector<double> c_wall_equilibrium(n_species);
     auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
     if (!equilibrium_result) {
