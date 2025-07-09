@@ -11,10 +11,9 @@
 namespace blast::thermophysics {
 
 namespace constants {
-    inline constexpr double R_universal = 8.31446261815324; // J/(kmol·K)
-    // inline constexpr double R_universal = 0; // J/(kmol·K)
-    inline constexpr double k_Boltzmann = 1.380649e-23;     // J/K
-    inline constexpr double N_Avogadro = 6.02214076e23;     // 1/mol
+    inline constexpr double R_universal = 8.31446261815324; 
+    inline constexpr double k_Boltzmann = 1.380649e-23;    
+    inline constexpr double N_Avogadro = 6.02214076e23;    
     inline constexpr double Pi = 3.14159265358979323846;
 }
 
@@ -29,7 +28,7 @@ public:
 // Abstract interface for mixture properties
 class MixtureInterface {
 public:
-    virtual ~MixtureInterface() = default; // We make a virtual destructor to delete pointers to the class. MixtureInterface* ptr = new DerivedMixture(); delete ptr;
+    virtual ~MixtureInterface() = default;
     
     // Species information
     [[nodiscard]] virtual auto n_species() const noexcept -> std::size_t = 0;

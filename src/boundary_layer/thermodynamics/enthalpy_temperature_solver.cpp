@@ -44,8 +44,6 @@ auto EnthalpyTemperatureSolver::brent_method(
         }
         return *h - target_enthalpy;
     };
-
-    // DEBUG: std::cout << target_enthalpy << std::endl;
     
     double a = temp_min;
     double b = temp_max;

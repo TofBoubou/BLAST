@@ -11,7 +11,7 @@
 namespace blast::boundary_layer::grid::coordinate_transform {
 using blast::core::TransformError;
 
-// Simpson integration constants (no more magic numbers!)
+// Simpson integration constants
 namespace simpson_constants {
     constexpr double coeff_5pt_1 = 17.0;
     constexpr double coeff_5pt_2 = 42.0;
@@ -26,7 +26,7 @@ namespace simpson_constants {
     constexpr double divisor_3pt = 3.0;
 }
 
-// Modern concepts for type safety
+// Concepts for type safety
 template<typename T>
 concept PhysicalQuantity = std::floating_point<T> && requires(T t) {
     { t >= T{0} } -> std::convertible_to<bool>;
@@ -92,9 +92,9 @@ auto compute_xi_from_integration(
     const auto dx = x_edge[1] - x_edge[0];
     
     auto x_diffs = std::views::zip(x_edge, x_edge | std::views::drop(1))
-                 | std::views::transform([](const auto& pair) { // transform apply a lambda to each pair
+                 | std::views::transform([](const auto& pair) {
                      return std::abs(std::get<1>(pair) - std::get<0>(pair)); 
-                   }); // At this point nothing is calculated, it will be the case only in a loop
+                   });
     
     if (!std::ranges::all_of(x_diffs, [dx, tolerance](auto diff) { 
         return std::abs(diff - dx) <= tolerance; 

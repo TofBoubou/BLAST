@@ -27,7 +27,7 @@ namespace blast::boundary_layer::equations {
                 const double sqrt_term = std::sqrt(2.0 * bc.rho_e() * bc.mu_e() * d_ue_dx_val);
                 return GeometryFactors(
                     1.0 / sqrt_term,                    // Diffusion flux factor
-                    1.0 / (2.0 * d_ue_dx_val),        // Chemical production factor (missing /rho)
+                    1.0 / (2.0 * d_ue_dx_val),        // Chemical production factor
                     std::sqrt(bc.rho_e() * bc.mu_e() / (2.0 * d_ue_dx_val))  // BC factor
                 );
             }
@@ -35,7 +35,7 @@ namespace blast::boundary_layer::equations {
                 const double sqrt_term = std::sqrt(bc.rho_e() * bc.mu_e() * bc.d_ue_dx());
                 return GeometryFactors(
                     1.0 / sqrt_term,                    
-                    1.0 / bc.d_ue_dx(),                // Missing /rho
+                    1.0 / bc.d_ue_dx(),            
                     std::sqrt(bc.rho_e() * bc.mu_e() / bc.d_ue_dx())
                 );
             }
@@ -43,8 +43,8 @@ namespace blast::boundary_layer::equations {
             case io::SimulationConfig::BodyType::FlatPlate:
                 return GeometryFactors(
                     1.0,
-                    0.0,   // No chemical production for these geometries
-                    0.0   // No boundary condition factor
+                    0.0,   
+                    0.0   
                 );
         }
     } else {
@@ -60,7 +60,6 @@ namespace blast::boundary_layer::equations {
     return GeometryFactors(1.0, 0.0, 0.0);
 }
 
-// Compute J_fact for energy equation (slightly different from species)
 [[nodiscard]] constexpr auto compute_energy_j_factor(
     int station,
     PhysicalQuantity auto xi,

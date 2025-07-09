@@ -19,8 +19,8 @@ public:
 };
 
 template<typename T>
-concept NumericRange = std::ranges::range<T> && // concept is like en exigeance. template<"Concept" T> then a function 
-                      std::floating_point<std::ranges::range_value_t<T>>; // contain floats?
+concept NumericRange = std::ranges::range<T> && 
+                      std::floating_point<std::ranges::range_value_t<T>>;
 
 template<typename T>
 concept GridConfigType = requires(const T& config) {
@@ -46,11 +46,11 @@ private:
     double eta_max_;
 
 public:
-    template<GridConfigType NumericalConfig> // NumericalConfig is restrained by the type GridConfigType
+    template<GridConfigType NumericalConfig>
     [[nodiscard]] static constexpr auto create_stagnation_grid(
-        NumericalConfig&& numerical_config, // different from io::NumericalConfig
+        NumericalConfig&& numerical_config, 
         const io::OuterEdgeConfig& edge_config
-    ) -> std::expected<BoundaryLayerGrid, GridError>; // some kind of constructor, it's a factory
+    ) -> std::expected<BoundaryLayerGrid, GridError>;
     
     template<GridConfigType NumericalConfig>
     [[nodiscard]] static constexpr auto create_downstream_grid(
@@ -60,7 +60,7 @@ public:
     ) -> std::expected<BoundaryLayerGrid, GridError>;
     
     // Modern accessors with noexcept
-    [[nodiscard]] constexpr auto xi_coordinates() const noexcept -> std::span<const double> { return xi_; } // std::span is a light view, so no copy
+    [[nodiscard]] constexpr auto xi_coordinates() const noexcept -> std::span<const double> { return xi_; }
     [[nodiscard]] constexpr auto xi_output_coordinates() const noexcept -> std::span<const double> { return xi_output_; }
     [[nodiscard]] constexpr auto eta_coordinates() const noexcept -> std::span<const double> { return eta_; }
     
@@ -80,12 +80,12 @@ private:
     constexpr BoundaryLayerGrid(int n_eta, double eta_max) noexcept
         : n_eta_(n_eta), eta_max_(eta_max), d_eta_(eta_max / static_cast<double>(n_eta - 1)) {
         
-        xi_.reserve(constants::default_grid_reserve); // it would be created anyway but we reserve it
+        xi_.reserve(constants::default_grid_reserve);
         xi_output_.reserve(constants::default_grid_reserve);
         eta_.reserve(n_eta_);
     }
     
-    inline constexpr auto generate_eta_distribution() noexcept -> void; // inline means that if this file is included in multiples files, then there won't be a compilation error because of the multiple definitions
+    inline constexpr auto generate_eta_distribution() noexcept -> void;
     auto generate_xi_distribution(const io::OuterEdgeConfig& edge_config) 
         -> std::expected<void, GridError>;
     auto generate_xi_output_distribution(const io::OutputConfig& output_config,
@@ -110,7 +110,7 @@ constexpr auto BoundaryLayerGrid::create_stagnation_grid(
     auto grid = BoundaryLayerGrid(numerical_config.n_eta, numerical_config.eta_max);
     
     grid.generate_eta_distribution();
-    grid.xi_.emplace_back(0.0);  // Stagnation point
+    grid.xi_.emplace_back(0.0);
     grid.xi_output_.emplace_back(0.0);
     
     return grid;
@@ -120,8 +120,8 @@ inline constexpr auto BoundaryLayerGrid::generate_eta_distribution() noexcept ->
     eta_.clear();
     
     // Modern range-based generation
-    auto eta_indices = std::views::iota(0, n_eta_); // std::ranges::transform(input_range, output_iterator, lambda); lambda gives a result and then we do output_iterator* = result
-    std::ranges::transform(eta_indices, std::back_inserter(eta_),  // auto it = std::back_inserter(eta_); *it = 42; equals to eta_.push_back(42);
+    auto eta_indices = std::views::iota(0, n_eta_); 
+    std::ranges::transform(eta_indices, std::back_inserter(eta_),
         [this](int i) constexpr { return static_cast<double>(i) * d_eta_; });
 }
 

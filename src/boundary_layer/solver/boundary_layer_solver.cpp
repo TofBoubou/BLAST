@@ -189,7 +189,7 @@ auto BoundaryLayerSolver::iterate_station(
     for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
         const auto solution_old = solution;
         
-        // 1. Solve continuity equation: dV/dη = -y
+        // 1. Solve continuity equation: dV/dη = -solve_continuity
         auto V_result = solve_continuity_equation(solution);
         if (!V_result) {
             return std::unexpected(SolverError(
@@ -490,8 +490,6 @@ auto BoundaryLayerSolver::create_initial_guess(
     
     equations::SolutionState guess(n_eta, n_species);
     
-    // 🔥 CRITICAL: Use OLD BLAST initialization strategy for better convergence
-    
     // Get equilibrium composition at wall conditions (like old BLAST)
     std::vector<double> c_wall_equilibrium(n_species);
     auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
@@ -504,21 +502,17 @@ auto BoundaryLayerSolver::create_initial_guess(
         c_wall_equilibrium = equilibrium_result.value();
     }
     
-    // Initialize with OLD BLAST strategy (uniform profiles like old code when used=false)
     for (std::size_t i = 0; i < n_eta; ++i) {
         const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
         const double eta_norm = static_cast<double>(i) / (n_eta - 1);
         
         // Boundary layer-like profiles  
-        // NOTE: V not initialized (like old BLAST) - will be computed from continuity
-        guess.F[i] = eta_norm * (2.0 - eta_norm); // Same as old BLAST
+        guess.F[i] = eta_norm * (2.0 - eta_norm);
         
-        // 🔥 LIKE OLD BLAST: Uniform enthalpy = 1.0 everywhere (not linear profile!)
-        guess.g[i] = 1.0;  // g = 1 everywhere, like old BLAST when used=false
+        guess.g[i] = 1.0; 
         
-        // 🔥 LIKE OLD BLAST: Uniform equilibrium composition everywhere
         for (std::size_t j = 0; j < n_species; ++j) {
-            guess.c(j, i) = c_wall_equilibrium[j];  // Equilibrium composition everywhere
+            guess.c(j, i) = c_wall_equilibrium[j]; 
         }
     }
     
@@ -532,7 +526,7 @@ auto BoundaryLayerSolver::extrapolate_from_previous(
 ) const -> equations::SolutionState {
     
     // Simple extrapolation - could be improved with higher-order methods
-    const double factor = (xi_current > xi_prev) ? 1.1 : 0.9; // Modest extrapolation
+    const double factor = (xi_current > xi_prev) ? 1.1 : 0.9;
     
     auto extrapolated = previous_solution;
     
@@ -541,8 +535,6 @@ auto BoundaryLayerSolver::extrapolate_from_previous(
         extrapolated.F[i] *= factor;
         extrapolated.g[i] = std::max(0.1, extrapolated.g[i] * factor); // Keep positive
     }
-    
-    // Species concentrations stay the same (conservative)
     
     return extrapolated;
 }
@@ -669,7 +661,6 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     
     const std::size_t edge_idx = n_eta - 1;  // Last eta point is the edge
     
-    // 🔥 CRITICAL: Force edge boundary conditions like in old BLAST
     // This ensures F = 1 and g = 1 at the edge, which is essential for convergence
     solution.F[edge_idx] = 1.0;  // Dimensionless velocity must be 1 at edge
     solution.g[edge_idx] = 1.0;  // Dimensionless enthalpy must be 1 at edge

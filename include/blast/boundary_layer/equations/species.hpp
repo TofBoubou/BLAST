@@ -41,7 +41,6 @@ auto apply_charge_neutrality(
     const thermophysics::MixtureInterface& mixture
 ) -> void;
 
-// Implementation details
 namespace detail {
     
     struct SpeciesCoefficients {

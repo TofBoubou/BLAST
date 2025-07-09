@@ -156,13 +156,11 @@ auto compute_stefan_maxwell_fluxes(
     auto& J = coeffs.diffusion.J;
     auto& dJ_deta = coeffs.diffusion.dJ_deta;
 
-    //ajout
     // Ensure matrices are properly sized before use
     J = core::Matrix<double>(n_species, n_eta);
     dJ_deta = core::Matrix<double>(n_species, n_eta);
     J.setZero();
     dJ_deta.setZero();
-    //
     
     // Single species case - no diffusion
     if (n_species == 1) {

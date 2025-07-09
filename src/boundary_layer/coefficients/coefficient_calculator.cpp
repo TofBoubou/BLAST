@@ -127,8 +127,6 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
         }
         thermo.MW.push_back(mw_result.value());
         
-        // Compute density using ideal gas law: ρ = P·MW/(R·T)
-        // Always use edge pressure to avoid circular dependency
         thermo.rho.push_back(bc.P_e() * thermo.MW[i] / 
                             (inputs.T[i] * thermophysics::constants::R_universal));
     }
@@ -187,7 +185,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(
             c_local[j] = inputs.c(j, i);
         }
         
-        // Use edge pressure consistently to avoid circular dependency
         const double P_edge = bc.P_e();
         
         // Get transport properties
@@ -206,19 +203,15 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         const double k_fr = k_result.value();
         const double Pr = mu * Cp / k_fr;
         
-        // Compute coefficients
         transport.l0.push_back(thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()));
         transport.l3.push_back(transport.l0[i] / Pr);
 
-        // std::cout << transport.l0[i] << std::endl;
     }
     
     // Compute derivatives
     transport.dl0_deta = derivatives::compute_eta_derivative(transport.l0, d_eta_);
     transport.dl3_deta = derivatives::compute_eta_derivative(transport.l3, d_eta_);
 
-    
-    
     return transport;
 }
 
@@ -257,7 +250,7 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
             }
         }
         
-        // Compute y coordinate
+        // Compute y coordinate for the continuity equation
         diff.y.push_back(-(2.0 * inputs.xi * xi_der.lambda0() + 1.0) * inputs.F[i] - 
                          2.0 * inputs.xi * xi_der.F_derivative()[i]);
     }

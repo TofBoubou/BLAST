@@ -200,14 +200,6 @@ auto build_species_coefficients(
                 -dJ_fake_deta(j, i) - 
                 coeffs.diffusion.dJ_deta(j, i) * factors.J_fact - 
                 2.0 * xi * c_derivatives(j, i) * F_field[i];
-            
-            // Add chemical production terms if non-equilibrium
-/*             if (sim_config.chemical_non_equilibrium && coeffs.chemical.wi.rows() > 0) {
-                const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
-                species_coeffs.d(i, j) = d_term + wi_term;
-            } else {
-                species_coeffs.d(i, j) = d_term;
-            } */
 
             const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
             species_coeffs.d(i, j) = d_term + wi_term;

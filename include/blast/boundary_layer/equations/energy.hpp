@@ -27,7 +27,6 @@ namespace blast::boundary_layer::equations {
     PhysicalQuantity auto d_eta
 ) -> std::expected<std::vector<double>, EquationError>;
 
-// Implementation details
 namespace detail {
     
     struct EnergyCoefficients {
@@ -73,7 +72,7 @@ namespace detail {
         const conditions::BoundaryConditions& bc,
         double J_fact,
         std::size_t eta_index
-    ) -> std::tuple<double, double>;  // Returns {tmp1, tmp2}
+    ) -> std::tuple<double, double>;
     
 } // namespace detail
 

@@ -8,7 +8,6 @@
 
 namespace blast::boundary_layer::conditions {
 
-// Immutable value types for boundary conditions
 struct EdgeConditions {
     double pressure;
     double viscosity;
@@ -38,7 +37,6 @@ struct BoundaryConditions {
     int station;
     double xi;
     
-    // Convenience getters with legacy names for compatibility
     [[nodiscard]] constexpr auto P_e() const noexcept { return edge.pressure; }
     [[nodiscard]] constexpr auto mu_e() const noexcept { return edge.viscosity; }
     [[nodiscard]] constexpr auto ue() const noexcept { return edge.velocity; }
@@ -51,7 +49,6 @@ struct BoundaryConditions {
     [[nodiscard]] constexpr auto d_he_dx() const noexcept { return edge.d_he_dx; }
     [[nodiscard]] constexpr auto d_he_dxi() const noexcept { return edge.d_he_dxi; }
     
-    // Access species safely
     [[nodiscard]] auto c_e() const noexcept -> const std::vector<double>& { 
         return edge.species_fractions; 
     }

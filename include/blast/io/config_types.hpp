@@ -19,7 +19,7 @@ struct SimulationConfig {
     enum class BodyType { Axisymmetric, Cone, TwoD, FlatPlate };
     enum class DiffusionType { Ramshaw, StefanMaxwell, MPP };
     
-    BodyType body_type = BodyType::Axisymmetric; // create a type that is BodyType that is an enum_class, we say to him that it's a constant and the constant is BodyType::Axisymmetric
+    BodyType body_type = BodyType::Axisymmetric;
     bool only_stagnation_point = true;
     DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
     bool consider_thermal_diffusion = false;

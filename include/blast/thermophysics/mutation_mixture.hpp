@@ -7,14 +7,14 @@
 namespace blast::thermophysics {
 
 // Concrete implementation using Mutation++
-class MutationMixture final : public MixtureInterface { // final because can't be derived
+class MutationMixture final : public MixtureInterface {
 private:
     std::unique_ptr<Mutation::Mixture> mixture_;
     const std::size_t n_species_;
     const bool has_electrons_;
     
     // Cached data
-    mutable std::vector<double> species_charges_; // mutable = can be modified even in a const function
+    mutable std::vector<double> species_charges_; 
     mutable std::vector<double> species_mw_;
     mutable std::vector<std::string> species_names_;
     

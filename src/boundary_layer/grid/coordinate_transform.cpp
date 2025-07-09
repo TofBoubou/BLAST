@@ -11,7 +11,7 @@ using blast::core::TransformError;
 
 template<PhysicalRange RhoData>
 auto compute_physical_y_from_eta(
-    PhysicalQuantity auto eta, // after a concept we need auto
+    PhysicalQuantity auto eta,
     PhysicalQuantity auto xi,
     PhysicalQuantity auto rho_wall,
     RhoData&& rho_eta,
@@ -24,7 +24,6 @@ auto compute_physical_y_from_eta(
     PhysicalQuantity auto r_body
 ) -> std::expected<double, TransformError> {
     
-    // Compute integral using modern ranges
     const auto eta_index = static_cast<size_t>(eta / d_eta + 0.5);
     if (eta_index >= std::ranges::size(rho_eta)) {
         return std::unexpected(TransformError("Eta index out of bounds"));
