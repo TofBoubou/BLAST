@@ -145,7 +145,7 @@ template<PhysicalRange RhoData>
     PhysicalQuantity auto mu_e,
     PhysicalQuantity auto u_e = 0.0,
     PhysicalQuantity auto r_body = 1.0
-) noexcept -> double;
+) -> std::expected<double, TransformError>;
 
 [[nodiscard]] constexpr auto linear_interpolate(
     std::floating_point auto x,
@@ -228,7 +228,7 @@ constexpr auto compute_stagnation_y_factor(
     PhysicalQuantity auto d_ue_dx,
     PhysicalQuantity auto rho_e,
     PhysicalQuantity auto mu_e
-) noexcept -> double;
+) -> std::expected<double, TransformError>;
 
 
 } // namespace blast::boundary_layer::grid::coordinate_transform

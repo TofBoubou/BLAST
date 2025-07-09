@@ -204,28 +204,34 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
         
         if (node["step_control"]) {
             auto sc_node = node["step_control"];
-            config.step_control.lower_bound = extract_value_optional<int>(
-                sc_node, "lower_bound", 10
-            );
-            config.step_control.upper_bound = extract_value_optional<int>(
-                sc_node, "upper_bound", 50
-            );
+            
+            auto lower_bound_result = extract_value<int>(sc_node, "lower_bound");
+            if (!lower_bound_result) return std::unexpected(lower_bound_result.error());
+            config.step_control.lower_bound = lower_bound_result.value();
+            
+            auto upper_bound_result = extract_value<int>(sc_node, "upper_bound");
+            if (!upper_bound_result) return std::unexpected(upper_bound_result.error());
+            config.step_control.upper_bound = upper_bound_result.value();
         }
         
         if (node["solvers"]) {
             auto solv_node = node["solvers"];
-            config.solvers.h2t_tolerance = extract_value_optional<double>(
-                solv_node, "h2t_tolerance", 1e-8
-            );
-            config.solvers.h2t_max_iterations = extract_value_optional<int>(
-                solv_node, "h2t_max_iterations", 100
-            );
-            config.solvers.stefan_tolerance = extract_value_optional<double>(
-                solv_node, "stefan_tolerance", 1e-6
-            );
-            config.solvers.stefan_max_iterations = extract_value_optional<int>(
-                solv_node, "stefan_max_iterations", 50
-            );
+            
+            auto h2t_tol_result = extract_value<double>(solv_node, "h2t_tolerance");
+            if (!h2t_tol_result) return std::unexpected(h2t_tol_result.error());
+            config.solvers.h2t_tolerance = h2t_tol_result.value();
+            
+            auto h2t_iter_result = extract_value<int>(solv_node, "h2t_max_iterations");
+            if (!h2t_iter_result) return std::unexpected(h2t_iter_result.error());
+            config.solvers.h2t_max_iterations = h2t_iter_result.value();
+            
+            auto stefan_tol_result = extract_value<double>(solv_node, "stefan_tolerance");
+            if (!stefan_tol_result) return std::unexpected(stefan_tol_result.error());
+            config.solvers.stefan_tolerance = stefan_tol_result.value();
+            
+            auto stefan_iter_result = extract_value<int>(solv_node, "stefan_max_iterations");
+            if (!stefan_iter_result) return std::unexpected(stefan_iter_result.error());
+            config.solvers.stefan_max_iterations = stefan_iter_result.value();
         }
         
         return config;
@@ -280,40 +286,45 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
     OutputConfig config;
     
     try {
-        config.x_stations = extract_value_optional<std::vector<double>>(
-            node, "x_stations", std::vector<double>{}
-        );
+        auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
+        if (!x_stations_result) return std::unexpected(x_stations_result.error());
+        config.x_stations = x_stations_result.value();
         
-        config.output_directory = extract_value_optional<std::string>(
-            node, "output_directory", "BLAST_outputs"
-        );
+        auto output_dir_result = extract_value<std::string>(node, "output_directory");
+        if (!output_dir_result) return std::unexpected(output_dir_result.error());
+        config.output_directory = output_dir_result.value();
         
-        config.generate_lookup_table = extract_value_optional<bool>(
-            node, "generate_lookup_table", false
-        );
+        auto gen_lookup_result = extract_value<bool>(node, "generate_lookup_table");
+        if (!gen_lookup_result) return std::unexpected(gen_lookup_result.error());
+        config.generate_lookup_table = gen_lookup_result.value();
         
         // lookup_table
         if (node["lookup_table"]) {
             auto lt_node = node["lookup_table"];
             
-            config.lookup_table.temperature_min = extract_value_optional<double>(
-                lt_node, "temperature_min", 300.0
-            );
-            config.lookup_table.temperature_max = extract_value_optional<double>(
-                lt_node, "temperature_max", 3000.0
-            );
-            config.lookup_table.temperature_step = extract_value_optional<double>(
-                lt_node, "temperature_step", 100.0
-            );
-            config.lookup_table.gamma_min = extract_value_optional<double>(
-                lt_node, "gamma_min", 0.0
-            );
-            config.lookup_table.gamma_max = extract_value_optional<double>(
-                lt_node, "gamma_max", 1.0
-            );
-            config.lookup_table.gamma_step = extract_value_optional<double>(
-                lt_node, "gamma_step", 0.1
-            );
+            auto temp_min_result = extract_value<double>(lt_node, "temperature_min");
+            if (!temp_min_result) return std::unexpected(temp_min_result.error());
+            config.lookup_table.temperature_min = temp_min_result.value();
+            
+            auto temp_max_result = extract_value<double>(lt_node, "temperature_max");
+            if (!temp_max_result) return std::unexpected(temp_max_result.error());
+            config.lookup_table.temperature_max = temp_max_result.value();
+            
+            auto temp_step_result = extract_value<double>(lt_node, "temperature_step");
+            if (!temp_step_result) return std::unexpected(temp_step_result.error());
+            config.lookup_table.temperature_step = temp_step_result.value();
+            
+            auto gamma_min_result = extract_value<double>(lt_node, "gamma_min");
+            if (!gamma_min_result) return std::unexpected(gamma_min_result.error());
+            config.lookup_table.gamma_min = gamma_min_result.value();
+            
+            auto gamma_max_result = extract_value<double>(lt_node, "gamma_max");
+            if (!gamma_max_result) return std::unexpected(gamma_max_result.error());
+            config.lookup_table.gamma_max = gamma_max_result.value();
+            
+            auto gamma_step_result = extract_value<double>(lt_node, "gamma_step");
+            if (!gamma_step_result) return std::unexpected(gamma_step_result.error());
+            config.lookup_table.gamma_step = gamma_step_result.value();
         }
         
         return config;
@@ -334,22 +345,22 @@ auto YamlParser::parse_initial_guess_config(const YAML::Node& node) const
     InitialGuessConfig config;
     
     try {
-        config.use_initial_guess = extract_value_optional<bool>(
-            node, "use_initial_guess", false
-        );
+        auto use_guess_result = extract_value<bool>(node, "use_initial_guess");
+        if (!use_guess_result) return std::unexpected(use_guess_result.error());
+        config.use_initial_guess = use_guess_result.value();
         
         if (config.use_initial_guess) {
             // Parser les profils seulement si on utilise l'initial guess
             if (node["temperature_profile"]) {
-                config.temperature_profile = extract_value_optional<std::vector<double>>(
-                    node, "temperature_profile", std::vector<double>{}
-                );
+                auto temp_profile_result = extract_value<std::vector<double>>(node, "temperature_profile");
+                if (!temp_profile_result) return std::unexpected(temp_profile_result.error());
+                config.temperature_profile = temp_profile_result.value();
             }
             
             if (node["enthalpy_profile"]) {
-                config.enthalpy_profile = extract_value_optional<std::vector<double>>(
-                    node, "enthalpy_profile", std::vector<double>{}
-                );
+                auto enthalpy_profile_result = extract_value<std::vector<double>>(node, "enthalpy_profile");
+                if (!enthalpy_profile_result) return std::unexpected(enthalpy_profile_result.error());
+                config.enthalpy_profile = enthalpy_profile_result.value();
             }
             
             if (node["species_profiles"]) {
@@ -421,9 +432,9 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
             point.viscosity = viscosity_result.value();
             
             if (point_node["species"]) {
-                point.species_fractions = extract_value_optional<std::vector<double>>(
-                    point_node, "species", std::vector<double>{}
-                );
+                auto species_result = extract_value<std::vector<double>>(point_node, "species");
+                if (!species_result) return std::unexpected(species_result.error());
+                point.species_fractions = species_result.value();
             }
             
             config.edge_points.push_back(point);

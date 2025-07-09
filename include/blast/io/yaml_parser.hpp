@@ -19,9 +19,6 @@ private:
     [[nodiscard]] auto extract_value(const YAML::Node& node, std::string_view key) const 
         -> std::expected<T, core::ConfigurationError>;
     
-    template<typename T>
-    [[nodiscard]] auto extract_value_optional(const YAML::Node& node, std::string_view key, 
-                                             const T& default_value) const -> T;
     
     template<typename EnumType>
     [[nodiscard]] auto extract_enum(const YAML::Node& node, std::string_view key, 
@@ -116,32 +113,6 @@ auto YamlParser::extract_enum(const YAML::Node& node, std::string_view key,
     return it->second;
 }
 
-template<typename T>
-auto YamlParser::extract_value_optional(const YAML::Node& node, std::string_view key, 
-                                        const T& default_value) const -> T {
-    try {
-        if (!node[std::string(key)]) {
-            return default_value;
-        }
-        
-        if constexpr (std::same_as<T, std::vector<double>>) {
-            auto sequence = node[std::string(key)];
-            std::vector<double> result;
-            result.reserve(sequence.size());
-            
-            for (const auto& item : sequence) {
-                result.push_back(item.as<double>());
-            }
-            return result;
-        } else {
-            return node[std::string(key)].as<T>();
-        }
-    } catch (const YAML::Exception& e) {
-        throw core::ConfigurationError(
-            std::format("Failed to parse optional field '{}': {}", key, e.what())
-        );
-    }
-}
 
 // Enum mappings
 namespace enum_mappings {
