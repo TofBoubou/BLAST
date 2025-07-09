@@ -250,11 +250,11 @@ auto interpolate_boundary_conditions(
         .velocity = interp_hermite(&io::OuterEdgeConfig::EdgePoint::velocity),    // Critical: momentum boundary layer
         .enthalpy = interp_hermite(&io::OuterEdgeConfig::EdgePoint::enthalpy),    // Critical: energy boundary layer
         .density = interp_hermite(&io::OuterEdgeConfig::EdgePoint::density),      // Critical: compressible flow
-        .species_fractions = {}, // Handle separately with Hermite below
-        .d_xi_dx = 0.0,  // TODO: Compute from grid
-        .d_ue_dx = 0.0,  // TODO: Compute derivative with Hermite
-        .d_he_dx = 0.0,  // TODO: Compute derivative with Hermite
-        .d_he_dxi = 0.0,
+        .species_fractions = {}, 
+        .d_xi_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_xi_dx),
+        .d_ue_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_ue_dx),
+        .d_he_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_he_dx),
+        .d_he_dxi = 0.0,  // Will be computed below
         .body_radius = interp_linear(&io::OuterEdgeConfig::EdgePoint::radius)     // Linear sufficient
     };
     
@@ -286,7 +286,7 @@ auto interpolate_boundary_conditions(
         .temperature = wall_temp
     };
     
-    // Compute derivatives (simplified for now)
+    // Compute derivatives
     const double d_ue_dxi = edge.d_ue_dx / edge.d_xi_dx;
     edge.d_he_dxi = edge.d_he_dx / edge.d_xi_dx;
     

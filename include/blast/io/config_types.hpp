@@ -96,6 +96,9 @@ struct OuterEdgeConfig {
         double density;
         double viscosity;
         std::vector<double> species_fractions;
+        double d_xi_dx;
+        double d_ue_dx;
+        double d_he_dx;
     };
     
     std::vector<EdgePoint> edge_points;
