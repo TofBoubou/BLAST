@@ -417,10 +417,8 @@ auto CoefficientCalculator::extract_local_composition(
             rho_species[j] = rho_total * c_local[j] / sum_c;
         }
     } else {
-        // Fallback for zero composition
-        for (std::size_t j = 0; j < n_species; ++j) {
-            rho_species[j] = 0.0;
-        }
+        // Error: zero composition is invalid
+        throw CoefficientError("Zero total composition encountered in extract_local_composition");
     }
     
     return {c_local, rho_species};
@@ -722,15 +720,11 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::vector<double>
     std::vector<double> derivatives(n);
     
     if (d_eta <= 0.0) {
-        // Return zeros for invalid spacing
-        std::fill(derivatives.begin(), derivatives.end(), 0.0);
-        return derivatives;
+        throw std::invalid_argument("Invalid grid spacing: d_eta must be positive");
     }
     
     if (n < 2) {
-        // Not enough points for derivative
-        std::fill(derivatives.begin(), derivatives.end(), 0.0);
-        return derivatives;
+        throw std::invalid_argument("Insufficient points for derivative calculation: need at least 2 points");
     }
     
     if (n < 5) {
@@ -773,15 +767,11 @@ auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<
     std::vector<double> second_derivatives(n);
     
     if (d_eta <= 0.0) {
-        // Return zeros for invalid spacing
-        std::fill(second_derivatives.begin(), second_derivatives.end(), 0.0);
-        return second_derivatives;
+        throw std::invalid_argument("Invalid grid spacing: d_eta must be positive");
     }
     
     if (n < 3) {
-        // Not enough points for second derivative
-        std::fill(second_derivatives.begin(), second_derivatives.end(), 0.0);
-        return second_derivatives;
+        throw std::invalid_argument("Insufficient points for second derivative calculation: need at least 3 points");
     }
     
     if (n < 5) {
@@ -823,8 +813,7 @@ auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) ->
     Matrix result(n_rows, n_cols);
     
     if (d_eta <= 0.0) {
-        result.setZero();
-        return result;
+        throw std::invalid_argument("Invalid grid spacing: d_eta must be positive");
     }
     
     for (std::size_t i = 0; i < n_rows; ++i) {

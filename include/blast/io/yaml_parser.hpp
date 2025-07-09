@@ -16,13 +16,17 @@ private:
     std::string file_path_;
     
     template<typename T>
-    [[nodiscard]] auto extract_value(const YAML::Node& node, std::string_view key, 
-                                    const T& default_value = T{}) const -> T;
+    [[nodiscard]] auto extract_value(const YAML::Node& node, std::string_view key) const 
+        -> std::expected<T, core::ConfigurationError>;
+    
+    template<typename T>
+    [[nodiscard]] auto extract_value_optional(const YAML::Node& node, std::string_view key, 
+                                             const T& default_value) const -> T;
     
     template<typename EnumType>
     [[nodiscard]] auto extract_enum(const YAML::Node& node, std::string_view key, 
-                                   const std::unordered_map<std::string, EnumType>& mapping,
-                                   EnumType default_value) const -> EnumType;
+                                   const std::unordered_map<std::string, EnumType>& mapping) const 
+        -> std::expected<EnumType, core::ConfigurationError>;
     
     [[nodiscard]] auto parse_simulation_config(const YAML::Node& node) const 
         -> std::expected<SimulationConfig, core::ConfigurationError>;
@@ -56,8 +60,65 @@ public:
 
 // Implementation of template methods
 template<typename T>
-auto YamlParser::extract_value(const YAML::Node& node, std::string_view key, 
-                               const T& default_value) const -> T {
+auto YamlParser::extract_value(const YAML::Node& node, std::string_view key) const 
+    -> std::expected<T, core::ConfigurationError> {
+    try {
+        if (!node[std::string(key)]) {
+            return std::unexpected(core::ConfigurationError(
+                std::format("Required field '{}' is missing", key)
+            ));
+        }
+        
+        if constexpr (std::same_as<T, std::vector<double>>) {
+            auto sequence = node[std::string(key)];
+            std::vector<double> result;
+            result.reserve(sequence.size());
+            
+            for (const auto& item : sequence) {
+                result.push_back(item.as<double>());
+            }
+            return result;
+        } else {
+            return node[std::string(key)].as<T>();
+        }
+    } catch (const YAML::Exception& e) {
+        return std::unexpected(core::ConfigurationError(
+            std::format("Failed to parse field '{}': {}", key, e.what())
+        ));
+    }
+}
+
+template<typename EnumType>
+auto YamlParser::extract_enum(const YAML::Node& node, std::string_view key, 
+                              const std::unordered_map<std::string, EnumType>& mapping) const 
+    -> std::expected<EnumType, core::ConfigurationError> {
+    auto str_result = extract_value<std::string>(node, key);
+    if (!str_result) {
+        return std::unexpected(str_result.error());
+    }
+    
+    auto str_value = str_result.value();
+    std::ranges::transform(str_value, str_value.begin(), ::tolower);
+    
+    auto it = mapping.find(str_value);
+    if (it == mapping.end()) {
+        std::string valid_options;
+        for (const auto& [option, _] : mapping) {
+            valid_options += option + ", ";
+        }
+        valid_options = valid_options.substr(0, valid_options.length() - 2);
+        
+        return std::unexpected(core::ConfigurationError(
+            std::format("Invalid value '{}' for field '{}'. Valid options: {}", str_value, key, valid_options)
+        ));
+    }
+    
+    return it->second;
+}
+
+template<typename T>
+auto YamlParser::extract_value_optional(const YAML::Node& node, std::string_view key, 
+                                        const T& default_value) const -> T {
     try {
         if (!node[std::string(key)]) {
             return default_value;
@@ -77,38 +138,9 @@ auto YamlParser::extract_value(const YAML::Node& node, std::string_view key,
         }
     } catch (const YAML::Exception& e) {
         throw core::ConfigurationError(
-            std::format("Failed to parse field '{}': {}", key, e.what())
+            std::format("Failed to parse optional field '{}': {}", key, e.what())
         );
     }
-}
-
-template<typename EnumType>
-auto YamlParser::extract_enum(const YAML::Node& node, std::string_view key, 
-                              const std::unordered_map<std::string, EnumType>& mapping,
-                              EnumType default_value) const -> EnumType {
-    auto str_value = extract_value<std::string>(node, key, "");
-    
-    if (str_value.empty()) {
-        return default_value;
-    }
-    
-    std::ranges::transform(str_value, str_value.begin(), ::tolower);
-    
-    auto it = mapping.find(str_value);
-    if (it == mapping.end()) {
-        std::string valid_options;
-        for (const auto& [option, _] : mapping) {
-            valid_options += option + ", ";
-        }
-        valid_options = valid_options.substr(0, valid_options.length() - 2);
-        
-        throw core::ValidationError(
-            std::string(key),
-            std::format("Invalid value '{}'. Valid options: {}", str_value, valid_options)
-        );
-    }
-    
-    return it->second;
 }
 
 // Enum mappings

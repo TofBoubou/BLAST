@@ -69,9 +69,11 @@ template<typename MemberPtr>
     const std::vector<double>& x_grid
 ) -> std::vector<double> {
     
-    if (values.size() != x_grid.size() || values.size() < 2) {
-        std::vector<double> derivatives(values.size(), 0.0);
-        return derivatives;
+    if (values.size() != x_grid.size()) {
+        throw std::invalid_argument("Values and grid sizes must match for derivative computation");
+    }
+    if (values.size() < 2) {
+        throw std::invalid_argument("Need at least 2 points for derivative computation");
     }
     
     // Check if grid is uniform (within tolerance)

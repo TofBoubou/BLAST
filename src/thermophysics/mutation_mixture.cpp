@@ -9,16 +9,16 @@ namespace blast::thermophysics {
 
 namespace {
     // Helper to convert config enums to Mutation++ strings
-    [[nodiscard]] auto database_to_string(io::MixtureConfig::Database db) -> std::string {
+    [[nodiscard]] auto database_to_string(io::MixtureConfig::Database db) -> std::expected<std::string, ThermophysicsError> {
         switch (db) {
             case io::MixtureConfig::Database::RRHO: return "RRHO";
             case io::MixtureConfig::Database::NASA7: return "NASA-7";
             case io::MixtureConfig::Database::NASA9: return "NASA-9";
         }
-        return "NASA-9"; // Default
+        return std::unexpected(ThermophysicsError("Unknown thermodynamic database type"));
     }
     
-    [[nodiscard]] auto viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::string {
+    [[nodiscard]] auto viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::expected<std::string, ThermophysicsError> {
         switch (algo) {
             case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG: 
                 return "Chapmann-Enskog_CG";
@@ -29,17 +29,20 @@ namespace {
             case io::MixtureConfig::ViscosityAlgorithm::Wilke: 
                 return "Wilke";
         }
-        return "Chapmann-Enskog_CG"; // Default
+        return std::unexpected(ThermophysicsError("Unknown viscosity algorithm type"));
     }
     
-    [[nodiscard]] constexpr auto thermal_cond_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::string_view {
+    [[nodiscard]] constexpr auto thermal_cond_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::expected<std::string_view, ThermophysicsError> {
         // Simplified mapping for thermal conductivity
         switch (algo) {
             case io::MixtureConfig::ViscosityAlgorithm::Wilke: 
                 return "Wilke";
-            default:
+            case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG:
+            case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_LDLT:
+            case io::MixtureConfig::ViscosityAlgorithm::GuptaYos:
                 return "Chapmann-Enskog_CG";
         }
+        return std::unexpected(ThermophysicsError("Unknown thermal conductivity algorithm type"));
     }
 }
 
@@ -54,15 +57,25 @@ MutationMixture::MutationMixture(const io::MixtureConfig& config)
         opts.setStateModel("ChemNonEq1T");
         
         // Set thermodynamic database
-        opts.setThermodynamicDatabase(database_to_string(config.thermodynamic_database));
+        auto db_result = database_to_string(config.thermodynamic_database);
+        if (!db_result) {
+            throw db_result.error();
+        }
+        opts.setThermodynamicDatabase(db_result.value());
         
         // Set viscosity algorithm
-        opts.setViscosityAlgorithm(viscosity_algo_to_string(config.viscosity_algorithm));
+        auto visc_result = viscosity_algo_to_string(config.viscosity_algorithm);
+        if (!visc_result) {
+            throw visc_result.error();
+        }
+        opts.setViscosityAlgorithm(visc_result.value());
         
         // Set thermal conductivity algorithm
-        opts.setThermalConductivityAlgorithm(
-            std::string(thermal_cond_algo_to_string(config.viscosity_algorithm))
-        );
+        auto thermal_result = thermal_cond_algo_to_string(config.viscosity_algorithm);
+        if (!thermal_result) {
+            throw thermal_result.error();
+        }
+        opts.setThermalConductivityAlgorithm(std::string(thermal_result.value()));
         
         // Create mixture
         mixture_ = std::make_unique<Mutation::Mixture>(opts);

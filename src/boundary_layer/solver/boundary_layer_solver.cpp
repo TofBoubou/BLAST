@@ -484,16 +484,14 @@ auto BoundaryLayerSolver::create_initial_guess(
     equations::SolutionState guess(n_eta, n_species);
     
     // Get equilibrium composition at wall conditions
-    std::vector<double> c_wall_equilibrium(n_species);
     auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
     if (!equilibrium_result) {
-        // Fallback to edge composition if equilibrium fails
-        for (std::size_t j = 0; j < n_species; ++j) {
-            c_wall_equilibrium[j] = (j < bc.c_e().size()) ? bc.c_e()[j] : 0.0;
-        }
-    } else {
-        c_wall_equilibrium = equilibrium_result.value();
+        return std::unexpected(SolverError(
+            "Failed to compute equilibrium composition at wall conditions: {}",
+            std::source_location::current(), equilibrium_result.error().message()
+        ));
     }
+    auto c_wall_equilibrium = equilibrium_result.value();
     
     for (std::size_t i = 0; i < n_eta; ++i) {
         const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
@@ -686,7 +684,8 @@ auto BoundaryLayerSolver::update_edge_properties(
     // Calculate new edge density using equation of state
     auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
     if (!MW_result) {
-        return; // Keep current values if calculation fails
+        throw SolverError("Failed to compute edge molecular weight: {}", 
+                         std::source_location::current(), MW_result.error().message());
     }
     const double MW_edge = MW_result.value();
     const double rho_e_new = P_edge * MW_edge / 
@@ -695,7 +694,8 @@ auto BoundaryLayerSolver::update_edge_properties(
     // Calculate new edge viscosity using mixture properties
     auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);
     if (!mu_result) {
-        return; // Keep current values if calculation fails
+        throw SolverError("Failed to compute edge viscosity: {}", 
+                         std::source_location::current(), mu_result.error().message());
     }
     const double mu_e_new = mu_result.value();
     

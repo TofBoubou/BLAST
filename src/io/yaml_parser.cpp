@@ -134,29 +134,35 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     SimulationConfig config;
     
     try {
-        config.body_type = extract_enum(
-            node, "body_type", 
-            enum_mappings::body_types,
-            SimulationConfig::BodyType::Axisymmetric
-        );
+        auto body_type_result = extract_enum(node, "body_type", enum_mappings::body_types);
+        if (!body_type_result) {
+            return std::unexpected(body_type_result.error());
+        }
+        config.body_type = body_type_result.value();
         
-        config.only_stagnation_point = extract_value<bool>(
-            node, "only_stagnation_point", true
-        );
+        auto only_stag_result = extract_value<bool>(node, "only_stagnation_point");
+        if (!only_stag_result) {
+            return std::unexpected(only_stag_result.error());
+        }
+        config.only_stagnation_point = only_stag_result.value();
         
-        config.diffusion_type = extract_enum(
-            node, "diffusion_type",
-            enum_mappings::diffusion_types,
-            SimulationConfig::DiffusionType::StefanMaxwell
-        );
+        auto diffusion_result = extract_enum(node, "diffusion_type", enum_mappings::diffusion_types);
+        if (!diffusion_result) {
+            return std::unexpected(diffusion_result.error());
+        }
+        config.diffusion_type = diffusion_result.value();
         
-        config.consider_thermal_diffusion = extract_value<bool>(
-            node, "consider_thermal_diffusion", false
-        );
+        auto thermal_diff_result = extract_value<bool>(node, "consider_thermal_diffusion");
+        if (!thermal_diff_result) {
+            return std::unexpected(thermal_diff_result.error());
+        }
+        config.consider_thermal_diffusion = thermal_diff_result.value();
         
-        config.chemical_non_equilibrium = extract_value<bool>(
-            node, "chemical_non_equilibrium", true
-        );
+        auto chemical_result = extract_value<bool>(node, "chemical_non_equilibrium");
+        if (!chemical_result) {
+            return std::unexpected(chemical_result.error());
+        }
+        config.chemical_non_equilibrium = chemical_result.value();
         
         return config;
         
@@ -176,38 +182,48 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
     NumericalConfig config;
     
     try {
-        config.n_eta = extract_value<int>(node, "n_eta", 101);
-        config.eta_max = extract_value<double>(node, "eta_max", 8.0);
-        config.convergence_tolerance = extract_value<double>(
-            node, "convergence_tolerance", 1e-6
-        );
-        config.max_iterations = extract_value<int>(node, "max_iterations", 1000);
-        config.under_relaxation = extract_value<double>(
-            node, "under_relaxation", 0.5
-        );
+        auto n_eta_result = extract_value<int>(node, "n_eta");
+        if (!n_eta_result) return std::unexpected(n_eta_result.error());
+        config.n_eta = n_eta_result.value();
+        
+        auto eta_max_result = extract_value<double>(node, "eta_max");
+        if (!eta_max_result) return std::unexpected(eta_max_result.error());
+        config.eta_max = eta_max_result.value();
+        
+        auto conv_tol_result = extract_value<double>(node, "convergence_tolerance");
+        if (!conv_tol_result) return std::unexpected(conv_tol_result.error());
+        config.convergence_tolerance = conv_tol_result.value();
+        
+        auto max_iter_result = extract_value<int>(node, "max_iterations");
+        if (!max_iter_result) return std::unexpected(max_iter_result.error());
+        config.max_iterations = max_iter_result.value();
+        
+        auto under_relax_result = extract_value<double>(node, "under_relaxation");
+        if (!under_relax_result) return std::unexpected(under_relax_result.error());
+        config.under_relaxation = under_relax_result.value();
         
         if (node["step_control"]) {
             auto sc_node = node["step_control"];
-            config.step_control.lower_bound = extract_value<int>(
+            config.step_control.lower_bound = extract_value_optional<int>(
                 sc_node, "lower_bound", 10
             );
-            config.step_control.upper_bound = extract_value<int>(
+            config.step_control.upper_bound = extract_value_optional<int>(
                 sc_node, "upper_bound", 50
             );
         }
         
         if (node["solvers"]) {
             auto solv_node = node["solvers"];
-            config.solvers.h2t_tolerance = extract_value<double>(
+            config.solvers.h2t_tolerance = extract_value_optional<double>(
                 solv_node, "h2t_tolerance", 1e-8
             );
-            config.solvers.h2t_max_iterations = extract_value<int>(
+            config.solvers.h2t_max_iterations = extract_value_optional<int>(
                 solv_node, "h2t_max_iterations", 100
             );
-            config.solvers.stefan_tolerance = extract_value<double>(
+            config.solvers.stefan_tolerance = extract_value_optional<double>(
                 solv_node, "stefan_tolerance", 1e-6
             );
-            config.solvers.stefan_max_iterations = extract_value<int>(
+            config.solvers.stefan_max_iterations = extract_value_optional<int>(
                 solv_node, "stefan_max_iterations", 50
             );
         }
@@ -230,23 +246,21 @@ auto YamlParser::parse_mixture_config(const YAML::Node& node) const
     MixtureConfig config;
     
     try {
-        config.name = extract_value<std::string>(node, "name", "air7");
+        auto name_result = extract_value<std::string>(node, "name");
+        if (!name_result) return std::unexpected(name_result.error());
+        config.name = name_result.value();
         
-        config.thermodynamic_database = extract_enum(
-            node, "thermodynamic_database",
-            enum_mappings::databases,
-            MixtureConfig::Database::NASA9
-        );
+        auto db_result = extract_enum(node, "thermodynamic_database", enum_mappings::databases);
+        if (!db_result) return std::unexpected(db_result.error());
+        config.thermodynamic_database = db_result.value();
         
-        config.viscosity_algorithm = extract_enum(
-            node, "viscosity_algorithm",
-            enum_mappings::viscosity_algorithms,
-            MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG
-        );
+        auto visc_result = extract_enum(node, "viscosity_algorithm", enum_mappings::viscosity_algorithms);
+        if (!visc_result) return std::unexpected(visc_result.error());
+        config.viscosity_algorithm = visc_result.value();
         
-        config.reference_temperature = extract_value<double>(
-            node, "reference_temperature", 0.0
-        );
+        auto ref_temp_result = extract_value<double>(node, "reference_temperature");
+        if (!ref_temp_result) return std::unexpected(ref_temp_result.error());
+        config.reference_temperature = ref_temp_result.value();
         
         return config;
         
@@ -266,15 +280,15 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
     OutputConfig config;
     
     try {
-        config.x_stations = extract_value<std::vector<double>>(
+        config.x_stations = extract_value_optional<std::vector<double>>(
             node, "x_stations", std::vector<double>{}
         );
         
-        config.output_directory = extract_value<std::string>(
+        config.output_directory = extract_value_optional<std::string>(
             node, "output_directory", "BLAST_outputs"
         );
         
-        config.generate_lookup_table = extract_value<bool>(
+        config.generate_lookup_table = extract_value_optional<bool>(
             node, "generate_lookup_table", false
         );
         
@@ -282,22 +296,22 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
         if (node["lookup_table"]) {
             auto lt_node = node["lookup_table"];
             
-            config.lookup_table.temperature_min = extract_value<double>(
+            config.lookup_table.temperature_min = extract_value_optional<double>(
                 lt_node, "temperature_min", 300.0
             );
-            config.lookup_table.temperature_max = extract_value<double>(
+            config.lookup_table.temperature_max = extract_value_optional<double>(
                 lt_node, "temperature_max", 3000.0
             );
-            config.lookup_table.temperature_step = extract_value<double>(
+            config.lookup_table.temperature_step = extract_value_optional<double>(
                 lt_node, "temperature_step", 100.0
             );
-            config.lookup_table.gamma_min = extract_value<double>(
+            config.lookup_table.gamma_min = extract_value_optional<double>(
                 lt_node, "gamma_min", 0.0
             );
-            config.lookup_table.gamma_max = extract_value<double>(
+            config.lookup_table.gamma_max = extract_value_optional<double>(
                 lt_node, "gamma_max", 1.0
             );
-            config.lookup_table.gamma_step = extract_value<double>(
+            config.lookup_table.gamma_step = extract_value_optional<double>(
                 lt_node, "gamma_step", 0.1
             );
         }
@@ -320,20 +334,20 @@ auto YamlParser::parse_initial_guess_config(const YAML::Node& node) const
     InitialGuessConfig config;
     
     try {
-        config.use_initial_guess = extract_value<bool>(
+        config.use_initial_guess = extract_value_optional<bool>(
             node, "use_initial_guess", false
         );
         
         if (config.use_initial_guess) {
             // Parser les profils seulement si on utilise l'initial guess
             if (node["temperature_profile"]) {
-                config.temperature_profile = extract_value<std::vector<double>>(
+                config.temperature_profile = extract_value_optional<std::vector<double>>(
                     node, "temperature_profile", std::vector<double>{}
                 );
             }
             
             if (node["enthalpy_profile"]) {
-                config.enthalpy_profile = extract_value<std::vector<double>>(
+                config.enthalpy_profile = extract_value_optional<std::vector<double>>(
                     node, "enthalpy_profile", std::vector<double>{}
                 );
             }
@@ -378,16 +392,36 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
         for (const auto& point_node : points_node) {
             OuterEdgeConfig::EdgePoint point;
             
-            point.x = extract_value<double>(point_node, "x", 0.0);
-            point.radius = extract_value<double>(point_node, "radius", 1.0);
-            point.velocity = extract_value<double>(point_node, "velocity", 0.0);
-            point.enthalpy = extract_value<double>(point_node, "enthalpy", 0.0);
-            point.pressure = extract_value<double>(point_node, "pressure", 101325.0);
-            point.density = extract_value<double>(point_node, "density", 1.225);
-            point.viscosity = extract_value<double>(point_node, "viscosity", 1.8e-5);
+            auto x_result = extract_value<double>(point_node, "x");
+            if (!x_result) return std::unexpected(x_result.error());
+            point.x = x_result.value();
+            
+            auto radius_result = extract_value<double>(point_node, "radius");
+            if (!radius_result) return std::unexpected(radius_result.error());
+            point.radius = radius_result.value();
+            
+            auto velocity_result = extract_value<double>(point_node, "velocity");
+            if (!velocity_result) return std::unexpected(velocity_result.error());
+            point.velocity = velocity_result.value();
+            
+            auto enthalpy_result = extract_value<double>(point_node, "enthalpy");
+            if (!enthalpy_result) return std::unexpected(enthalpy_result.error());
+            point.enthalpy = enthalpy_result.value();
+            
+            auto pressure_result = extract_value<double>(point_node, "pressure");
+            if (!pressure_result) return std::unexpected(pressure_result.error());
+            point.pressure = pressure_result.value();
+            
+            auto density_result = extract_value<double>(point_node, "density");
+            if (!density_result) return std::unexpected(density_result.error());
+            point.density = density_result.value();
+            
+            auto viscosity_result = extract_value<double>(point_node, "viscosity");
+            if (!viscosity_result) return std::unexpected(viscosity_result.error());
+            point.viscosity = viscosity_result.value();
             
             if (point_node["species"]) {
-                point.species_fractions = extract_value<std::vector<double>>(
+                point.species_fractions = extract_value_optional<std::vector<double>>(
                     point_node, "species", std::vector<double>{}
                 );
             }
@@ -396,15 +430,17 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
         }
         
         // Scalars
-        config.velocity_gradient_stagnation = extract_value<double>(
-            node, "velocity_gradient_stagnation", 0.0
-        );
-        config.freestream_density = extract_value<double>(
-            node, "freestream_density", 1.225
-        );
-        config.freestream_velocity = extract_value<double>(
-            node, "freestream_velocity", 0.0
-        );
+        auto vel_grad_result = extract_value<double>(node, "velocity_gradient_stagnation");
+        if (!vel_grad_result) return std::unexpected(vel_grad_result.error());
+        config.velocity_gradient_stagnation = vel_grad_result.value();
+        
+        auto freestream_dens_result = extract_value<double>(node, "freestream_density");
+        if (!freestream_dens_result) return std::unexpected(freestream_dens_result.error());
+        config.freestream_density = freestream_dens_result.value();
+        
+        auto freestream_vel_result = extract_value<double>(node, "freestream_velocity");
+        if (!freestream_vel_result) return std::unexpected(freestream_vel_result.error());
+        config.freestream_velocity = freestream_vel_result.value();
 
         return config;
         
@@ -425,9 +461,9 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
     
     try {
         // Parser les températures de paroi (requis)
-        config.wall_temperatures = extract_value<std::vector<double>>(
-            node, "temperatures", std::vector<double>{}
-        );
+        auto temp_result = extract_value<std::vector<double>>(node, "temperatures");
+        if (!temp_result) return std::unexpected(temp_result.error());
+        config.wall_temperatures = temp_result.value();
         
         if (config.wall_temperatures.empty()) {
             return std::unexpected(
