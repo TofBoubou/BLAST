@@ -7,7 +7,7 @@
 namespace blast::boundary_layer::equations {
 
 // Simple integration for continuity equation
-// Solves: dV/dη = -right_handed where V is the velocity-like variable
+// Solves: dV/dη = -d_velocity_field where V is the velocity-like variable
 template<NumericRange VField>
 [[nodiscard]] constexpr auto solve_continuity(
     VField&& d_velocity_field,

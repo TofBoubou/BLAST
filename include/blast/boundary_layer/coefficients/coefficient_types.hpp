@@ -26,7 +26,6 @@ struct ThermodynamicCoefficients {
 // Diffusion related coefficients
 struct DiffusionCoefficients {
     core::Matrix<double> Dij_bin;   // Binary diffusion coefficients [n_eta x n_species x n_species]
-    std::vector<double> right_handed;          // dV/dη = -right_handed for continuity
     core::Matrix<double> J;         // Diffusion fluxes [n_species x n_eta]
     core::Matrix<double> dJ_deta;   // Flux derivatives [n_species x n_eta]
 };

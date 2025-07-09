@@ -226,7 +226,6 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
     
     DiffusionCoefficients diff;
     diff.Dij_bin = core::Matrix<double>(n_eta * n_species, n_species);
-    diff.y.reserve(n_eta);
     
     // Use edge pressure consistently
     const double P_edge = bc.P_e();
@@ -249,10 +248,6 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
                 diff.Dij_bin(i * n_species + j, k) = dij_local(j, k);
             }
         }
-        
-        // Compute y coordinate for the continuity equation
-        diff.y.push_back(-(2.0 * inputs.xi * xi_der.lambda0() + 1.0) * inputs.F[i] - 
-                         2.0 * inputs.xi * xi_der.F_derivative()[i]);
     }
     
     return diff;
