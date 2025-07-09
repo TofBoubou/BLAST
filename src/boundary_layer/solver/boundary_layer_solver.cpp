@@ -637,9 +637,7 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     
     const std::size_t edge_idx = n_eta - 1;  // Last eta point is the edge
     
-    // This ensures F = 1 and g = 1 at the edge, which is essential for convergence
-    solution.F[edge_idx] = 1.0;  // Dimensionless velocity must be 1 at edge
-    solution.g[edge_idx] = 1.0;  // Dimensionless enthalpy must be 1 at edge
+    // Force species composition at edge only
     
     // Force species composition at edge
     const auto& edge_composition = bc.c_e();
