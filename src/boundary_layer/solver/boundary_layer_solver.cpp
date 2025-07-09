@@ -366,13 +366,8 @@ auto BoundaryLayerSolver::solve_energy_equation(
     int station
 ) -> std::expected<std::vector<double>, SolverError> {
     
-    // Compute dF/deta for energy equation  
-    std::vector<double> dF_deta(solution.F.size());
-    for (std::size_t i = 1; i < solution.F.size() - 1; ++i) {
-        dF_deta[i] = (solution.F[i+1] - solution.F[i-1]) / (2.0 * grid_->d_eta());
-    }
-    dF_deta[0] = (solution.F[1] - solution.F[0]) / grid_->d_eta();
-    dF_deta.back() = (solution.F.back() - solution.F[solution.F.size()-2]) / grid_->d_eta();
+    // Compute dF/deta for energy equation using 4th-order scheme
+    auto dF_deta = coefficients::derivatives::compute_eta_derivative(solution.F, grid_->d_eta());
     
     auto result = equations::solve_energy(
         solution.g, inputs, coeffs, bc, *xi_derivatives_,
@@ -573,30 +568,13 @@ auto BoundaryLayerSolver::compute_eta_derivatives(
     
     equations::SolutionState derivatives(n_eta, n_species);
     
-    // Simple finite difference derivatives
-    auto compute_derivative = [d_eta](const std::vector<double>& field) {
-        std::vector<double> deriv(field.size());
-        
-        // Forward difference at start
-        deriv[0] = (field[1] - field[0]) / d_eta;
-        
-        // Central difference in interior
-        for (std::size_t i = 1; i < field.size() - 1; ++i) {
-            deriv[i] = (field[i+1] - field[i-1]) / (2.0 * d_eta);
-        }
-        
-        // Backward difference at end
-        deriv.back() = (field.back() - field[field.size()-2]) / d_eta;
-        
-        return deriv;
-    };
-    
-    derivatives.F = compute_derivative(solution.F);
-    derivatives.g = compute_derivative(solution.g);
-    derivatives.V = compute_derivative(solution.V);
+    // High-order finite difference derivatives using unified function
+    using namespace coefficients::derivatives;
+    derivatives.F = compute_eta_derivative(solution.F, d_eta);
+    derivatives.g = compute_eta_derivative(solution.g, d_eta);
+    derivatives.V = compute_eta_derivative(solution.V, d_eta);
     
     // Species derivatives - use the high-order derivative functions
-    using namespace coefficients::derivatives;
     for (std::size_t j = 0; j < n_species; ++j) {
         std::vector<double> c_row(n_eta);
         for (std::size_t i = 0; i < n_eta; ++i) {
