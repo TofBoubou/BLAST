@@ -10,7 +10,8 @@
       "Bash(cd:*)",
       "Bash(rg:*)",
       "Bash(cd:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }

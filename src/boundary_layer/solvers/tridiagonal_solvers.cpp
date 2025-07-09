@@ -1,6 +1,5 @@
 #include "blast/boundary_layer/solvers/tridiagonal_solvers.hpp"
 #include <algorithm>
-#include <numeric>
 
 namespace blast::boundary_layer::solvers {
 
@@ -14,7 +13,7 @@ namespace {
     // Compute collocation coefficients for a given eta point
     [[nodiscard]] auto compute_collocation_coeffs(
         double a, double b, double c, double t
-    ) noexcept -> CollocationCoeffs {
+    ) -> std::expected<CollocationCoeffs, SolverError> {
         CollocationCoeffs coeffs;
         
         if (t == -1.0) {
@@ -36,7 +35,9 @@ namespace {
             coeffs.a = -6.0 * a - 2.0 * b;
             coeffs.b = -10.0 * a - 2.0 * b;
         } else {
-            std::terminate();
+            return std::unexpected(SolverError(
+                std::format("Invalid collocation point t={}, expected -1, 0, or 1", t)
+            ));
         }
         
         return coeffs;
@@ -59,15 +60,35 @@ auto solve_momentum_energy_tridiagonal(
         return std::unexpected(SolverError("Need at least 3 eta points"));
     }
     
+    // Validate coefficient array sizes
+    if (a_coeffs.size() != n_eta || b_coeffs.size() != n_eta || 
+        c_coeffs.size() != n_eta || d_rhs.size() != n_eta) {
+        return std::unexpected(SolverError("Coefficient arrays size mismatch"));
+    }
+    
     // Allocate working arrays
     std::vector<double> A(n_eta), B(n_eta), C(n_eta), D(n_eta);
     
     // Fill coefficients for interior points
     for (std::size_t i = 1; i < n_eta - 1; ++i) {
         // Collocation at t = -1, 0, 1
-        auto col_m1 = compute_collocation_coeffs(a_coeffs[i-1], b_coeffs[i-1], c_coeffs[i-1], -1.0);
-        auto col_0 = compute_collocation_coeffs(a_coeffs[i], b_coeffs[i], c_coeffs[i], 0.0);
-        auto col_p1 = compute_collocation_coeffs(a_coeffs[i+1], b_coeffs[i+1], c_coeffs[i+1], 1.0);
+        auto col_m1_result = compute_collocation_coeffs(a_coeffs[i-1], b_coeffs[i-1], c_coeffs[i-1], -1.0);
+        if (!col_m1_result) {
+            return std::unexpected(col_m1_result.error());
+        }
+        auto col_m1 = col_m1_result.value();
+        
+        auto col_0_result = compute_collocation_coeffs(a_coeffs[i], b_coeffs[i], c_coeffs[i], 0.0);
+        if (!col_0_result) {
+            return std::unexpected(col_0_result.error());
+        }
+        auto col_0 = col_0_result.value();
+        
+        auto col_p1_result = compute_collocation_coeffs(a_coeffs[i+1], b_coeffs[i+1], c_coeffs[i+1], 1.0);
+        if (!col_p1_result) {
+            return std::unexpected(col_p1_result.error());
+        }
+        auto col_p1 = col_p1_result.value();
         
         // Sub-determinants to eliminate alpha and beta
         const double det_m1 = col_0.a * col_p1.b - col_0.b * col_p1.a;
@@ -91,8 +112,17 @@ auto solve_momentum_energy_tridiagonal(
     bc_col.b = 2.0 * f_bc;
     
     // Equation collocation at wall
-    auto col_1 = compute_collocation_coeffs(a_coeffs[0], b_coeffs[0], c_coeffs[0], -1.0);
-    auto col_2 = compute_collocation_coeffs(a_coeffs[1], b_coeffs[1], c_coeffs[1], 0.0);
+    auto col_1_result = compute_collocation_coeffs(a_coeffs[0], b_coeffs[0], c_coeffs[0], -1.0);
+    if (!col_1_result) {
+        return std::unexpected(col_1_result.error());
+    }
+    auto col_1 = col_1_result.value();
+    
+    auto col_2_result = compute_collocation_coeffs(a_coeffs[1], b_coeffs[1], c_coeffs[1], 0.0);
+    if (!col_2_result) {
+        return std::unexpected(col_2_result.error());
+    }
+    auto col_2 = col_2_result.value();
     
     // Sub-determinants for wall
     const double det_m1 = col_1.a * col_2.b - col_1.b * col_2.a;
@@ -115,7 +145,9 @@ auto solve_momentum_energy_tridiagonal(
     
     // Solve tridiagonal system
     std::vector<double> solution(n_eta);
-    detail::thomas_algorithm(C, B, A, D, solution);
+    if (auto result = detail::thomas_algorithm(C, B, A, D, solution); !result) {
+        return std::unexpected(result.error());
+    }
     
     return solution;
 }
@@ -139,8 +171,25 @@ auto solve_species_block_tridiagonal(
         return std::unexpected(SolverError("Need at least 3 eta points"));
     }
     
+    // Validate matrix dimensions
+    if (a_coeffs.rows() != n_eta || a_coeffs.cols() != n_species ||
+        b_coeffs.rows() != n_eta || b_coeffs.cols() != n_species ||
+        c_coeffs.rows() != n_eta || c_coeffs.cols() != n_species ||
+        d_rhs.rows() != n_eta || d_rhs.cols() != n_species) {
+        return std::unexpected(SolverError("Coefficient matrix dimensions mismatch"));
+    }
+    
+    // Validate boundary condition array sizes
+    if (f_bc.size() != n_species || g_bc.size() != n_species || h_bc.size() != n_species) {
+        return std::unexpected(SolverError("Boundary condition arrays size mismatch"));
+    }
+    
     const std::size_t start_idx = has_electrons ? 1 : 0;
     const std::size_t n_heavy = n_species - start_idx;
+    
+    if (n_heavy == 0) {
+        return std::unexpected(SolverError("No heavy species to solve"));
+    }
     
     // Allocate block matrices
     std::vector<core::Matrix<double>> A(n_eta), B(n_eta), C(n_eta);
@@ -165,15 +214,29 @@ auto solve_species_block_tridiagonal(
             const int jh = j - start_idx;  // Heavy species index
             
             // Collocation coefficients
-            auto col_m1 = compute_collocation_coeffs(
+            auto col_m1_result = compute_collocation_coeffs(
                 a_coeffs(i-1, j), b_coeffs(i-1, j), c_coeffs(i-1, j), -1.0
             );
-            auto col_0 = compute_collocation_coeffs(
+            if (!col_m1_result) {
+                return std::unexpected(col_m1_result.error());
+            }
+            auto col_m1 = col_m1_result.value();
+            
+            auto col_0_result = compute_collocation_coeffs(
                 a_coeffs(i, j), b_coeffs(i, j), c_coeffs(i, j), 0.0
             );
-            auto col_p1 = compute_collocation_coeffs(
+            if (!col_0_result) {
+                return std::unexpected(col_0_result.error());
+            }
+            auto col_0 = col_0_result.value();
+            
+            auto col_p1_result = compute_collocation_coeffs(
                 a_coeffs(i+1, j), b_coeffs(i+1, j), c_coeffs(i+1, j), 1.0
             );
+            if (!col_p1_result) {
+                return std::unexpected(col_p1_result.error());
+            }
+            auto col_p1 = col_p1_result.value();
             
             // Sub-determinants
             det_m1[jh] = col_0.a * col_p1.b - col_0.b * col_p1.a;
@@ -212,12 +275,21 @@ auto solve_species_block_tridiagonal(
         col_bc[jh].b = 2.0 * f_bc[j];
         
         // Equation collocations
-        col_1[jh] = compute_collocation_coeffs(
+        auto col_1_result = compute_collocation_coeffs(
             a_coeffs(0, j), b_coeffs(0, j), c_coeffs(0, j), -1.0
         );
-        col_2[jh] = compute_collocation_coeffs(
+        if (!col_1_result) {
+            return std::unexpected(col_1_result.error());
+        }
+        col_1[jh] = col_1_result.value();
+        
+        auto col_2_result = compute_collocation_coeffs(
             a_coeffs(1, j), b_coeffs(1, j), c_coeffs(1, j), 0.0
         );
+        if (!col_2_result) {
+            return std::unexpected(col_2_result.error());
+        }
+        col_2[jh] = col_2_result.value();
         
         // Sub-determinants
         det_m1[jh] = col_1[jh].a * col_2[jh].b - col_1[jh].b * col_2[jh].a;
@@ -236,23 +308,32 @@ auto solve_species_block_tridiagonal(
     }
     
     // Make block matrix truly tridiagonal
-    // Handle top boundary condition
-
-    Eigen::PartialPivLU<Eigen::MatrixXd> lu_A1(A[1].eigen());
-    auto temp_solve_C = lu_A1.solve(C[1].eigen());
-    auto temp_solve_B = lu_A1.solve(B[1].eigen());
-
-    B[0].eigen() = (R0.eigen() - R2.eigen() * temp_solve_C).eval();
-    A[0].eigen() = (R1.eigen() - R2.eigen() * temp_solve_B).eval();
- 
-    Eigen::VectorXd D1(n_heavy);
-    for (std::size_t j = 0; j < n_heavy; ++j) {
-        D1[j] = D(1, j + start_idx);
-    }
-    Eigen::VectorXd temp = R2.eigen() * lu_A1.solve(D1);
+    try {
+        // Handle top boundary condition
+        Eigen::PartialPivLU<Eigen::MatrixXd> lu_A1(A[1].eigen());
+        if (lu_A1.info() != Eigen::Success) {
+            return std::unexpected(SolverError("Singular matrix A[1] in boundary condition setup"));
+        }
         
-    for (std::size_t j = 0; j < n_heavy; ++j) {
-        D(0, j + start_idx) = R[j] - temp[j];
+        auto temp_solve_C = lu_A1.solve(C[1].eigen());
+        auto temp_solve_B = lu_A1.solve(B[1].eigen());
+
+        B[0].eigen() = (R0.eigen() - R2.eigen() * temp_solve_C).eval();
+        A[0].eigen() = (R1.eigen() - R2.eigen() * temp_solve_B).eval();
+ 
+        Eigen::VectorXd D1(n_heavy);
+        for (std::size_t j = 0; j < n_heavy; ++j) {
+            D1[j] = D(1, j + start_idx);
+        }
+        Eigen::VectorXd temp = R2.eigen() * lu_A1.solve(D1);
+            
+        for (std::size_t j = 0; j < n_heavy; ++j) {
+            D(0, j + start_idx) = R[j] - temp[j];
+        }
+    } catch (const std::exception& e) {
+        return std::unexpected(SolverError(
+            std::format("Matrix operation failed in boundary setup: {}", e.what())
+        ));
     }
     
     // Handle bottom boundary
@@ -263,29 +344,52 @@ auto solve_species_block_tridiagonal(
     
     // Solve block tridiagonal system
     core::Matrix<double> solution(n_species, n_eta);
-    detail::block_thomas_algorithm(C, B, A, D, solution, start_idx);
+    if (auto result = detail::block_thomas_algorithm(C, B, A, D, solution, start_idx); !result) {
+        return std::unexpected(result.error());
+    }
     
     return solution;
 }
 
 namespace detail {
 
-void thomas_algorithm(
+auto thomas_algorithm(
     std::span<double> lower_diag,
     std::span<double> main_diag,
     std::span<double> upper_diag,
     std::span<double> rhs,
     std::span<double> solution
-) {
+) -> std::expected<void, SolverError> {
     const auto n = main_diag.size();
     
+    // Validation des tailles
+    if (lower_diag.size() != n || upper_diag.size() != n || 
+        rhs.size() != n || solution.size() != n) {
+        return std::unexpected(SolverError("Incompatible array sizes in Thomas algorithm"));
+    }
+    
+    if (n < 2) {
+        return std::unexpected(SolverError("System too small for Thomas algorithm"));
+    }
+    
     // Forward sweep
+    if (std::abs(main_diag[0]) < 1e-14) {
+        return std::unexpected(SolverError("Zero diagonal element at position 0"));
+    }
+    
     main_diag[0] = 1.0 / main_diag[0];
     lower_diag[0] = rhs[0] * main_diag[0];
     
     for (std::size_t i = 1; i < n - 1; ++i) {
         upper_diag[i-1] = upper_diag[i-1] * main_diag[i-1];
         main_diag[i] = main_diag[i] - lower_diag[i] * upper_diag[i-1];
+        
+        if (std::abs(main_diag[i]) < 1e-14) {
+            return std::unexpected(SolverError(
+                std::format("Zero diagonal element at position {}", i)
+            ));
+        }
+        
         main_diag[i] = 1.0 / main_diag[i];
         lower_diag[i] = (rhs[i] - lower_diag[i] * lower_diag[i-1]) * main_diag[i];
     }
@@ -295,25 +399,58 @@ void thomas_algorithm(
     for (int i = n - 3; i >= 0; --i) {
         solution[i] = lower_diag[i] - upper_diag[i] * solution[i+1];
     }
+    
+    return {};
 }
 
-void block_thomas_algorithm(
+auto block_thomas_algorithm(
     std::vector<core::Matrix<double>>& lower_blocks,
     std::vector<core::Matrix<double>>& main_blocks,
     std::vector<core::Matrix<double>>& upper_blocks,
     core::Matrix<double>& rhs,
     core::Matrix<double>& solution,
     int start_species
-) {
+) -> std::expected<void, SolverError> {
     const auto n_eta = main_blocks.size();
+    
+    if (n_eta < 2) {
+        return std::unexpected(SolverError("System too small for block Thomas algorithm"));
+    }
+    
+    if (lower_blocks.size() != n_eta || upper_blocks.size() != n_eta) {
+        return std::unexpected(SolverError("Incompatible block matrix sizes"));
+    }
+    
     const auto n_heavy = main_blocks[0].rows();
+    if (n_heavy == 0) {
+        return std::unexpected(SolverError("Empty block matrices"));
+    }
+    
+    // Validation des tailles de matrices
+    for (std::size_t i = 0; i < n_eta; ++i) {
+        if (main_blocks[i].rows() != n_heavy || main_blocks[i].cols() != n_heavy ||
+            lower_blocks[i].rows() != n_heavy || lower_blocks[i].cols() != n_heavy ||
+            upper_blocks[i].rows() != n_heavy || upper_blocks[i].cols() != n_heavy) {
+            return std::unexpected(SolverError(
+                std::format("Inconsistent block matrix dimensions at position {}", i)
+            ));
+        }
+    }
     
     // Forward elimination
     for (std::size_t i = 1; i < n_eta - 1; ++i) {
+        try {
             Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[i-1].eigen());
+            
+            if (lu_B.info() != Eigen::Success) {
+                return std::unexpected(SolverError(
+                    std::format("Singular matrix at block position {}", i-1)
+                ));
+            }
+            
             upper_blocks[i-1].eigen() = (lu_B.solve(upper_blocks[i-1].eigen())).eval();
-            main_blocks[i].eigen() = (main_blocks[i].eigen() - lower_blocks[i].eigen() * upper_blocks[i-1].eigen()).eval();
-
+            main_blocks[i].eigen() = (main_blocks[i].eigen() - 
+                                     lower_blocks[i].eigen() * upper_blocks[i-1].eigen()).eval();
             
             // Update RHS
             for (std::size_t j = 0; j < n_heavy; ++j) {
@@ -323,30 +460,51 @@ void block_thomas_algorithm(
                 }
                 rhs(i, j + start_species) -= temp;
             }
+        } catch (const std::exception& e) {
+            return std::unexpected(SolverError(
+                std::format("Matrix operation failed at block {}: {}", i, e.what())
+            ));
+        }
     }
     
     // Back substitution
-    // Last interior point
-    Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[n_eta - 2].eigen());
-    Eigen::VectorXd rhs_vec(n_heavy);
-    for (std::size_t k = 0; k < n_heavy; ++k) {
-        rhs_vec[k] = rhs(n_eta - 2, k + start_species);
-    }
-    Eigen::VectorXd sol = lu_B.solve(rhs_vec);
-    for (std::size_t j = 0; j < n_heavy; ++j) {
-        solution(j + start_species, n_eta - 2) = sol[j];
-    }
-    
-    // Remaining points
-    for (std::ptrdiff_t i = static_cast<std::ptrdiff_t>(n_eta) - 3; i >= 0; --i) {
+    try {
+        // Last interior point
+        Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[n_eta - 2].eigen());
+        
+        if (lu_B.info() != Eigen::Success) {
+            return std::unexpected(SolverError(
+                std::format("Singular matrix at final block position {}", n_eta - 2)
+            ));
+        }
+        
+        Eigen::VectorXd rhs_vec(n_heavy);
+        for (std::size_t k = 0; k < n_heavy; ++k) {
+            rhs_vec[k] = rhs(n_eta - 2, k + start_species);
+        }
+        
+        Eigen::VectorXd sol = lu_B.solve(rhs_vec);
         for (std::size_t j = 0; j < n_heavy; ++j) {
-            solution(j + start_species, i) = rhs(i, j + start_species);
-            for (std::size_t k = 0; k < n_heavy; ++k) {
-                solution(j + start_species, i) -= 
-                    upper_blocks[i](j, k) * solution(k + start_species, i+1);
+            solution(j + start_species, n_eta - 2) = sol[j];
+        }
+        
+        // Remaining points
+        for (std::ptrdiff_t i = static_cast<std::ptrdiff_t>(n_eta) - 3; i >= 0; --i) {
+            for (std::size_t j = 0; j < n_heavy; ++j) {
+                solution(j + start_species, i) = rhs(i, j + start_species);
+                for (std::size_t k = 0; k < n_heavy; ++k) {
+                    solution(j + start_species, i) -= 
+                        upper_blocks[i](j, k) * solution(k + start_species, i+1);
+                }
             }
         }
+    } catch (const std::exception& e) {
+        return std::unexpected(SolverError(
+            std::format("Back substitution failed: {}", e.what())
+        ));
     }
+    
+    return {};
 }
 
 } // namespace detail

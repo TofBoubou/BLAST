@@ -16,6 +16,15 @@ auto CoefficientCalculator::calculate(
     const XiDerivatives& xi_der
 ) const -> std::expected<CoefficientSet, CoefficientError> {
     
+    // Validate inputs
+    if (inputs.T.empty() || inputs.c.rows() == 0 || inputs.c.cols() == 0) {
+        return std::unexpected(CoefficientError("Invalid input dimensions"));
+    }
+    
+    if (inputs.T.size() != static_cast<std::size_t>(inputs.c.cols())) {
+        return std::unexpected(CoefficientError("Temperature and concentration dimensions mismatch"));
+    }
+    
     CoefficientSet coeffs;
     
     // 1. Calculate thermodynamic coefficients first (needed by others)
@@ -109,13 +118,30 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
     
     // Calculate molecular weights and densities
     for (std::size_t i = 0; i < n_eta; ++i) {
+        // Validate temperature
+        if (!std::isfinite(inputs.T[i]) || inputs.T[i] <= 0.0) {
+            return std::unexpected(CoefficientError(
+                std::format("Invalid temperature at eta={}: T={}", i, inputs.T[i])
+            ));
+        }
+        
         // Extract species concentrations at this eta point
         std::vector<double> c_local(n_species);
+        double sum_c = 0.0;
         for (std::size_t j = 0; j < n_species; ++j) {
             c_local[j] = inputs.c(j, i);
-            if (std::isnan(c_local[j]) || !std::isfinite(c_local[j])) {
-                std::cout << "NaN/Inf detected at eta=" << i << " species=" << j << " c=" << c_local[j] << std::endl;
+            if (!std::isfinite(c_local[j]) || c_local[j] < 0.0) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid concentration at eta={} species={}: c={}", i, j, c_local[j])
+                ));
             }
+            sum_c += c_local[j];
+        }
+        
+        if (sum_c <= 0.0) {
+            return std::unexpected(CoefficientError(
+                std::format("Zero or negative total concentration at eta={}: sum_c={}", i, sum_c)
+            ));
         }
         
         // Get molecular weight
@@ -137,12 +163,23 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
         std::vector<double> dc_deta_local(n_species);
         for (std::size_t j = 0; j < n_species; ++j) {
             dc_deta_local[j] = inputs.dc_deta(j, i);
+            if (!std::isfinite(dc_deta_local[j])) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid dc_deta at eta={} species={}", i, j)
+                ));
+            }
         }
         
         // d(MW)/dη = -MW² · Σ(dc_j/dη / Mw_j)
         double sum = 0.0;
         for (std::size_t j = 0; j < n_species; ++j) {
-            sum += dc_deta_local[j] / mixture_.species_molecular_weight(j);
+            double mw_j = mixture_.species_molecular_weight(j);
+            if (mw_j <= 0.0) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid species molecular weight for species {}", j)
+                ));
+            }
+            sum += dc_deta_local[j] / mw_j;
         }
         thermo.d_MW_deta[i] = -thermo.MW[i] * thermo.MW[i] * sum;
     }
@@ -201,11 +238,21 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         const double mu = mu_result.value();
         const double Cp = cp_result.value();
         const double k_fr = k_result.value();
+        
+        if (mu <= 0.0 || Cp <= 0.0 || k_fr <= 0.0) {
+            return std::unexpected(CoefficientError(
+                std::format("Invalid transport properties at eta={}: mu={}, Cp={}, k={}", i, mu, Cp, k_fr)
+            ));
+        }
+        
         const double Pr = mu * Cp / k_fr;
+        
+        if (bc.rho_e() <= 0.0 || bc.mu_e() <= 0.0) {
+            return std::unexpected(CoefficientError("Invalid edge conditions: rho_e or mu_e <= 0"));
+        }
         
         transport.l0.push_back(thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()));
         transport.l3.push_back(transport.l0[i] / Pr);
-
     }
     
     // Compute derivatives
@@ -229,6 +276,9 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
     
     // Use edge pressure consistently
     const double P_edge = bc.P_e();
+    if (P_edge <= 0.0) {
+        return std::unexpected(CoefficientError("Invalid edge pressure: P_e <= 0"));
+    }
     
     // Calculate binary diffusion coefficients
     for (std::size_t i = 0; i < n_eta; ++i) {
@@ -245,7 +295,13 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
 
         for (std::size_t j = 0; j < n_species; ++j) {
             for (std::size_t k = 0; k < n_species; ++k) {
-                diff.Dij_bin(i * n_species + j, k) = dij_local(j, k);
+                double dij_val = dij_local(j, k);
+                if (!std::isfinite(dij_val) || dij_val < 0.0) {
+                    return std::unexpected(CoefficientError(
+                        std::format("Invalid diffusion coefficient at eta={}, species {}-{}: Dij={}", i, j, k, dij_val)
+                    ));
+                }
+                diff.Dij_bin(i * n_species + j, k) = dij_val;
             }
         }
     }
@@ -276,6 +332,11 @@ auto CoefficientCalculator::calculate_chemical_coefficients(
         // Store results
         const auto& [wi_local, dwi_dc] = result.value();
         for (std::size_t j = 0; j < n_species; ++j) {
+            if (!std::isfinite(wi_local[j])) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid production rate at eta={}, species={}", i, j)
+                ));
+            }
             chem.wi(i, j) = wi_local[j];
         }
         chem.d_wi_dc.push_back(std::move(dwi_dc));
@@ -292,6 +353,10 @@ auto CoefficientCalculator::calculate_station_coefficients(
 ) const -> std::expected<std::pair<std::vector<double>, core::Matrix<double>>, CoefficientError> {
     
     const auto n_species = inputs.c.rows();
+    
+    if (station_index >= inputs.T.size()) {
+        return std::unexpected(CoefficientError("Station index out of bounds"));
+    }
     
     // Extract and normalize composition
     auto [c_local, rho_species] = extract_local_composition(
@@ -347,8 +412,15 @@ auto CoefficientCalculator::extract_local_composition(
     }
     
     // Normalize and compute partial densities
-    for (std::size_t j = 0; j < n_species; ++j) {
-        rho_species[j] = rho_total * c_local[j] / sum_c;
+    if (sum_c > 0.0) {
+        for (std::size_t j = 0; j < n_species; ++j) {
+            rho_species[j] = rho_total * c_local[j] / sum_c;
+        }
+    } else {
+        // Fallback for zero composition
+        for (std::size_t j = 0; j < n_species; ++j) {
+            rho_species[j] = 0.0;
+        }
     }
     
     return {c_local, rho_species};
@@ -380,6 +452,10 @@ auto CoefficientCalculator::transform_jacobian(
     const auto& h_species = h_sp_result.value();
     const double Cp = cp_result.value();
     
+    if (Cp <= 0.0) {
+        return std::unexpected(CoefficientError("Invalid specific heat: Cp <= 0"));
+    }
+    
     // Compute dT/dc_j = -h_j/Cp
     std::vector<double> dT_dc(n_species);
     for (std::size_t j = 0; j < n_species; ++j) {
@@ -409,6 +485,12 @@ auto CoefficientCalculator::transform_jacobian(
                 sum += dwi_drho(i, k) * drho_dc(k, j);
             }
             dwi_dc(i, j) = sum + dwi_dT[i] * dT_dc[j];
+            
+            if (!std::isfinite(dwi_dc(i, j))) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid Jacobian element at ({}, {})", i, j)
+                ));
+            }
         }
     }
     
@@ -427,7 +509,10 @@ auto CoefficientCalculator::compute_density_derivatives(
     for (std::size_t k = 0; k < n_species; ++k) {
         for (std::size_t j = 0; j < n_species; ++j) {
             drho_dc(k, j) = (k == j) ? rho_total : 0.0;
-            drho_dc(k, j) -= rho_species[k] * MW_mixture / mixture_.species_molecular_weight(j);
+            double mw_j = mixture_.species_molecular_weight(j);
+            if (mw_j > 0.0) {
+                drho_dc(k, j) -= rho_species[k] * MW_mixture / mw_j;
+            }
         }
     }
     
@@ -443,6 +528,10 @@ auto CoefficientCalculator::compute_temperature_derivatives(
     constexpr double eps = 1e-6;
     const double dT = eps * T;
     
+    if (dT <= 0.0) {
+        return std::unexpected(CoefficientError("Invalid temperature for finite difference"));
+    }
+    
     auto wi_pert_result = mixture_.production_rates(rho_species, T + dT);
     if (!wi_pert_result) {
         return std::unexpected(CoefficientError("Failed to compute perturbed rates"));
@@ -453,6 +542,11 @@ auto CoefficientCalculator::compute_temperature_derivatives(
     
     for (std::size_t j = 0; j < wi_base.size(); ++j) {
         dwi_dT[j] = (wi_pert[j] - wi_base[j]) / dT;
+        if (!std::isfinite(dwi_dT[j])) {
+            return std::unexpected(CoefficientError(
+                std::format("Invalid temperature derivative for species {}", j)
+            ));
+        }
     }
     
     return dwi_dT;
@@ -490,6 +584,11 @@ auto CoefficientCalculator::calculate_thermal_diffusion(
         
         const auto& tdr_local = tdr_result.value();
         for (std::size_t j = 0; j < n_species; ++j) {
+            if (!std::isfinite(tdr_local[j])) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid TDR at eta={}, species={}", i, j)
+                ));
+            }
             tdr.tdr(j, i) = tdr_local[j];
         }
     }
@@ -502,6 +601,11 @@ auto CoefficientCalculator::calculate_thermal_diffusion(
         // Compute TDR term
         tdr.tdr_term = core::Matrix<double>(n_eta, n_species);
         for (std::size_t i = 0; i < n_eta; ++i) {
+            if (inputs.T[i] <= 0.0) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid temperature for TDR calculation at eta={}", i)
+                ));
+            }
             for (std::size_t j = 0; j < n_species; ++j) {
                 tdr.tdr_term(i, j) = tdr.tdr(j, i) / inputs.T[i] * dT_deta[i];
             }
@@ -531,6 +635,11 @@ auto CoefficientCalculator::calculate_species_enthalpies(
         
         const auto& h_local = h_result.value();
         for (std::size_t j = 0; j < n_species; ++j) {
+            if (!std::isfinite(h_local[j])) {
+                return std::unexpected(CoefficientError(
+                    std::format("Invalid species enthalpy at eta={}, species={}", i, j)
+                ));
+            }
             h_species(j, i) = h_local[j];
         }
     }
@@ -584,12 +693,22 @@ auto CoefficientCalculator::calculate_wall_properties(
         return std::unexpected(CoefficientError("Failed to compute wall specific heat"));
     }
     
+    const double k_wall = k_result.value();
+    const double mu_wall = mu_result.value();
+    const double Cp_wall = cp_result.value();
+    
+    if (k_wall <= 0.0 || mu_wall <= 0.0 || Cp_wall <= 0.0) {
+        return std::unexpected(CoefficientError(
+            std::format("Invalid wall properties: k={}, mu={}, Cp={}", k_wall, mu_wall, Cp_wall)
+        ));
+    }
+    
     WallProperties wall;
-    wall.k_wall = k_result.value();
-    wall.mu_wall = mu_result.value();
-    wall.Cp_wall = cp_result.value();
+    wall.k_wall = k_wall;
+    wall.mu_wall = mu_wall;
+    wall.Cp_wall = Cp_wall;
     wall.rho_wall = thermo.rho[0];
-    wall.Pr_wall = (wall.k_wall > 0) ? wall.mu_wall * wall.Cp_wall / wall.k_wall : 0.72;
+    wall.Pr_wall = mu_wall * Cp_wall / k_wall;
     
     return wall;
 }
@@ -602,15 +721,25 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::vector<double>
     const auto n = std::ranges::size(values);
     std::vector<double> derivatives(n);
     
+    if (d_eta <= 0.0) {
+        // Return zeros for invalid spacing
+        std::fill(derivatives.begin(), derivatives.end(), 0.0);
+        return derivatives;
+    }
+    
+    if (n < 2) {
+        // Not enough points for derivative
+        std::fill(derivatives.begin(), derivatives.end(), 0.0);
+        return derivatives;
+    }
+    
     if (n < 5) {
         // Simple finite differences for small arrays
-        if (n >= 2) {
-            derivatives[0] = (values[1] - values[0]) / d_eta;
-            for (std::size_t i = 1; i < n - 1; ++i) {
-                derivatives[i] = (values[i + 1] - values[i - 1]) / (2.0 * d_eta);
-            }
-            derivatives[n - 1] = (values[n - 1] - values[n - 2]) / d_eta;
+        derivatives[0] = (values[1] - values[0]) / d_eta;
+        for (std::size_t i = 1; i < n - 1; ++i) {
+            derivatives[i] = (values[i + 1] - values[i - 1]) / (2.0 * d_eta);
         }
+        derivatives[n - 1] = (values[n - 1] - values[n - 2]) / d_eta;
         return derivatives;
     }
     
@@ -643,15 +772,26 @@ auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<
     const auto n = std::ranges::size(values);
     std::vector<double> second_derivatives(n);
     
+    if (d_eta <= 0.0) {
+        // Return zeros for invalid spacing
+        std::fill(second_derivatives.begin(), second_derivatives.end(), 0.0);
+        return second_derivatives;
+    }
+    
+    if (n < 3) {
+        // Not enough points for second derivative
+        std::fill(second_derivatives.begin(), second_derivatives.end(), 0.0);
+        return second_derivatives;
+    }
+    
     if (n < 5) {
         // Simple finite differences for small arrays
-        if (n >= 3) {
-            second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / (d_eta * d_eta);
-            for (std::size_t i = 1; i < n - 1; ++i) {
-                second_derivatives[i] = (values[i-1] - 2.0 * values[i] + values[i+1]) / (d_eta * d_eta);
-            }
-            second_derivatives[n-1] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / (d_eta * d_eta);
+        const double d_eta_sq = d_eta * d_eta;
+        second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
+        for (std::size_t i = 1; i < n - 1; ++i) {
+            second_derivatives[i] = (values[i-1] - 2.0 * values[i] + values[i+1]) / d_eta_sq;
         }
+        second_derivatives[n-1] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / d_eta_sq;
         return second_derivatives;
     }
     
@@ -659,8 +799,9 @@ auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<
     const double dx2_12 = 12.0 * d_eta * d_eta;
     
     // Forward difference at boundaries
-    second_derivatives[0] = (2.0 * values[0] - 5.0 * values[1] + 4.0 * values[2] - values[3]) / (d_eta * d_eta);
-    second_derivatives[1] = (values[0] - 2.0 * values[1] + values[2]) / (d_eta * d_eta);
+    const double d_eta_sq = d_eta * d_eta;
+    second_derivatives[0] = (2.0 * values[0] - 5.0 * values[1] + 4.0 * values[2] - values[3]) / d_eta_sq;
+    second_derivatives[1] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
     
     // Central differences with 5-point stencil
     for (std::size_t i = 2; i < n - 2; ++i) {
@@ -669,8 +810,8 @@ auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<
     }
     
     // Backward difference at boundaries
-    second_derivatives[n-2] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / (d_eta * d_eta);
-    second_derivatives[n-1] = (2.0 * values[n-1] - 5.0 * values[n-2] + 4.0 * values[n-3] - values[n-4]) / (d_eta * d_eta);
+    second_derivatives[n-2] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / d_eta_sq;
+    second_derivatives[n-1] = (2.0 * values[n-1] - 5.0 * values[n-2] + 4.0 * values[n-3] - values[n-4]) / d_eta_sq;
     
     return second_derivatives;
 }
@@ -680,6 +821,11 @@ auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) ->
     const auto n_rows = values.rows();
     const auto n_cols = values.cols();
     Matrix result(n_rows, n_cols);
+    
+    if (d_eta <= 0.0) {
+        result.setZero();
+        return result;
+    }
     
     for (std::size_t i = 0; i < n_rows; ++i) {
         std::vector<double> row_values(n_cols);

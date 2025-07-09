@@ -37,28 +37,27 @@ public:
     const core::Matrix<double>& b_coeffs,  // [n_eta x n_species]
     const core::Matrix<double>& c_coeffs,  // [n_eta x n_species]
     const core::Matrix<double>& d_rhs,     // [n_eta x n_species]
-    bool has_electrons = false
+    bool has_electrons
 ) -> std::expected<core::Matrix<double>, SolverError>;
 
 // Internal Thomas algorithm implementation
 namespace detail {
-    void thomas_algorithm(
+    [[nodiscard]] auto thomas_algorithm(
         std::span<double> lower_diag,
         std::span<double> main_diag,
         std::span<double> upper_diag,
         std::span<double> rhs,
         std::span<double> solution
-    );
+    ) -> std::expected<void, SolverError>;
     
-    void block_thomas_algorithm(
+    [[nodiscard]] auto block_thomas_algorithm(
         std::vector<core::Matrix<double>>& lower_blocks,
         std::vector<core::Matrix<double>>& main_blocks,
         std::vector<core::Matrix<double>>& upper_blocks,
         core::Matrix<double>& rhs,
         core::Matrix<double>& solution,
         int start_species
-    );
-
+    ) -> std::expected<void, SolverError>;
 }
 
 } // namespace blast::boundary_layer::solvers

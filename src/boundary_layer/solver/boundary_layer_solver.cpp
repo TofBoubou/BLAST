@@ -470,8 +470,6 @@ auto BoundaryLayerSolver::check_convergence(
         }
     }
     info.residual_c = std::sqrt(c_sum / c_count);
-
-    std::cout << info.residual_F << std::endl;
     
     info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
     
