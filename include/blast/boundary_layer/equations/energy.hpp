@@ -54,7 +54,7 @@ namespace detail {
         std::span<const double> V_field,
         int station,
         PhysicalQuantity auto d_eta
-    ) -> EnergyCoefficients;
+    ) -> std::expected<EnergyCoefficients, EquationError>;
     
     [[nodiscard]] auto build_energy_boundary_conditions(
         const coefficients::CoefficientInputs& inputs,

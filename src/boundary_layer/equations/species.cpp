@@ -40,10 +40,14 @@ auto solve_species(
     // Non-equilibrium case: solve transport equations
     
     // Build species coefficients
-    auto species_coeffs = detail::build_species_coefficients(
+    auto species_coeffs_result = detail::build_species_coefficients(
         c_previous, inputs, coeffs, bc, xi_der, mixture, sim_config,
         F_field, V_field, station, d_eta
     );
+    if (!species_coeffs_result) {
+        return std::unexpected(species_coeffs_result.error());
+    }
+    auto species_coeffs = species_coeffs_result.value();
     
     // Build boundary conditions  
     auto boundary_result = detail::build_species_boundary_conditions(
@@ -155,7 +159,7 @@ auto build_species_coefficients(
     std::span<const double> V_field,
     int station,
     PhysicalQuantity auto d_eta
-) -> SpeciesCoefficients {
+) -> std::expected<SpeciesCoefficients, EquationError> {
     
     const auto n_eta = c_previous.cols();
     const auto n_species = c_previous.rows();
@@ -165,7 +169,11 @@ auto build_species_coefficients(
     const auto c_derivatives = xi_der.c_derivative();
     
     // Compute geometry factors
-    const auto factors = compute_geometry_factors(station, xi, bc, sim_config);
+    const auto factors_result = compute_geometry_factors(station, xi, bc, sim_config);
+    if (!factors_result) {
+        return std::unexpected(factors_result.error());
+    }
+    const auto factors = factors_result.value();
     
     // Parameters for fake fluxes
     constexpr double Le = 1.2;  // Lewis number

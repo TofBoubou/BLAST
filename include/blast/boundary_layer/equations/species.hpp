@@ -68,7 +68,7 @@ namespace detail {
         std::span<const double> V_field,
         int station,
         PhysicalQuantity auto d_eta
-    ) -> SpeciesCoefficients;
+    ) -> std::expected<SpeciesCoefficients, EquationError>;
     
     [[nodiscard]] auto build_species_boundary_conditions(
         const core::Matrix<double>& c_wall,

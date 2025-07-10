@@ -30,10 +30,14 @@ auto solve_energy(
     }
     
     // Build coefficients
-    auto energy_coeffs = detail::build_energy_coefficients(
+    auto energy_coeffs_result = detail::build_energy_coefficients(
         g_previous, inputs, coeffs, bc, xi_der, sim_config,
         F_field, dF_deta, V_field, station, d_eta
     );
+    if (!energy_coeffs_result) {
+        return std::unexpected(energy_coeffs_result.error());
+    }
+    auto energy_coeffs = energy_coeffs_result.value();
     
     // Build boundary conditions  
     auto boundary_conds = detail::build_energy_boundary_conditions(
@@ -76,7 +80,7 @@ auto build_energy_coefficients(
     std::span<const double> V_field,
     int station,
     PhysicalQuantity auto d_eta
-) -> EnergyCoefficients {
+) -> std::expected<EnergyCoefficients, EquationError> {
     
     const auto n_eta = g_previous.size();
     const auto n_species = inputs.c.rows();
@@ -86,7 +90,11 @@ auto build_energy_coefficients(
     const auto g_derivatives = xi_der.g_derivative();
     
     // Compute geometry factor for diffusion fluxes
-    const double J_fact = compute_energy_j_factor(station, xi, bc, sim_config);
+    const auto J_fact_result = compute_energy_j_factor(station, xi, bc, sim_config);
+    if (!J_fact_result) {
+        return std::unexpected(J_fact_result.error());
+    }
+    const double J_fact = J_fact_result.value();
     
     EnergyCoefficients energy_coeffs;
     energy_coeffs.a.reserve(n_eta);
