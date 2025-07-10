@@ -44,12 +44,9 @@ namespace {
         }
         return std::unexpected(ThermophysicsError("Unknown thermal conductivity algorithm type"));
     }
-}
 
-MutationMixture::MutationMixture(const io::MixtureConfig& config) 
-    : n_species_(0), has_electrons_(false) { // n_species_ is a const and needs to be defined at the construction
-    
-    try {
+    // Helper to create and configure Mutation++ mixture
+    [[nodiscard]] auto create_mutation_mixture(const io::MixtureConfig& config) -> std::unique_ptr<Mutation::Mixture> {
         // Configure Mutation++ options
         Mutation::MixtureOptions opts(config.name);
         
@@ -78,11 +75,16 @@ MutationMixture::MutationMixture(const io::MixtureConfig& config)
         opts.setThermalConductivityAlgorithm(std::string(thermal_result.value()));
         
         // Create mixture
-        mixture_ = std::make_unique<Mutation::Mixture>(opts);
-        
-        // Initialize const members via const_cast in constructor only
-        const_cast<std::size_t&>(n_species_) = mixture_->nSpecies();
-        const_cast<bool&>(has_electrons_) = mixture_->hasElectrons();
+        return std::make_unique<Mutation::Mixture>(opts);
+    }
+}
+
+MutationMixture::MutationMixture(const io::MixtureConfig& config) 
+    : mixture_(create_mutation_mixture(config))
+    , n_species_(mixture_->nSpecies())
+    , has_electrons_(mixture_->hasElectrons()) {
+    
+    try {
         
         // Cache species properties
         species_mw_.reserve(n_species_);
