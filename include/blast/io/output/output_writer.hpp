@@ -140,21 +140,6 @@ namespace convenience {
         bool include_derivatives = true
     ) -> std::expected<void, OutputError>;
     
-    // Write solution in VTK format for visualization
-    [[nodiscard]] auto write_vtk(
-        const blast::boundary_layer::solver::SolutionResult& solution,
-        const Configuration& config,
-        const thermophysics::MixtureInterface& mixture,
-        const std::filesystem::path& output_path
-    ) -> std::expected<void, OutputError>;
-    
-    // Write CSV files for basic analysis
-    [[nodiscard]] auto write_csv_series(
-        const blast::boundary_layer::solver::SolutionResult& solution,
-        const Configuration& config,
-        const thermophysics::MixtureInterface& mixture,
-        const std::filesystem::path& output_directory
-    ) -> std::expected<std::vector<std::filesystem::path>, OutputError>;
     
     // Quick write with auto-detection of format from extension
     [[nodiscard]] auto write_auto(

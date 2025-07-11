@@ -1,7 +1,6 @@
 #include "blast/io/config_manager.hpp"
 #include "blast/io/output/output_writer.hpp"
 #include "blast/io/output/hdf5_writer.hpp"
-#include "blast/io/output/csv_writer.hpp"
 #include "blast/thermophysics/mixture_interface.hpp"
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
 #include <iostream>
@@ -84,7 +83,7 @@ int main(int argc, char* argv[]) {
         blast::io::output::OutputConfig output_config;
         output_config.base_directory = config.output.output_directory;
         output_config.primary_format = blast::io::output::OutputFormat::HDF5;
-        output_config.additional_formats = {blast::io::output::OutputFormat::VTK_XML};
+        output_config.additional_formats = {};
         output_config.save_metadata = true;
         output_config.save_derivatives = true;
         output_config.compress_data = true;
@@ -115,8 +114,6 @@ int main(int argc, char* argv[]) {
             std::string format_name;
             switch (format) {
                 case blast::io::output::OutputFormat::HDF5: format_name = "HDF5"; break;
-                case blast::io::output::OutputFormat::VTK_XML: format_name = "VTK XML"; break;
-                case blast::io::output::OutputFormat::VTK_LEGACY: format_name = "VTK Legacy"; break;
                 default: format_name = "Unknown"; break;
             }
             std::cout << "  " << format_name << ": " << path.string() << std::endl;
@@ -221,22 +218,6 @@ int main(int argc, char* argv[]) {
                       << " (" << std::setprecision(2) << std::fixed << (file_size / 1024.0) << " KB)" << std::endl;
         }
         
-        // Additional convenience outputs
-        if (solution.converged && !solution.stations.empty()) {
-            std::cout << "\nWriting convenience formats..." << std::endl;
-            
-            // Write a simple CSV for quick analysis
-            try {
-                auto csv_result = blast::io::output::csv::write_csv_series(
-                    solution, config, mixture, output_config.base_directory / "csv"
-                );
-                if (csv_result) {
-                    std::cout << "✓ CSV files written to: " << (output_config.base_directory / "csv").string() << std::endl;
-                }
-            } catch (const std::exception& e) {
-                std::cout << "  Warning: CSV output not available" << std::endl;
-            }
-        }
         
         // Performance summary
         auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(output_end - start_time);

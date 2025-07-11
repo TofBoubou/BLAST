@@ -12,11 +12,7 @@ namespace blast::io::output {
 
 // Output format enumeration
 enum class OutputFormat {
-    HDF5,
-    VTK_XML,
-    VTK_LEGACY,
-    TECPLOT,
-    CSV
+    HDF5
 };
 
 // Output configuration

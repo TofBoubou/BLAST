@@ -3,21 +3,17 @@
 BLAST Boundary Layer Post-Processing Script
 
 This script provides comprehensive post-processing capabilities for BLAST simulation results.
-It can read HDF5, VTK, and CSV output formats and generate publication-quality plots.
+It can read HDF5 output format and generate publication-quality plots.
 
 Usage:
     python postprocess_blast.py --input simulation.h5 --plots all
     python postprocess_blast.py --input simulation.h5 --plots profiles --station 0
-    python postprocess_blast.py --input csv_dir/ --format csv --plots wall
 """
 
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
 import h5py
-import vtk
-from vtk.util import numpy_support
 import seaborn as sns
 from pathlib import Path
 import json
@@ -43,23 +39,12 @@ class BLASTReader:
         """Auto-detect input format"""
         if self.input_path.suffix.lower() in ['.h5', '.hdf5']:
             return 'hdf5'
-        elif self.input_path.suffix.lower() in ['.vts', '.vtk']:
-            return 'vtk'
-        elif self.input_path.is_dir():
-            # Check for CSV files
-            csv_files = list(self.input_path.glob('*.csv'))
-            if csv_files:
-                return 'csv'
-        raise ValueError(f"Cannot detect format for: {self.input_path}")
+        raise ValueError(f"Only HDF5 format is supported. Got: {self.input_path}")
     
     def load_data(self) -> Dict:
         """Load data based on detected format"""
         if self.format == 'hdf5':
             return self._load_hdf5()
-        elif self.format == 'csv':
-            return self._load_csv()
-        elif self.format == 'vtk':
-            return self._load_vtk()
         else:
             raise NotImplementedError(f"Format {self.format} not implemented")
     
@@ -120,206 +105,7 @@ class BLASTReader:
                     result[f'{key}_attrs'] = dict(item.attrs)
         return result
     
-    def _load_csv(self) -> Dict:
-        """Load CSV directory structure"""
-        data = {'stations': {}}
-        
-        # Load metadata if available
-        metadata_file = self.input_path / 'metadata.txt'
-        if metadata_file.exists():
-            data['metadata'] = self._parse_metadata_file(metadata_file)
-        
-        # Load station files
-        station_files = sorted(self.input_path.glob('station_*.csv'))
-        for i, station_file in enumerate(station_files):
-            station_data = pd.read_csv(station_file, comment='#')
-            data['stations'][f'station_{i:03d}'] = station_data.to_dict('series')
-        
-        # Load wall properties
-        wall_file = self.input_path / 'wall_properties.csv'
-        if wall_file.exists():
-            data['wall'] = pd.read_csv(wall_file, comment='#').to_dict('series')
-        
-        # Load integrated quantities
-        integrated_file = self.input_path / 'integrated_quantities.csv'
-        if integrated_file.exists():
-            data['integrated'] = pd.read_csv(integrated_file, comment='#').to_dict('series')
-        
-        self.data = data
-        return data
     
-    def _parse_metadata_file(self, file_path: Path) -> Dict:
-        """Parse BLAST metadata file"""
-        metadata = {}
-        with open(file_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('#') or not line:
-                    continue
-                if ':' in line:
-                    key, value = line.split(':', 1)
-                    key = key.strip()
-                    value = value.strip()
-                    
-                    # Try to convert to appropriate type
-                    try:
-                        if value.lower() in ['true', 'false']:
-                            metadata[key] = value.lower() == 'true'
-                        elif ',' in value:
-                            metadata[key] = [v.strip() for v in value.split(',')]
-                        else:
-                            metadata[key] = float(value) if '.' in value else int(value)
-                    except ValueError:
-                        metadata[key] = value
-        return metadata
-    
-    def _load_vtk(self) -> Dict:
-        """
-        Robust VTK reader for BLAST .vts output.
-        - Gère PointData ou CellData
-        - Supporte les grilles 1×N×1 sans <Points>
-        - Reconstruit η si nécessaire
-        - Trace chaque étape avec des prints DEBUG
-        """
-        try:
-            # -- Imports locaux ---------------------------------------------------
-            from vtk import vtkXMLStructuredGridReader, vtkCellCenters, vtkObject
-            from vtk.util import numpy_support as nps
-            import vtk
-            import numpy as _np
-
-            vtkObject.GlobalWarningDisplayOff()  # pas de spam VTK sur stderr
-
-            # -- Lecture du fichier ----------------------------------------------
-            print(f"DEBUG ▸ Loading VTK file: {self.input_path}")
-            reader = vtkXMLStructuredGridReader()
-            reader.SetFileName(str(self.input_path))
-            if not reader.CanReadFile(str(self.input_path)):
-                raise RuntimeError("VTK says it cannot read this file")
-
-            reader.Update()
-            grid = reader.GetOutput()
-            if grid is None:
-                raise RuntimeError("VTK reader returned None grid")
-
-            dims = grid.GetDimensions()       # (nx, ny, nz)
-            npts = grid.GetNumberOfPoints()
-            ncells = grid.GetNumberOfCells()
-            print(f"DEBUG ▸ Grid dims   : {dims}")
-            print(f"DEBUG ▸ #Points     : {npts}")
-            print(f"DEBUG ▸ #Cells      : {ncells}")
-
-            # -- Construire η -----------------------------------------------------
-            eta: _np.ndarray
-            got_pts = False
-
-            # Plan A : utiliser les points fournis
-            if npts > 0:
-                pts = grid.GetPoints()
-                coords = nps.vtk_to_numpy(pts.GetData())
-                eta = coords[:, 1]
-                got_pts = True
-                print("DEBUG ▸ η from Points (plan A)")
-
-            # Plan B : centres de cellules
-            elif ncells > 0:
-                cc = vtkCellCenters()
-                cc.SetInputData(grid)
-                cc.Update()
-                pts = cc.GetOutput().GetPoints()
-                if pts and pts.GetNumberOfPoints() > 0:
-                    coords = nps.vtk_to_numpy(pts.GetData())
-                    eta = coords[:, 1]
-                    got_pts = True
-                    print("DEBUG ▸ η from CellCenters (plan B)")
-
-            # Plan C : longueur des scalaires
-            if not got_pts:
-                print("DEBUG ▸ Need to build η from scalar length (plan C)")
-                # On l'initialise ensuite quand on connaît la taille des arrays
-                eta = None  # placeholder
-
-            # -- Récupérer les tableaux ------------------------------------------
-            def dump_arrays(vtk_data, label):
-                arrays = {}
-                for i in range(vtk_data.GetNumberOfArrays()):
-                    arr = vtk_data.GetArray(i)
-                    if arr:
-                        arrays[arr.GetName()] = nps.vtk_to_numpy(arr)
-                print(f"DEBUG ▸ {label}: found {len(arrays)} arrays")
-                return arrays
-
-            pdata = dump_arrays(grid.GetPointData(), "PointData")
-            cdata = dump_arrays(grid.GetCellData(),  "CellData")
-
-            data_arrays = pdata or cdata           # priorité PointData, sinon CellData
-            if not data_arrays:
-                raise RuntimeError("No scalar arrays in PointData nor CellData")
-
-            # Si plan C : maintenant qu'on connaît la taille des arrays → construire η
-            if eta is None:
-                npts_from_arrays = len(next(iter(data_arrays.values())))
-                eta = _np.linspace(0.0, npts_from_arrays - 1, npts_from_arrays)
-                print(f"DEBUG ▸ η built as linspace(0,{npts_from_arrays-1})")
-
-            # -- Mapping vers structure BLAST ------------------------------------
-            data = {'stations': {'station_000': {}}}
-            station = data['stations']['station_000']
-            station['eta'] = eta
-
-            species_data = {}
-            for name, arr in data_arrays.items():
-                print(f"DEBUG ▸ Mapping array '{name}' shape {arr.shape}")
-                lname = name.lower()
-                if lname == 'f':
-                    station['F'] = arr
-                elif lname == 'g':
-                    station['g'] = arr
-                elif lname == 'v':
-                    station['V'] = arr
-                elif lname == 'temperature':
-                    station['temperature'] = arr
-                elif lname == 'pressure':
-                    station['pressure'] = arr
-                elif lname == 'density':
-                    station['density'] = arr
-                elif name.startswith('Species_'):
-                    idx = int(name.split('_')[1])
-                    species_data[idx] = arr
-                else:
-                    station[lname] = arr  # attr attr
-
-            # -- Espèces ----------------------------------------------------------
-            species_names = []
-            if species_data:
-                nsp = len(species_data)
-                npts_sp = len(next(iter(species_data.values())))
-                station['species_concentrations'] = _np.zeros((nsp, npts_sp))
-                for idx in sorted(species_data):
-                    station['species_concentrations'][idx, :] = species_data[idx]
-                    species_names.append(f"Species_{idx}")
-                print(f"DEBUG ▸ Species: {species_names}")
-
-            # -- Métadonnées ------------------------------------------------------
-            data['metadata'] = {
-                'grid': {
-                    'n_eta': float(len(eta)),
-                    'eta_max': float(eta.max()),
-                    'eta_coordinates': eta.tolist(),
-                    'xi_coordinates': [0.0],
-                },
-                'mixture': {'species_names': species_names},
-            }
-
-            print("DEBUG ▸ VTK file parsed successfully")
-            self.data = data
-            self.metadata = data['metadata']
-            return data
-
-        except ImportError:
-            raise ImportError("VTK library not available. `pip install vtk`")
-        except Exception as e:
-            raise RuntimeError(f"Failed to load VTK file: {e}")
 
     
     def get_station_data(self, station_index: int) -> Dict:
@@ -666,7 +452,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='BLAST Post-Processing Tool')
     parser.add_argument('--input', '-i', type=str, required=True,
-                       help='Input file or directory (HDF5, VTK, or CSV)')
+                       help='Input HDF5 file')
     parser.add_argument('--plots', '-p', type=str, default='all',
                        choices=['all', 'profiles', 'wall', 'integrated', 'summary'],
                        help='Type of plots to generate')
@@ -674,8 +460,6 @@ def main():
                        help='Station index for profile plots')
     parser.add_argument('--output', '-o', type=str, default='blast_plots',
                        help='Output directory for plots')
-    parser.add_argument('--format', '-f', type=str, choices=['hdf5', 'csv', 'vtk'],
-                       help='Force input format (auto-detect if not specified)')
     parser.add_argument('--dpi', type=int, default=300,
                        help='DPI for saved figures')
     parser.add_argument('--show', action='store_true',
@@ -686,8 +470,6 @@ def main():
     # Initialize reader
     try:
         reader = BLASTReader(args.input)
-        if args.format:
-            reader.format = args.format
         
         print(f"Loading {reader.format.upper()} data from: {reader.input_path}")
         reader.load_data()

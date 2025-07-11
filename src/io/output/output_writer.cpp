@@ -1,6 +1,5 @@
 #include "blast/io/output/output_writer.hpp"
 #include "blast/io/output/hdf5_writer.hpp"
-#include "blast/io/output/vtk_writer.hpp"
 #include <algorithm>
 #include <chrono>
 #include <iomanip>
@@ -16,20 +15,6 @@ auto WriterFactory::create_writer(OutputFormat format)
         case OutputFormat::HDF5:
             return std::make_unique<HDF5Writer>();
         
-        case OutputFormat::VTK_XML:
-            return std::make_unique<VTKXMLWriter>();
-        
-        case OutputFormat::VTK_LEGACY:
-            return std::make_unique<VTKLegacyWriter>();
-        
-        case OutputFormat::CSV:
-            // TODO: Implement CSV writer
-            return std::unexpected(UnsupportedFormatError(format));
-        
-        case OutputFormat::TECPLOT:
-            // TODO: Implement Tecplot writer
-            return std::unexpected(UnsupportedFormatError(format));
-        
         default:
             return std::unexpected(UnsupportedFormatError(format));
     }
@@ -37,9 +22,7 @@ auto WriterFactory::create_writer(OutputFormat format)
 
 auto WriterFactory::get_available_formats() noexcept -> std::vector<OutputFormat> {
     return {
-        OutputFormat::HDF5,
-        OutputFormat::VTK_XML,
-        OutputFormat::VTK_LEGACY
+        OutputFormat::HDF5
         // Add more as implemented
     };
 }
@@ -371,7 +354,7 @@ auto write_vtk(
 ) -> std::expected<void, OutputError> {
     
     OutputConfig out_config;
-    out_config.primary_format = OutputFormat::VTK_XML;
+    out_config.primary_format = OutputFormat::HDF5;
     out_config.base_directory = output_path.parent_path();
     
     OutputWriter writer(out_config);
@@ -397,10 +380,6 @@ auto write_auto(
     OutputFormat format;
     if (extension == ".h5" || extension == ".hdf5") {
         format = OutputFormat::HDF5;
-    } else if (extension == ".vts" || extension == ".vtu") {
-        format = OutputFormat::VTK_XML;
-    } else if (extension == ".vtk") {
-        format = OutputFormat::VTK_LEGACY;
     } else {
         return std::unexpected(OutputError(
             std::format("Cannot auto-detect format for extension '{}'", extension)

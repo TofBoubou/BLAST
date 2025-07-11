@@ -60,9 +60,7 @@ IO_SOURCES = \
 # NEW: Output system sources
 OUTPUT_SOURCES = \
     $(SRC_DIR)/io/output/output_writer.cpp \
-    $(SRC_DIR)/io/output/hdf5_writer.cpp \
-    $(SRC_DIR)/io/output/vtk_writer.cpp \
-    $(SRC_DIR)/io/output/csv_writer.cpp
+    $(SRC_DIR)/io/output/hdf5_writer.cpp
 
 THERMOPHYSICS_SOURCES = \
     $(SRC_DIR)/thermophysics/mutation_mixture.cpp
