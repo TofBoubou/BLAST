@@ -1,14 +1,16 @@
 #include "blast/io/config_manager.hpp"
+#include "blast/io/output/output_writer.hpp"
 #include "blast/thermophysics/mixture_interface.hpp"
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <iomanip>
+#include <chrono>
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <config_file.yaml>\n";
+        std::cerr << "Usage: " << argv[0] << " <config_file.yaml> [output_name]\n";
         return 1;
     }
     
@@ -66,8 +68,62 @@ int main(int argc, char* argv[]) {
             std::cout << "  Wall temp: " << config.wall_parameters.wall_temperatures[0] << " K" << std::endl;
         }
         
+        // Initialize HDF5 library
+        std::cout << "\nInitializing output system..." << std::endl;
+        if (auto hdf5_init = blast::io::output::hdf5::initialize(); !hdf5_init) {
+            std::cerr << "Warning: Failed to initialize HDF5: " << hdf5_init.error().message() << std::endl;
+        } else {
+            if (auto version = blast::io::output::hdf5::check_version()) {
+                std::cout << "✓ HDF5 library version: " << version.value() << std::endl;
+            }
+        }
+        
+        // Configure output system
+        blast::io::output::OutputConfig output_config;
+        output_config.base_directory = config.output.output_directory;
+        output_config.primary_format = blast::io::output::OutputFormat::HDF5;
+        output_config.additional_formats = {blast::io::output::OutputFormat::VTK_XML};
+        output_config.save_metadata = true;
+        output_config.save_derivatives = true;
+        output_config.compress_data = true;
+        output_config.include_timestamp = true;
+        
+        // Select variables to save based on simulation type
+        output_config.variables.flow_variables = true;
+        output_config.variables.species_concentrations = true;
+        output_config.variables.transport_properties = config.simulation.consider_thermal_diffusion;
+        output_config.variables.chemical_rates = config.simulation.chemical_non_equilibrium;
+        output_config.variables.diffusion_fluxes = true;
+        
+        blast::io::output::OutputWriter output_writer(output_config);
+        
+        // Validate output configuration
+        if (auto validation = output_writer.validate_config(); !validation) {
+            std::cerr << "Output configuration error: " << validation.error().message() << std::endl;
+            return 1;
+        }
+        
+        std::cout << "✓ Output system configured" << std::endl;
+        
+        // Show planned output files
+        std::string case_name = (argc > 2) ? argv[2] : "simulation";
+        auto output_info = output_writer.get_output_info(case_name);
+        std::cout << "\nPlanned output files:" << std::endl;
+        for (const auto& [format, path] : output_info) {
+            std::string format_name;
+            switch (format) {
+                case blast::io::output::OutputFormat::HDF5: format_name = "HDF5"; break;
+                case blast::io::output::OutputFormat::VTK_XML: format_name = "VTK XML"; break;
+                case blast::io::output::OutputFormat::VTK_LEGACY: format_name = "VTK Legacy"; break;
+                default: format_name = "Unknown"; break;
+            }
+            std::cout << "  " << format_name << ": " << path.string() << std::endl;
+        }
+        
         // Create and run solver
         std::cout << "\n=== STARTING BOUNDARY LAYER SOLUTION ===" << std::endl;
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
         blast::boundary_layer::solver::BoundaryLayerSolver solver(mixture, config);
         
         auto solution_result = solver.solve();
@@ -77,7 +133,11 @@ int main(int argc, char* argv[]) {
         }
         
         auto& solution = solution_result.value();
+        auto solve_time = std::chrono::high_resolution_clock::now();
+        auto solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(solve_time - start_time);
+        
         std::cout << "✓ Solution completed successfully!" << std::endl;
+        std::cout << "  Solve time: " << solve_duration.count() << " ms" << std::endl;
         
         // Print solution summary
         std::cout << "\n=== SOLUTION SUMMARY ===" << std::endl;
@@ -126,11 +186,82 @@ int main(int argc, char* argv[]) {
             }
         }
         
+        // Write output files
+        std::cout << "\n=== WRITING OUTPUT FILES ===" << std::endl;
+        
+        // Progress callback for output writing
+        auto progress_callback = [](double progress, const std::string& stage) {
+            std::cout << "\r  " << stage << " [" << std::setw(6) << std::fixed << std::setprecision(1) 
+                      << (progress * 100.0) << "%]" << std::flush;
+        };
+        
+        auto output_start = std::chrono::high_resolution_clock::now();
+        auto output_result = output_writer.write_solution(
+            solution, config, mixture, case_name, progress_callback
+        );
+        auto output_end = std::chrono::high_resolution_clock::now();
+        auto output_duration = std::chrono::duration_cast<std::chrono::milliseconds>(output_end - output_start);
+        
+        std::cout << std::endl; // New line after progress
+        
+        if (!output_result) {
+            std::cerr << "Failed to write output: " << output_result.error().message() << std::endl;
+            return 1;
+        }
+        
+        auto& output_files = output_result.value();
+        std::cout << "✓ Output written successfully!" << std::endl;
+        std::cout << "  Output time: " << output_duration.count() << " ms" << std::endl;
+        std::cout << "\nGenerated files:" << std::endl;
+        for (const auto& file_path : output_files) {
+            auto file_size = std::filesystem::file_size(file_path);
+            std::cout << "  " << file_path.filename().string() 
+                      << " (" << std::setprecision(2) << std::fixed << (file_size / 1024.0) << " KB)" << std::endl;
+        }
+        
+        // Additional convenience outputs
+        if (solution.converged && !solution.stations.empty()) {
+            std::cout << "\nWriting convenience formats..." << std::endl;
+            
+            // Write a simple CSV for quick analysis
+            try {
+                auto csv_result = blast::io::output::convenience::write_csv_series(
+                    solution, config, mixture, output_config.base_directory / "csv"
+                );
+                if (csv_result) {
+                    std::cout << "✓ CSV files written to: " << (output_config.base_directory / "csv").string() << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cout << "  Warning: CSV output not available" << std::endl;
+            }
+        }
+        
+        // Performance summary
+        auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(output_end - start_time);
+        std::cout << "\n=== PERFORMANCE SUMMARY ===" << std::endl;
+        std::cout << "Total runtime: " << total_time.count() << " ms" << std::endl;
+        std::cout << "  Solution: " << solve_duration.count() << " ms (" 
+                  << std::setprecision(1) << std::fixed 
+                  << (100.0 * solve_duration.count() / total_time.count()) << "%)" << std::endl;
+        std::cout << "  Output: " << output_duration.count() << " ms (" 
+                  << std::setprecision(1) << std::fixed 
+                  << (100.0 * output_duration.count() / total_time.count()) << "%)" << std::endl;
+        
         std::cout << "\n=== CALCULATION COMPLETED SUCCESSFULLY ===" << std::endl;
+        
+        // Post-processing recommendations
+        std::cout << "\nPost-processing recommendations:" << std::endl;
+        std::cout << "  • Open .h5 files with HDFView or Python (h5py, pandas)" << std::endl;
+        std::cout << "  • Visualize .vts files with ParaView" << std::endl;
+        std::cout << "  • Use Python scripts for detailed analysis" << std::endl;
+        
         return 0;
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
+        
+        // Cleanup
+        blast::io::output::hdf5::finalize();
         return 1;
     }
 }
