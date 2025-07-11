@@ -8,11 +8,35 @@
 #include <algorithm>
 #include <iomanip>
 #include <chrono>
+#include <filesystem>
+#include <cstdlib>
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <config_file.yaml> [output_name]\n";
         return 1;
+    }
+    
+    try {
+        std::filesystem::path exe_path = std::filesystem::canonical(argv[0]).parent_path();
+        
+        std::filesystem::path mpp_data_path = exe_path / "libs" / "mutationpp" / "data";
+        
+        if (std::filesystem::exists(mpp_data_path)) {
+            std::string mpp_data_str = std::filesystem::canonical(mpp_data_path).string();
+            setenv("MPP_DATA_DIRECTORY", mpp_data_str.c_str(), 1);
+            std::cout << "MPP_DATA_DIRECTORY auto-set to: " << mpp_data_str << std::endl;
+        } else {
+            std::cerr << "Warning: Mutation++ data directory not found at: " << mpp_data_path << std::endl;
+            std::cerr << "Looking for MPP_DATA_DIRECTORY in environment..." << std::endl;
+            if (const char* env_mpp = std::getenv("MPP_DATA_DIRECTORY")) {
+                std::cout << "Using existing MPP_DATA_DIRECTORY: " << env_mpp << std::endl;
+            } else {
+                std::cerr << "Warning: MPP_DATA_DIRECTORY not set. Mutation++ may fail." << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Warning: Could not auto-configure MPP_DATA_DIRECTORY: " << e.what() << std::endl;
     }
     
     try {
@@ -190,8 +214,9 @@ int main(int argc, char* argv[]) {
         
         // Progress callback for output writing
         auto progress_callback = [](double progress, const std::string& stage) {
-            std::cout << "\r  " << stage << " [" << std::setw(6) << std::fixed << std::setprecision(1) 
-                      << (progress * 100.0) << "%]" << std::flush;
+            std::cout << "\r" << std::setw(60) << std::left 
+                      << ("  " + stage + " [" + std::to_string(static_cast<int>(progress * 100.0)) + "%]")
+                      << std::flush;
         };
         
         auto output_start = std::chrono::high_resolution_clock::now();
@@ -235,8 +260,6 @@ int main(int argc, char* argv[]) {
         // Post-processing recommendations
         std::cout << "\nPost-processing recommendations:" << std::endl;
         std::cout << "  • Open .h5 files with HDFView or Python (h5py, pandas)" << std::endl;
-        std::cout << "  • Visualize .vts files with ParaView" << std::endl;
-        std::cout << "  • Use Python scripts for detailed analysis" << std::endl;
         
         return 0;
         

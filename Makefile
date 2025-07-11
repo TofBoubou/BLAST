@@ -1,9 +1,9 @@
 # BLAST Modern Makefile with Output System
-# Updated to include HDF5, VTK, and comprehensive output capabilities
+# Updated to include HDF5 and comprehensive output capabilities
 
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++23 -Wall -Wextra -O3 -DNDEBUG -march=native
+CXXFLAGS = -std=c++23 -O3 -DNDEBUG -march=native -w
 DEBUG_FLAGS = -std=c++23 -Wall -Wextra -g -O0 -DDEBUG
 INCLUDE_FLAGS = -Iinclude -I/usr/include/hdf5/serial
 
@@ -15,7 +15,6 @@ YAML_CPP_PATH = libs/yaml-cpp
 
 # External library flags
 HDF5_FLAGS = $(shell pkg-config --cflags --libs hdf5)
-VTK_FLAGS = $(shell pkg-config --cflags --libs vtk)
 ZLIB_FLAGS = -lz
 
 # Include paths
@@ -28,7 +27,6 @@ INCLUDES = $(INCLUDE_FLAGS) \
 LIBS = -L$(MUTATIONPP_PATH)/install/lib -lmutation++ \
        -L$(YAML_CPP_PATH)/build -lyaml-cpp \
        $(HDF5_FLAGS) \
-       $(VTK_FLAGS) \
        $(ZLIB_FLAGS) \
        -lpthread -ldl
 
@@ -57,7 +55,7 @@ IO_SOURCES = \
     $(SRC_DIR)/io/config_manager.cpp \
     $(SRC_DIR)/io/yaml_parser.cpp
 
-# NEW: Output system sources
+# Output system sources
 OUTPUT_SOURCES = \
     $(SRC_DIR)/io/output/output_writer.cpp \
     $(SRC_DIR)/io/output/hdf5_writer.cpp
@@ -130,7 +128,6 @@ check_dependencies:
 	@echo "Checking dependencies..."
 	@command -v pkg-config >/dev/null 2>&1 || { echo "Error: pkg-config not found"; exit 1; }
 	@pkg-config --exists hdf5 || { echo "Error: HDF5 development libraries not found. Install libhdf5-dev"; exit 1; }
-	@pkg-config --exists vtk || echo "Warning: VTK not found. VTK output will be disabled."
 	@test -d $(MUTATIONPP_PATH) || { echo "Error: Mutation++ not found at $(MUTATIONPP_PATH)"; exit 1; }
 	@test -d $(YAML_CPP_PATH) || { echo "Error: yaml-cpp not found at $(YAML_CPP_PATH)"; exit 1; }
 	@test -d $(EIGEN_PATH) || { echo "Error: Eigen not found at $(EIGEN_PATH)"; exit 1; }
@@ -164,7 +161,6 @@ install_deps_ubuntu:
 		cmake \
 		pkg-config \
 		libhdf5-dev \
-		libvtk9-dev \
 		libboost-all-dev \
 		zlib1g-dev \
 		git
@@ -178,7 +174,6 @@ install_deps_macos:
 		cmake \
 		pkg-config \
 		hdf5 \
-		vtk \
 		boost \
 		zlib
 	@echo "✓ System dependencies installed"
@@ -196,11 +191,10 @@ test: $(TARGET)
 # Post-processing setup
 .PHONY: setup_postprocess
 setup_postprocess:
-	@echo "Setting up post-processing environment..."
+	@echo "Setting up HDF5 post-processing environment..."
 	@command -v python3 >/dev/null 2>&1 || { echo "Error: Python 3 not found"; exit 1; }
 	python3 -m pip install numpy matplotlib pandas h5py seaborn pathlib
-	@chmod +x scripts/postprocess_blast.py
-	@echo "✓ Post-processing setup complete"
+	@echo "✓ HDF5 post-processing setup complete"
 
 # Example run
 .PHONY: example
@@ -208,11 +202,7 @@ example: $(TARGET)
 	@echo "Running example simulation..."
 	@mkdir -p example_output
 	./$(TARGET) config/default.yaml example_simulation
-	@if [ -f scripts/postprocess_blast.py ]; then \
-		echo "Running post-processing..."; \
-		python3 scripts/postprocess_blast.py --input example_simulation*.h5 --plots summary --output example_output; \
-	fi
-	@echo "✓ Example complete. Check example_output/ for results"
+	@echo "✓ Example complete. HDF5 output available for analysis"
 
 # Performance profiling
 .PHONY: profile
@@ -277,9 +267,6 @@ install: $(TARGET)
 	@echo "Installing BLAST..."
 	@mkdir -p $(HOME)/bin
 	cp $(TARGET) $(HOME)/bin/
-	@if [ -f scripts/postprocess_blast.py ]; then \
-		cp scripts/postprocess_blast.py $(HOME)/bin/; \
-	fi
 	@echo "✓ BLAST installed to $(HOME)/bin"
 
 # Help target
@@ -292,7 +279,7 @@ help:
 	@echo "  all              Build production executable"
 	@echo "  debug            Build debug executable"
 	@echo "  test             Run test simulation"
-	@echo "  example          Run example with post-processing"
+	@echo "  example          Run example simulation"
 	@echo "  clean            Remove build files"
 	@echo "  clean_all        Remove all generated files"
 	@echo ""
@@ -300,7 +287,7 @@ help:
 	@echo "  install_deps_ubuntu   Install Ubuntu/Debian dependencies"
 	@echo "  install_deps_macos    Install macOS dependencies"
 	@echo "  build_libs            Build external libraries"
-	@echo "  setup_postprocess     Setup Python post-processing"
+	@echo "  setup_postprocess     Setup HDF5 post-processing"
 	@echo ""
 	@echo "Development targets:"
 	@echo "  format           Format source code"
@@ -312,7 +299,7 @@ help:
 	@echo "Example workflow:"
 	@echo "  make install_deps_ubuntu  # Install system dependencies"
 	@echo "  make build_libs           # Build external libraries"
-	@echo "  make setup_postprocess    # Setup post-processing"
+	@echo "  make setup_postprocess    # Setup HDF5 post-processing"
 	@echo "  make all                  # Build BLAST"
 	@echo "  make example              # Run example"
 
