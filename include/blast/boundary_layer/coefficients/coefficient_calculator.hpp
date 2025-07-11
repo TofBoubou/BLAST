@@ -16,7 +16,7 @@ namespace derivatives {
     [[nodiscard]] auto compute_eta_derivative(
         Range&& values,
         double d_eta
-    ) -> std::vector<double>;
+    ) -> std::expected<std::vector<double>, CoefficientError>;
     
     template<std::ranges::sized_range Range>
     [[nodiscard]] auto compute_eta_second_derivative(
@@ -34,7 +34,7 @@ namespace derivatives {
     [[nodiscard]] auto compute_matrix_eta_second_derivative(
         const Matrix& values,
         double d_eta
-    ) -> Matrix;
+    ) -> std::expected<Matrix, CoefficientError>;
 }
 
 class CoefficientCalculator {
@@ -96,7 +96,7 @@ private:
         std::size_t station_index,
         const core::Matrix<double>& c,
         double rho_total
-    ) const -> std::pair<std::vector<double>, std::vector<double>>;
+    ) const -> std::expected<std::pair<std::vector<double>, std::vector<double>>, CoefficientError>;
     
     [[nodiscard]] auto transform_jacobian(
         std::size_t station_index,

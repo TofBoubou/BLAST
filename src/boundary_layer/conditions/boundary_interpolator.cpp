@@ -67,13 +67,13 @@ template<typename MemberPtr>
 [[nodiscard]] auto compute_property_derivatives(
     const std::vector<double>& values,
     const std::vector<double>& x_grid
-) -> std::vector<double> {
+) -> std::expected<std::vector<double>, BoundaryConditionError> {
     
     if (values.size() != x_grid.size()) {
-        throw std::invalid_argument("Values and grid sizes must match for derivative computation");
+        return std::unexpected(BoundaryConditionError("Values and grid sizes must match for derivative computation"));
     }
     if (values.size() < 2) {
-        throw std::invalid_argument("Need at least 2 points for derivative computation");
+        return std::unexpected(BoundaryConditionError("Need at least 2 points for derivative computation"));
     }
     
     // Check if grid is uniform (within tolerance)
@@ -91,7 +91,11 @@ template<typename MemberPtr>
     
     if (is_uniform) {
         // Reuse existing high-order O(h^4) function for uniform grids
-        return coefficients::derivatives::compute_eta_derivative(values, dx_first);
+        auto result = coefficients::derivatives::compute_eta_derivative(values, dx_first);
+        if (!result) {
+            return std::unexpected(BoundaryConditionError("Failed to compute property derivatives"));
+        }
+        return result.value();
     } else {
         // Handle non-uniform grids with weighted central differences
         const auto n = values.size();
@@ -236,20 +240,40 @@ auto interpolate_boundary_conditions(
     };
     
     // Lambda for high-accuracy Hermite interpolation (for critical properties)
-    auto interp_hermite = [&](auto member_ptr) {
+    auto interp_hermite = [&](auto member_ptr) -> std::expected<double, BoundaryConditionError> {
         auto values = extract_edge_property(edge_config.edge_points, member_ptr);
-        auto derivatives = compute_property_derivatives(values, x_grid);
-        return interpolate_property(values, ix1, ix2, x_grid, x_interp, derivatives);
+        auto derivatives_result = compute_property_derivatives(values, x_grid);
+        if (!derivatives_result) {
+            return std::unexpected(derivatives_result.error());
+        }
+        return interpolate_property(values, ix1, ix2, x_grid, x_interp, derivatives_result.value());
     };
     
     // Interpolate edge properties with appropriate method
     // Use Hermite for critical properties with strong gradients
+    auto pressure_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::pressure);
+    if (!pressure_result) {
+        return std::unexpected(pressure_result.error());
+    }
+    auto velocity_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::velocity);
+    if (!velocity_result) {
+        return std::unexpected(velocity_result.error());
+    }
+    auto enthalpy_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::enthalpy);
+    if (!enthalpy_result) {
+        return std::unexpected(enthalpy_result.error());
+    }
+    auto density_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::density);
+    if (!density_result) {
+        return std::unexpected(density_result.error());
+    }
+    
     EdgeConditions edge{
-        .pressure = interp_hermite(&io::OuterEdgeConfig::EdgePoint::pressure),    // Critical: strong gradients
+        .pressure = pressure_result.value(),    // Critical: strong gradients
         .viscosity = interp_linear(&io::OuterEdgeConfig::EdgePoint::viscosity),   // Linear sufficient
-        .velocity = interp_hermite(&io::OuterEdgeConfig::EdgePoint::velocity),    // Critical: momentum boundary layer
-        .enthalpy = interp_hermite(&io::OuterEdgeConfig::EdgePoint::enthalpy),    // Critical: energy boundary layer
-        .density = interp_hermite(&io::OuterEdgeConfig::EdgePoint::density),      // Critical: compressible flow
+        .velocity = velocity_result.value(),    // Critical: momentum boundary layer
+        .enthalpy = enthalpy_result.value(),    // Critical: energy boundary layer
+        .density = density_result.value(),      // Critical: compressible flow
         .species_fractions = {}, 
         .d_xi_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_xi_dx),
         .d_ue_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_ue_dx),
@@ -269,17 +293,23 @@ auto interpolate_boundary_conditions(
                 species_values.push_back(point.species_fractions[s]);
             }
             // Use Hermite for species fractions (critical for chemical accuracy)
-            auto species_derivatives = compute_property_derivatives(species_values, x_grid);
+            auto species_derivatives_result = compute_property_derivatives(species_values, x_grid);
+            if (!species_derivatives_result) {
+                return std::unexpected(species_derivatives_result.error());
+            }
             edge.species_fractions[s] = interpolate_property(
-                species_values, ix1, ix2, x_grid, x_interp, species_derivatives
+                species_values, ix1, ix2, x_grid, x_interp, species_derivatives_result.value()
             );
         }
     }
     
     // Interpolate wall temperature using Hermite (critical for thermal boundary layer)
-    auto wall_temp_derivatives = compute_property_derivatives(wall_config.wall_temperatures, x_grid);
+    auto wall_temp_derivatives_result = compute_property_derivatives(wall_config.wall_temperatures, x_grid);
+    if (!wall_temp_derivatives_result) {
+        return std::unexpected(wall_temp_derivatives_result.error());
+    }
     const double wall_temp = interpolate_property(
-        wall_config.wall_temperatures, ix1, ix2, x_grid, x_interp, wall_temp_derivatives
+        wall_config.wall_temperatures, ix1, ix2, x_grid, x_interp, wall_temp_derivatives_result.value()
     );
     
     WallConditions wall{

@@ -46,7 +46,7 @@ namespace {
     }
 
     // Helper to create and configure Mutation++ mixture
-    [[nodiscard]] auto create_mutation_mixture(const io::MixtureConfig& config) -> std::unique_ptr<Mutation::Mixture> {
+    [[nodiscard]] auto create_mutation_mixture(const io::MixtureConfig& config) -> std::expected<std::unique_ptr<Mutation::Mixture>, ThermophysicsError> {
         // Configure Mutation++ options
         Mutation::MixtureOptions opts(config.name);
         
@@ -56,21 +56,21 @@ namespace {
         // Set thermodynamic database
         auto db_result = database_to_string(config.thermodynamic_database);
         if (!db_result) {
-            throw db_result.error();
+            return std::unexpected(db_result.error());
         }
         opts.setThermodynamicDatabase(db_result.value());
         
         // Set viscosity algorithm
         auto visc_result = viscosity_algo_to_string(config.viscosity_algorithm);
         if (!visc_result) {
-            throw visc_result.error();
+            return std::unexpected(visc_result.error());
         }
         opts.setViscosityAlgorithm(visc_result.value());
         
         // Set thermal conductivity algorithm
         auto thermal_result = thermal_cond_algo_to_string(config.viscosity_algorithm);
         if (!thermal_result) {
-            throw thermal_result.error();
+            return std::unexpected(thermal_result.error());
         }
         opts.setThermalConductivityAlgorithm(std::string(thermal_result.value()));
         
@@ -80,7 +80,7 @@ namespace {
 }
 
 MutationMixture::MutationMixture(const io::MixtureConfig& config) 
-    : mixture_(create_mutation_mixture(config))
+    : mixture_(create_mutation_mixture(config).value())
     , n_species_(mixture_->nSpecies())
     , has_electrons_(mixture_->hasElectrons()) {
     
@@ -104,6 +104,12 @@ MutationMixture::MutationMixture(const io::MixtureConfig& config)
         }
         
     } catch (const std::exception& e) {
+        auto mixture_result = create_mutation_mixture(config);
+        if (!mixture_result) {
+            throw ThermophysicsError(
+                std::format("Failed to create Mutation++ mixture: {}", mixture_result.error().what())
+            );
+        }
         throw ThermophysicsError(
             std::format("Failed to create Mutation++ mixture: {}", e.what())
         );

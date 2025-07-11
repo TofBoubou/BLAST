@@ -231,9 +231,13 @@ auto compute_stefan_maxwell_fluxes(
     // Compute eta derivatives of fluxes
     for (std::size_t j = 0; j < n_species; ++j) {
         auto J_row = J.eigen().row(j);
-        auto dJ = derivatives::compute_eta_derivative(
+        auto dJ_result = derivatives::compute_eta_derivative(
             std::span(J_row.data(), n_eta), d_eta
         );
+        if (!dJ_result) {
+            return std::unexpected(CoefficientError("Failed to compute diffusion flux derivative"));
+        }
+        auto dJ = dJ_result.value();
         
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_deta(j, i) = dJ[i];

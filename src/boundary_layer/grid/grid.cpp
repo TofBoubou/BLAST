@@ -34,7 +34,11 @@ namespace {
         
         if (is_uniform) {
             // Reuse high-order function for uniform grids
-            return coefficients::derivatives::compute_eta_derivative(coord_values, dx_first);
+            auto result = coefficients::derivatives::compute_eta_derivative(coord_values, dx_first);
+            if (!result) {
+                return std::vector<double>(coord_values.size(), 0.0);
+            }
+            return result.value();
         } else {
             // Handle non-uniform grids
             const auto n = coord_values.size();

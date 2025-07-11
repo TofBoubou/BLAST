@@ -183,7 +183,14 @@ auto build_species_coefficients(
     auto dc_deta_fixed = fix_concentration_derivatives(c_previous, inputs.dc_deta);
     
     // Compute fake fluxes and their derivatives
-    auto [J_fake, dJ_fake_deta] = compute_fake_fluxes(dc_deta_fixed, coeffs, d_eta, Le, Pr);
+    core::Matrix<double> J_fake, dJ_fake_deta;
+    try {
+        auto result = compute_fake_fluxes(dc_deta_fixed, coeffs, d_eta, Le, Pr);
+        J_fake = std::move(result.first);
+        dJ_fake_deta = std::move(result.second);
+    } catch (const std::exception& e) {
+        return std::unexpected(EquationError("Failed to compute fake fluxes"));
+    }
     
     SpeciesCoefficients species_coeffs;
     species_coeffs.a = core::Matrix<double>(n_eta, n_species);
@@ -286,16 +293,20 @@ auto compute_fake_fluxes(
     // Compute derivatives of fake fluxes
     for (std::size_t j = 0; j < n_species; ++j) {
         auto J_row = J_fake.eigen().row(j);
-        auto dJ = coefficients::derivatives::compute_eta_derivative(
+        auto dJ_result = coefficients::derivatives::compute_eta_derivative(
             std::span(J_row.data(), n_eta), d_eta
         );
+        if (!dJ_result) {
+            throw std::runtime_error("Failed to compute diffusion flux derivative");
+        }
+        auto dJ = dJ_result.value();
         
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_fake_deta(j, i) = dJ[i];
         }
     }
     
-    return {std::move(J_fake), std::move(dJ_fake_deta)};
+    return std::make_pair(std::move(J_fake), std::move(dJ_fake_deta));
 }
 
 auto fix_concentration_derivatives(

@@ -185,7 +185,11 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
     }
     
     // Compute density derivative
-    thermo.d_rho_deta = derivatives::compute_eta_derivative(thermo.rho, d_eta_);
+    auto d_rho_deta_result = derivatives::compute_eta_derivative(thermo.rho, d_eta_);
+    if (!d_rho_deta_result) {
+        return std::unexpected(CoefficientError("Failed to compute density derivative"));
+    }
+    thermo.d_rho_deta = d_rho_deta_result.value();
     
     // Compute wall enthalpy
     std::vector<double> c_wall(n_species);
@@ -256,8 +260,17 @@ auto CoefficientCalculator::calculate_transport_coefficients(
     }
     
     // Compute derivatives
-    transport.dl0_deta = derivatives::compute_eta_derivative(transport.l0, d_eta_);
-    transport.dl3_deta = derivatives::compute_eta_derivative(transport.l3, d_eta_);
+    auto dl0_deta_result = derivatives::compute_eta_derivative(transport.l0, d_eta_);
+    if (!dl0_deta_result) {
+        return std::unexpected(CoefficientError("Failed to compute dl0/deta"));
+    }
+    transport.dl0_deta = dl0_deta_result.value();
+    
+    auto dl3_deta_result = derivatives::compute_eta_derivative(transport.l3, d_eta_);
+    if (!dl3_deta_result) {
+        return std::unexpected(CoefficientError("Failed to compute dl3/deta"));
+    }
+    transport.dl3_deta = dl3_deta_result.value();
 
     return transport;
 }
@@ -359,9 +372,13 @@ auto CoefficientCalculator::calculate_station_coefficients(
     }
     
     // Extract and normalize composition
-    auto [c_local, rho_species] = extract_local_composition(
+    auto composition_result = extract_local_composition(
         station_index, inputs.c, thermo.rho[station_index]
     );
+    if (!composition_result) {
+        return std::unexpected(composition_result.error());
+    }
+    auto [c_local, rho_species] = composition_result.value();
     
     // Get production rates
     auto wi_result = mixture_.production_rates(rho_species, inputs.T[station_index]);
@@ -399,7 +416,7 @@ auto CoefficientCalculator::extract_local_composition(
     std::size_t station_index,
     const core::Matrix<double>& c,
     double rho_total
-) const -> std::pair<std::vector<double>, std::vector<double>> {
+) const -> std::expected<std::pair<std::vector<double>, std::vector<double>>, CoefficientError> {
     
     const auto n_species = c.rows();
     std::vector<double> c_local(n_species);
@@ -418,10 +435,10 @@ auto CoefficientCalculator::extract_local_composition(
         }
     } else {
         // Error: zero composition is invalid
-        throw CoefficientError("Zero total composition encountered in extract_local_composition");
+        return std::unexpected(CoefficientError("Zero total composition encountered in extract_local_composition"));
     }
     
-    return {c_local, rho_species};
+    return std::make_pair(c_local, rho_species);
 }
 
 auto CoefficientCalculator::transform_jacobian(
@@ -594,7 +611,11 @@ auto CoefficientCalculator::calculate_thermal_diffusion(
     // Compute TDR term for diffusion fluxes
     if (sim_config_.consider_thermal_diffusion) {
         // Compute dT/deta
-        auto dT_deta = derivatives::compute_eta_derivative(inputs.T, d_eta_);
+        auto dT_deta_result = derivatives::compute_eta_derivative(inputs.T, d_eta_);
+        if (!dT_deta_result) {
+            return std::unexpected(CoefficientError("Failed to compute dT/deta"));
+        }
+        auto dT_deta = dT_deta_result.value();
         
         // Compute TDR term
         tdr.tdr_term = core::Matrix<double>(n_eta, n_species);
@@ -651,7 +672,11 @@ auto CoefficientCalculator::calculate_species_enthalpies(
             h_row[i] = h_species(j, i);
         }
         
-        auto dh = derivatives::compute_eta_derivative(h_row, d_eta_);
+        auto dh_result = derivatives::compute_eta_derivative(h_row, d_eta_);
+        if (!dh_result) {
+            return std::unexpected(CoefficientError("Failed to compute dh/deta for species"));
+        }
+        auto dh = dh_result.value();
         for (std::size_t i = 0; i < n_eta; ++i) {
             dh_species_deta(j, i) = dh[i];
         }
@@ -715,16 +740,16 @@ auto CoefficientCalculator::calculate_wall_properties(
 namespace derivatives {
 
 template<std::ranges::sized_range Range>
-auto compute_eta_derivative(Range&& values, double d_eta) -> std::vector<double> {
+auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
     const auto n = std::ranges::size(values);
     std::vector<double> derivatives(n);
     
     if (d_eta <= 0.0) {
-        throw std::invalid_argument("Invalid grid spacing: d_eta must be positive");
+        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
     }
     
     if (n < 2) {
-        throw std::invalid_argument("Insufficient points for derivative calculation: need at least 2 points");
+        return std::unexpected(CoefficientError("Insufficient points for derivative calculation: need at least 2 points"));
     }
     
     if (n < 5) {
@@ -807,13 +832,13 @@ auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<
 }
 
 template<typename Matrix>
-auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) -> Matrix {
+auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) -> std::expected<Matrix, CoefficientError> {
     const auto n_rows = values.rows();
     const auto n_cols = values.cols();
     Matrix result(n_rows, n_cols);
     
     if (d_eta <= 0.0) {
-        throw std::invalid_argument("Invalid grid spacing: d_eta must be positive");
+        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
     }
     
     for (std::size_t i = 0; i < n_rows; ++i) {
@@ -831,10 +856,10 @@ auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) ->
 }
 
 // Explicit instantiations
-template auto compute_eta_derivative(std::span<const double>&&, double) -> std::vector<double>;
-template auto compute_eta_derivative(const std::vector<double>&, double) -> std::vector<double>;
-template auto compute_eta_derivative(std::vector<double>&&, double) -> std::vector<double>;
-template auto compute_eta_derivative(std::span<double>&&, double) -> std::vector<double>;
+template auto compute_eta_derivative(std::span<const double>&&, double) -> std::expected<std::vector<double>, CoefficientError>;
+template auto compute_eta_derivative(const std::vector<double>&, double) -> std::expected<std::vector<double>, CoefficientError>;
+template auto compute_eta_derivative(std::vector<double>&&, double) -> std::expected<std::vector<double>, CoefficientError>;
+template auto compute_eta_derivative(std::span<double>&&, double) -> std::expected<std::vector<double>, CoefficientError>;
 
 template auto compute_eta_second_derivative(std::span<const double>&&, double) -> std::vector<double>;
 template auto compute_eta_second_derivative(const std::vector<double>&, double) -> std::vector<double>;
