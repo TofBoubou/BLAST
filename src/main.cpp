@@ -1,5 +1,7 @@
 #include "blast/io/config_manager.hpp"
 #include "blast/io/output/output_writer.hpp"
+#include "blast/io/output/hdf5_writer.hpp"
+#include "blast/io/output/csv_writer.hpp"
 #include "blast/thermophysics/mixture_interface.hpp"
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
 #include <iostream>
@@ -225,7 +227,7 @@ int main(int argc, char* argv[]) {
             
             // Write a simple CSV for quick analysis
             try {
-                auto csv_result = blast::io::output::convenience::write_csv_series(
+                auto csv_result = blast::io::output::csv::write_csv_series(
                     solution, config, mixture, output_config.base_directory / "csv"
                 );
                 if (csv_result) {

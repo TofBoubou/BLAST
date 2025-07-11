@@ -2,6 +2,7 @@
 #include "output_writer.hpp"
 #include <fstream>
 #include <iomanip>
+#include <map>
 
 namespace blast::io::output {
 
@@ -64,6 +65,20 @@ private:
     [[nodiscard]] auto write_metadata_file(
         const std::filesystem::path& file_path,
         const SimulationMetadata& metadata
+    ) const -> std::expected<void, OutputError>;
+    
+    [[nodiscard]] auto write_variable_file(
+        const std::filesystem::path& file_path,
+        const std::vector<StationData>& stations,
+        const std::string& variable_name,
+        const OutputConfig& config
+    ) const -> std::expected<void, OutputError>;
+    
+    [[nodiscard]] auto write_species_file(
+        const std::filesystem::path& file_path,
+        const std::vector<StationData>& stations,
+        const SimulationMetadata& metadata,
+        const OutputConfig& config
     ) const -> std::expected<void, OutputError>;
 
 public:

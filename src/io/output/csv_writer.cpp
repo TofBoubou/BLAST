@@ -275,6 +275,241 @@ auto CSVWriter::write_metadata_file(
     return {};
 }
 
+auto CSVWriter::write_single_file(
+    const std::filesystem::path& file_path,
+    const OutputDataset& dataset,
+    const OutputConfig& config
+) const -> std::expected<void, OutputError> {
+    
+    std::ofstream file(file_path);
+    if (!file.is_open()) {
+        return std::unexpected(FileWriteError(file_path, "Cannot open file for writing"));
+    }
+    
+    // Set output format
+    if (csv_config_.scientific_notation) {
+        file << std::scientific;
+    } else {
+        file << std::fixed;
+    }
+    file << std::setprecision(csv_config_.precision);
+    
+    // Write header
+    if (csv_config_.include_headers) {
+        file << "# BLAST Boundary Layer Solution - Combined Data" << csv_config_.line_ending;
+        file << "# Station,eta,xi,x_physical,y_physical,temperature,pressure,density,F,g,V";
+        
+        if (config.variables.species_concentrations && !dataset.stations.empty() && dataset.stations[0].species_concentrations.rows() > 0) {
+            for (std::size_t i = 0; i < dataset.stations[0].species_concentrations.cols(); ++i) {
+                file << csv_config_.delimiter << "species_" << i;
+            }
+        }
+        file << csv_config_.line_ending;
+    }
+    
+    // Write data for all stations
+    for (std::size_t station_idx = 0; station_idx < dataset.stations.size(); ++station_idx) {
+        const auto& station = dataset.stations[station_idx];
+        
+        for (std::size_t eta_idx = 0; eta_idx < station.eta.size(); ++eta_idx) {
+            file << station_idx << csv_config_.delimiter;
+            file << station.eta[eta_idx] << csv_config_.delimiter;
+            file << station.xi << csv_config_.delimiter;
+            file << station.x_physical << csv_config_.delimiter;
+            file << (eta_idx < station.y_physical.size() ? station.y_physical[eta_idx] : 0.0) << csv_config_.delimiter;
+            file << (eta_idx < station.temperature.size() ? station.temperature[eta_idx] : 0.0) << csv_config_.delimiter;
+            file << (eta_idx < station.pressure.size() ? station.pressure[eta_idx] : 0.0) << csv_config_.delimiter;
+            file << (eta_idx < station.density.size() ? station.density[eta_idx] : 0.0) << csv_config_.delimiter;
+            file << (eta_idx < station.F.size() ? station.F[eta_idx] : 0.0) << csv_config_.delimiter;
+            file << (eta_idx < station.g.size() ? station.g[eta_idx] : 0.0) << csv_config_.delimiter;
+            file << (eta_idx < station.V.size() ? station.V[eta_idx] : 0.0);
+            
+            if (config.variables.species_concentrations && station.species_concentrations.rows() > 0) {
+                for (std::size_t spec_idx = 0; spec_idx < station.species_concentrations.cols(); ++spec_idx) {
+                    file << csv_config_.delimiter;
+                    if (eta_idx < station.species_concentrations.rows()) {
+                        file << station.species_concentrations(eta_idx, spec_idx);
+                    } else {
+                        file << 0.0;
+                    }
+                }
+            }
+            file << csv_config_.line_ending;
+        }
+    }
+    
+    return {};
+}
+
+auto CSVWriter::write_variable_files(
+    const std::filesystem::path& base_path,
+    const OutputDataset& dataset,
+    const OutputConfig& config
+) const -> std::expected<void, OutputError> {
+    
+    if (dataset.stations.empty()) {
+        return std::unexpected(OutputError("No station data to write"));
+    }
+    
+    auto base_name = base_path.stem().string();
+    auto output_dir = base_path.parent_path() / base_name;
+    std::filesystem::create_directories(output_dir);
+    
+    // Write metadata file
+    auto metadata_path = output_dir / "metadata.txt";
+    if (auto result = write_metadata_file(metadata_path, dataset.metadata); !result) {
+        return std::unexpected(result.error());
+    }
+    
+    // Write each variable to its own file
+    std::vector<std::string> variable_names = {"temperature", "pressure", "density", "F", "g", "V"};
+    
+    for (const auto& var_name : variable_names) {
+        auto var_path = output_dir / (var_name + ".csv");
+        if (auto result = write_variable_file(var_path, dataset.stations, var_name, config); !result) {
+            return std::unexpected(result.error());
+        }
+    }
+    
+    // Write species concentrations if available
+    if (config.variables.species_concentrations && !dataset.stations.empty() && dataset.stations[0].species_concentrations.rows() > 0) {
+        auto species_path = output_dir / "species_concentrations.csv";
+        if (auto result = write_species_file(species_path, dataset.stations, dataset.metadata, config); !result) {
+            return std::unexpected(result.error());
+        }
+    }
+    
+    return {};
+}
+
+auto CSVWriter::write_variable_file(
+    const std::filesystem::path& file_path,
+    const std::vector<StationData>& stations,
+    const std::string& variable_name,
+    const OutputConfig& config
+) const -> std::expected<void, OutputError> {
+    
+    std::ofstream file(file_path);
+    if (!file.is_open()) {
+        return std::unexpected(FileWriteError(file_path, "Cannot open file for writing"));
+    }
+    
+    // Set output format
+    if (csv_config_.scientific_notation) {
+        file << std::scientific;
+    } else {
+        file << std::fixed;
+    }
+    file << std::setprecision(csv_config_.precision);
+    
+    // Write header
+    if (csv_config_.include_headers) {
+        file << "# BLAST Boundary Layer Solution - " << variable_name << csv_config_.line_ending;
+        file << "eta" << csv_config_.delimiter << "xi";
+        for (std::size_t i = 0; i < stations.size(); ++i) {
+            file << csv_config_.delimiter << "station_" << i;
+        }
+        file << csv_config_.line_ending;
+    }
+    
+    // Get the maximum eta size
+    std::size_t max_eta_size = 0;
+    for (const auto& station : stations) {
+        max_eta_size = std::max(max_eta_size, station.eta.size());
+    }
+    
+    // Write data
+    for (std::size_t eta_idx = 0; eta_idx < max_eta_size; ++eta_idx) {
+        // Write eta coordinate (use first station's eta)
+        if (eta_idx < stations[0].eta.size()) {
+            file << stations[0].eta[eta_idx];
+        } else {
+            file << 0.0;
+        }
+        
+        // Write xi coordinate (use first station's xi)
+        file << csv_config_.delimiter << stations[0].xi;
+        
+        // Write variable data for each station
+        for (const auto& station : stations) {
+            file << csv_config_.delimiter;
+            
+            const std::vector<double>* var_data = nullptr;
+            if (variable_name == "temperature") var_data = &station.temperature;
+            else if (variable_name == "pressure") var_data = &station.pressure;
+            else if (variable_name == "density") var_data = &station.density;
+            else if (variable_name == "F") var_data = &station.F;
+            else if (variable_name == "g") var_data = &station.g;
+            else if (variable_name == "V") var_data = &station.V;
+            
+            if (var_data && eta_idx < var_data->size()) {
+                file << (*var_data)[eta_idx];
+            } else {
+                file << 0.0;
+            }
+        }
+        file << csv_config_.line_ending;
+    }
+    
+    return {};
+}
+
+auto CSVWriter::write_species_file(
+    const std::filesystem::path& file_path,
+    const std::vector<StationData>& stations,
+    const SimulationMetadata& metadata,
+    const OutputConfig& config
+) const -> std::expected<void, OutputError> {
+    
+    std::ofstream file(file_path);
+    if (!file.is_open()) {
+        return std::unexpected(FileWriteError(file_path, "Cannot open file for writing"));
+    }
+    
+    // Set output format
+    if (csv_config_.scientific_notation) {
+        file << std::scientific;
+    } else {
+        file << std::fixed;
+    }
+    file << std::setprecision(csv_config_.precision);
+    
+    // Write header
+    if (csv_config_.include_headers) {
+        file << "# BLAST Boundary Layer Solution - Species Concentrations" << csv_config_.line_ending;
+        file << "station" << csv_config_.delimiter << "eta" << csv_config_.delimiter << "xi";
+        
+        for (const auto& species_name : metadata.mixture.species_names) {
+            file << csv_config_.delimiter << species_name;
+        }
+        file << csv_config_.line_ending;
+    }
+    
+    // Write data
+    for (std::size_t station_idx = 0; station_idx < stations.size(); ++station_idx) {
+        const auto& station = stations[station_idx];
+        
+        for (std::size_t eta_idx = 0; eta_idx < station.eta.size(); ++eta_idx) {
+            file << station_idx << csv_config_.delimiter;
+            file << station.eta[eta_idx] << csv_config_.delimiter;
+            file << station.xi;
+            
+            // Write species concentrations
+            for (std::size_t spec_idx = 0; spec_idx < metadata.mixture.species_names.size(); ++spec_idx) {
+                file << csv_config_.delimiter;
+                if (eta_idx < station.species_concentrations.rows() && spec_idx < station.species_concentrations.cols()) {
+                    file << station.species_concentrations(eta_idx, spec_idx);
+                } else {
+                    file << 0.0;
+                }
+            }
+            file << csv_config_.line_ending;
+        }
+    }
+    
+    return {};
+}
+
 // ProfileCSVWriter implementation
 auto ProfileCSVWriter::write_profiles(
     const std::filesystem::path& file_path,

@@ -11,7 +11,10 @@
       "Bash(rg:*)",
       "Bash(cd:*)",
       "Bash(cd:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(find:*)",
+      "Bash(g++:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

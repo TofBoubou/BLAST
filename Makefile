@@ -5,7 +5,8 @@
 CXX = g++
 CXXFLAGS = -std=c++23 -Wall -Wextra -O3 -DNDEBUG -march=native
 DEBUG_FLAGS = -std=c++23 -Wall -Wextra -g -O0 -DDEBUG
-INCLUDE_FLAGS = -Iinclude
+INCLUDE_FLAGS = -Iinclude -I/usr/include/hdf5/serial
+
 
 # Library paths and flags
 EIGEN_PATH = libs/eigen
@@ -20,7 +21,7 @@ ZLIB_FLAGS = -lz
 # Include paths
 INCLUDES = $(INCLUDE_FLAGS) \
            -I$(EIGEN_PATH) \
-           -I$(MUTATIONPP_PATH)/include \
+           -I$(MUTATIONPP_PATH)/install/include \
            -I$(YAML_CPP_PATH)/include
 
 # Library linking

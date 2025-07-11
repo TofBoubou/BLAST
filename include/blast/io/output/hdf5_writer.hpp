@@ -3,6 +3,7 @@
 #include <hdf5.h>
 #include <memory>
 #include <string_view>
+#include <map>
 
 namespace blast::io::output {
 

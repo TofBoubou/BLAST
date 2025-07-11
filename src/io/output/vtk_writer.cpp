@@ -597,4 +597,123 @@ auto compute_cell_data(
 
 } // namespace vtk
 
+// VTKLegacyWriter implementation
+auto VTKLegacyWriter::write(
+    const std::filesystem::path& file_path,
+    const OutputDataset& dataset,
+    const OutputConfig& config,
+    ProgressCallback progress
+) const -> std::expected<void, OutputError> {
+    
+    try {
+        if (progress) progress(0.0, "Starting VTK Legacy write");
+        
+        return write_legacy_format(file_path, dataset, config);
+        
+    } catch (const std::exception& e) {
+        return std::unexpected(OutputError(
+            std::format("VTK Legacy write failed: {}", e.what())
+        ));
+    }
+}
+
+auto VTKLegacyWriter::write_legacy_format(
+    const std::filesystem::path& file_path,
+    const OutputDataset& dataset,
+    const OutputConfig& config
+) const -> std::expected<void, OutputError> {
+    
+    if (dataset.stations.empty()) {
+        return std::unexpected(OutputError("No station data to write"));
+    }
+    
+    std::ofstream file(file_path);
+    if (!file.is_open()) {
+        return std::unexpected(FileWriteError(file_path, "Cannot open file for writing"));
+    }
+    
+    // Write VTK legacy header
+    write_header(file);
+    
+    // Write coordinates
+    if (auto result = write_coordinates(file, dataset.stations); !result) {
+        return result;
+    }
+    
+    // Write scalar fields
+    const auto& station = dataset.stations[0];
+    
+    file << "POINT_DATA " << station.eta.size() << "\n";
+    
+    if (config.variables.flow_variables && !station.temperature.empty()) {
+        write_scalar_field(file, "Temperature", station.temperature);
+    }
+    
+    if (config.variables.flow_variables && !station.pressure.empty()) {
+        write_scalar_field(file, "Pressure", station.pressure);
+    }
+    
+    if (config.variables.flow_variables && !station.density.empty()) {
+        write_scalar_field(file, "Density", station.density);
+    }
+    
+    return {};
+}
+
+auto VTKLegacyWriter::write_header(std::ostream& os) const -> void {
+    os << "# vtk DataFile Version 3.0\n";
+    os << "BLAST Boundary Layer Solution\n";
+    os << "ASCII\n";
+    os << "DATASET STRUCTURED_GRID\n";
+}
+
+auto VTKLegacyWriter::write_coordinates(
+    std::ostream& os,
+    const std::vector<StationData>& stations
+) const -> std::expected<void, OutputError> {
+    
+    if (stations.empty()) {
+        return std::unexpected(OutputError("No station data"));
+    }
+    
+    const auto& station = stations[0];
+    int n_points = station.eta.size();
+    
+    os << "DIMENSIONS " << n_points << " 1 1\n";
+    os << "POINTS " << n_points << " float\n";
+    
+    for (size_t i = 0; i < station.eta.size(); ++i) {
+        os << station.eta[i] << " 0.0 0.0\n";
+    }
+    
+    return {};
+}
+
+auto VTKLegacyWriter::write_scalar_field(
+    std::ostream& os,
+    const std::string& name,
+    const std::vector<double>& data
+) const -> void {
+    
+    os << "SCALARS " << name << " float\n";
+    os << "LOOKUP_TABLE default\n";
+    
+    for (double value : data) {
+        os << value << "\n";
+    }
+}
+
+auto VTKLegacyWriter::write_vector_field(
+    std::ostream& os,
+    const std::string& name,
+    const std::vector<std::array<double, 3>>& data
+) const -> void {
+    
+    os << "VECTORS " << name << " float\n";
+    
+    for (const auto& vec : data) {
+        os << vec[0] << " " << vec[1] << " " << vec[2] << "\n";
+    }
+}
+
 } // namespace blast::io::output
