@@ -425,8 +425,11 @@ auto HDF5Writer::write_vector(
     }
     DataspaceHandle space(space_id);
     
-    // Create dataset with compression if enabled
-    auto prop_result = create_dataset_properties();
+    // Create dataset properties - use chunked properties if compression is enabled
+    auto prop_result = (hdf5_config_.compression_level > 0) ? 
+        create_chunked_properties(data.size()) : 
+        create_dataset_properties();
+    
     if (!prop_result) {
         return std::unexpected(prop_result.error());
     }
@@ -486,8 +489,11 @@ auto HDF5Writer::write_matrix(
     }
     DataspaceHandle space(space_id);
     
-    // Create dataset
-    auto prop_result = create_dataset_properties();
+    // Create dataset properties - use chunked properties if compression is enabled
+    auto prop_result = (hdf5_config_.compression_level > 0) ? 
+        create_chunked_properties_2d(data.rows(), data.cols()) : 
+        create_dataset_properties();
+    
     if (!prop_result) {
         return std::unexpected(prop_result.error());
     }
@@ -531,6 +537,44 @@ auto HDF5Writer::write_matrix(
     }
     
     return {};
+}
+
+auto HDF5Writer::create_chunked_properties_2d(std::size_t rows, std::size_t cols) const 
+    -> std::expected<PropertyHandle, OutputError> {
+    
+    auto plist_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (plist_id < 0) {
+        return std::unexpected(OutputError("Failed to create dataset property list"));
+    }
+    PropertyHandle props(plist_id);
+    
+    // Set chunking for 2D data - chunk sizes must be <= data sizes
+    hsize_t chunk_dims[2];
+    chunk_dims[0] = std::min(rows, hdf5_config_.chunk_size);
+    chunk_dims[1] = std::min(cols, hdf5_config_.chunk_size);
+    
+    // Ensure minimum chunk size of 1 in each dimension
+    if (chunk_dims[0] == 0) chunk_dims[0] = 1;
+    if (chunk_dims[1] == 0) chunk_dims[1] = 1;
+    
+    if (H5Pset_chunk(props, 2, chunk_dims) < 0) {
+        return std::unexpected(OutputError("Failed to set 2D chunking"));
+    }
+    
+    // Set compression if enabled
+    if (hdf5_config_.compression_level > 0) {
+        if (hdf5_config_.use_shuffle_filter) {
+            H5Pset_shuffle(props);
+        }
+        
+        H5Pset_deflate(props, hdf5_config_.compression_level);
+        
+        if (hdf5_config_.use_fletcher32) {
+            H5Pset_fletcher32(props);
+        }
+    }
+    
+    return props;
 }
 
 auto HDF5Writer::write_scalar(
@@ -705,6 +749,41 @@ auto HDF5Writer::create_dataset_properties() const
         return std::unexpected(OutputError("Failed to create dataset property list"));
     }
     PropertyHandle props(plist_id);
+    
+    // Set compression if enabled - but no chunking here since we don't know the size
+    if (hdf5_config_.compression_level > 0) {
+        if (hdf5_config_.use_shuffle_filter) {
+            H5Pset_shuffle(props);
+        }
+        
+        H5Pset_deflate(props, hdf5_config_.compression_level);
+        
+        if (hdf5_config_.use_fletcher32) {
+            H5Pset_fletcher32(props);
+        }
+    }
+    
+    return props;
+}
+
+auto HDF5Writer::create_chunked_properties(std::size_t size) const 
+    -> std::expected<PropertyHandle, OutputError> {
+    
+    auto plist_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (plist_id < 0) {
+        return std::unexpected(OutputError("Failed to create dataset property list"));
+    }
+    PropertyHandle props(plist_id);
+    
+    // Set chunking - chunk size must be <= data size
+    hsize_t chunk_size = std::min(size, hdf5_config_.chunk_size);
+    if (chunk_size == 0) {
+        chunk_size = 1; // Minimum chunk size
+    }
+    
+    if (H5Pset_chunk(props, 1, &chunk_size) < 0) {
+        return std::unexpected(OutputError("Failed to set chunking"));
+    }
     
     // Set compression if enabled
     if (hdf5_config_.compression_level > 0) {

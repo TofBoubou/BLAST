@@ -85,6 +85,8 @@ MutationMixture::MutationMixture(const io::MixtureConfig& config)
     , has_electrons_(mixture_->hasElectrons()) {
     
     try {
+
+        std::cout << "rbcubr" << std::endl;
         
         // Cache species properties
         species_mw_.reserve(n_species_);

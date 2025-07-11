@@ -129,6 +129,9 @@ private:
         const std::string& units = "",
         const std::string& description = ""
     ) const -> std::expected<void, OutputError>;
+
+    [[nodiscard]] auto create_chunked_properties_2d(std::size_t rows, std::size_t cols) const 
+    -> std::expected<PropertyHandle, OutputError>;
     
     [[nodiscard]] auto write_scalar(
         hid_t parent,
