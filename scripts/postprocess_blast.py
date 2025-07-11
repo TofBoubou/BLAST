@@ -102,7 +102,19 @@ class BLASTReader:
             if isinstance(item, h5py.Group):
                 result[key] = self._read_hdf5_group(item)
             elif isinstance(item, h5py.Dataset):
-                result[key] = np.array(item)
+                # Handle string datasets specially
+                if h5py.check_string_dtype(item.dtype):
+                    # Read string data and decode if necessary
+                    data = item[()]
+                    if isinstance(data, np.ndarray):
+                        # Array of strings
+                        result[key] = [s.decode('utf-8') if isinstance(s, bytes) else s for s in data]
+                    else:
+                        # Single string
+                        result[key] = data.decode('utf-8') if isinstance(data, bytes) else data
+                else:
+                    result[key] = np.array(item)
+                
                 # Read attributes
                 if item.attrs:
                     result[f'{key}_attrs'] = dict(item.attrs)
@@ -162,18 +174,174 @@ class BLASTReader:
         return metadata
     
     def _load_vtk(self) -> Dict:
-        """Load VTK data (basic implementation)"""
-        # This would require more complex VTK parsing
-        raise NotImplementedError("VTK loading not fully implemented")
+        """
+        Robust VTK reader for BLAST .vts output.
+        - Gère PointData ou CellData
+        - Supporte les grilles 1×N×1 sans <Points>
+        - Reconstruit η si nécessaire
+        - Trace chaque étape avec des prints DEBUG
+        """
+        try:
+            # -- Imports locaux ---------------------------------------------------
+            from vtk import vtkXMLStructuredGridReader, vtkCellCenters, vtkObject
+            from vtk.util import numpy_support as nps
+            import vtk
+            import numpy as _np
+
+            vtkObject.GlobalWarningDisplayOff()  # pas de spam VTK sur stderr
+
+            # -- Lecture du fichier ----------------------------------------------
+            print(f"DEBUG ▸ Loading VTK file: {self.input_path}")
+            reader = vtkXMLStructuredGridReader()
+            reader.SetFileName(str(self.input_path))
+            if not reader.CanReadFile(str(self.input_path)):
+                raise RuntimeError("VTK says it cannot read this file")
+
+            reader.Update()
+            grid = reader.GetOutput()
+            if grid is None:
+                raise RuntimeError("VTK reader returned None grid")
+
+            dims = grid.GetDimensions()       # (nx, ny, nz)
+            npts = grid.GetNumberOfPoints()
+            ncells = grid.GetNumberOfCells()
+            print(f"DEBUG ▸ Grid dims   : {dims}")
+            print(f"DEBUG ▸ #Points     : {npts}")
+            print(f"DEBUG ▸ #Cells      : {ncells}")
+
+            # -- Construire η -----------------------------------------------------
+            eta: _np.ndarray
+            got_pts = False
+
+            # Plan A : utiliser les points fournis
+            if npts > 0:
+                pts = grid.GetPoints()
+                coords = nps.vtk_to_numpy(pts.GetData())
+                eta = coords[:, 1]
+                got_pts = True
+                print("DEBUG ▸ η from Points (plan A)")
+
+            # Plan B : centres de cellules
+            elif ncells > 0:
+                cc = vtkCellCenters()
+                cc.SetInputData(grid)
+                cc.Update()
+                pts = cc.GetOutput().GetPoints()
+                if pts and pts.GetNumberOfPoints() > 0:
+                    coords = nps.vtk_to_numpy(pts.GetData())
+                    eta = coords[:, 1]
+                    got_pts = True
+                    print("DEBUG ▸ η from CellCenters (plan B)")
+
+            # Plan C : longueur des scalaires
+            if not got_pts:
+                print("DEBUG ▸ Need to build η from scalar length (plan C)")
+                # On l'initialise ensuite quand on connaît la taille des arrays
+                eta = None  # placeholder
+
+            # -- Récupérer les tableaux ------------------------------------------
+            def dump_arrays(vtk_data, label):
+                arrays = {}
+                for i in range(vtk_data.GetNumberOfArrays()):
+                    arr = vtk_data.GetArray(i)
+                    if arr:
+                        arrays[arr.GetName()] = nps.vtk_to_numpy(arr)
+                print(f"DEBUG ▸ {label}: found {len(arrays)} arrays")
+                return arrays
+
+            pdata = dump_arrays(grid.GetPointData(), "PointData")
+            cdata = dump_arrays(grid.GetCellData(),  "CellData")
+
+            data_arrays = pdata or cdata           # priorité PointData, sinon CellData
+            if not data_arrays:
+                raise RuntimeError("No scalar arrays in PointData nor CellData")
+
+            # Si plan C : maintenant qu'on connaît la taille des arrays → construire η
+            if eta is None:
+                npts_from_arrays = len(next(iter(data_arrays.values())))
+                eta = _np.linspace(0.0, npts_from_arrays - 1, npts_from_arrays)
+                print(f"DEBUG ▸ η built as linspace(0,{npts_from_arrays-1})")
+
+            # -- Mapping vers structure BLAST ------------------------------------
+            data = {'stations': {'station_000': {}}}
+            station = data['stations']['station_000']
+            station['eta'] = eta
+
+            species_data = {}
+            for name, arr in data_arrays.items():
+                print(f"DEBUG ▸ Mapping array '{name}' shape {arr.shape}")
+                lname = name.lower()
+                if lname == 'f':
+                    station['F'] = arr
+                elif lname == 'g':
+                    station['g'] = arr
+                elif lname == 'v':
+                    station['V'] = arr
+                elif lname == 'temperature':
+                    station['temperature'] = arr
+                elif lname == 'pressure':
+                    station['pressure'] = arr
+                elif lname == 'density':
+                    station['density'] = arr
+                elif name.startswith('Species_'):
+                    idx = int(name.split('_')[1])
+                    species_data[idx] = arr
+                else:
+                    station[lname] = arr  # attr attr
+
+            # -- Espèces ----------------------------------------------------------
+            species_names = []
+            if species_data:
+                nsp = len(species_data)
+                npts_sp = len(next(iter(species_data.values())))
+                station['species_concentrations'] = _np.zeros((nsp, npts_sp))
+                for idx in sorted(species_data):
+                    station['species_concentrations'][idx, :] = species_data[idx]
+                    species_names.append(f"Species_{idx}")
+                print(f"DEBUG ▸ Species: {species_names}")
+
+            # -- Métadonnées ------------------------------------------------------
+            data['metadata'] = {
+                'grid': {
+                    'n_eta': float(len(eta)),
+                    'eta_max': float(eta.max()),
+                    'eta_coordinates': eta.tolist(),
+                    'xi_coordinates': [0.0],
+                },
+                'mixture': {'species_names': species_names},
+            }
+
+            print("DEBUG ▸ VTK file parsed successfully")
+            self.data = data
+            self.metadata = data['metadata']
+            return data
+
+        except ImportError:
+            raise ImportError("VTK library not available. `pip install vtk`")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load VTK file: {e}")
+
     
     def get_station_data(self, station_index: int) -> Dict:
-        """Get data for specific station"""
+        """Get data for specific station with species concentration processing"""
         if self.data is None:
             self.load_data()
         
         station_key = f'station_{station_index:03d}'
         if station_key in self.data['stations']:
-            return self.data['stations'][station_key]
+            station_data = self.data['stations'][station_key].copy()
+            
+            # Process species concentrations if available
+            if 'species_concentrations' in station_data:
+                species_names = self.get_species_names()
+                conc_matrix = station_data['species_concentrations']
+                
+                # Add individual species as separate arrays
+                for i, species in enumerate(species_names):
+                    if i < conc_matrix.shape[0]:
+                        station_data[f'c_{species}'] = conc_matrix[i, :]
+            
+            return station_data
         else:
             available = list(self.data['stations'].keys())
             raise KeyError(f"Station {station_index} not found. Available: {available}")
@@ -182,7 +350,12 @@ class BLASTReader:
         """Extract species names from metadata or data"""
         if self.metadata and 'mixture' in self.metadata:
             if 'species_names' in self.metadata['mixture']:
-                return list(self.metadata['mixture']['species_names'])
+                names = self.metadata['mixture']['species_names']
+                # Handle both list and array formats
+                if isinstance(names, (list, np.ndarray)):
+                    return [str(name) for name in names]
+                else:
+                    return [str(names)]
         
         # Fallback: extract from column names
         if self.data and 'stations' in self.data:
@@ -229,8 +402,8 @@ class BLASTPlotter:
         axes[0, 1].set_title('Enthalpy Profile')
         
         # Plot 3: Physical temperature
-        if 'Temperature' in station_data:
-            axes[0, 2].plot(station_data['Temperature'], eta, 'orange', linewidth=2)
+        if 'temperature' in station_data:
+            axes[0, 2].plot(station_data['temperature'], eta, 'orange', linewidth=2)
             axes[0, 2].set_xlabel('Temperature (K)')
             axes[0, 2].set_ylabel('η')
             axes[0, 2].grid(True, alpha=0.3)
@@ -238,30 +411,36 @@ class BLASTPlotter:
         
         # Plot 4: Major species concentrations
         colors = plt.cm.tab10(np.linspace(0, 1, len(species_names)))
+        legend_added = False
         for i, (species, color) in enumerate(zip(species_names[:6], colors)):
-            col_name = f'c_{species}' if f'c_{species}' in station_data else species
+            col_name = f'c_{species}'
             if col_name in station_data:
                 axes[1, 0].plot(station_data[col_name], eta, color=color, 
                                linewidth=2, label=species)
+                legend_added = True
         
         axes[1, 0].set_xlabel('Mass Fraction')
         axes[1, 0].set_ylabel('η')
         axes[1, 0].grid(True, alpha=0.3)
-        axes[1, 0].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        # Only add legend if there are labeled artists
+        if legend_added:
+            axes[1, 0].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
         axes[1, 0].set_title('Species Concentrations')
         
         # Plot 5: Density and pressure
-        if 'Density' in station_data:
+        if 'density' in station_data:
             ax_rho = axes[1, 1]
-            ax_rho.plot(station_data['Density'], eta, 'g-', linewidth=2, label='Density')
+            ax_rho.plot(station_data['density'], eta, 'g-', linewidth=2, label='Density')
             ax_rho.set_xlabel('Density (kg/m³)')
             ax_rho.set_ylabel('η')
             ax_rho.grid(True, alpha=0.3)
             ax_rho.set_title('Density Profile')
             
-            if 'Pressure' in station_data:
+            if 'pressure' in station_data:
                 ax_p = ax_rho.twinx()
-                ax_p.plot(station_data['Pressure'], eta, 'm--', linewidth=2, label='Pressure')
+                ax_p.plot(station_data['pressure'], eta, 'm--', linewidth=2, label='Pressure')
                 ax_p.set_xlabel('Pressure (Pa)')
                 ax_p.legend(loc='upper right')
         
@@ -433,7 +612,10 @@ class BLASTPlotter:
         self.plot_integrated_quantities(save_path=output_dir / 'integrated_quantities.png')
         
         # Create summary data file
-        self._create_summary_json(output_dir / 'summary.json')
+        try:
+            self._create_summary_json(output_dir / 'summary.json')
+        except Exception as e:
+            print(f"Warning: Could not create summary JSON file: {e}")
         
         print("Summary report completed!")
     
@@ -461,6 +643,12 @@ class BLASTPlotter:
                 return int(obj)
             elif isinstance(obj, np.floating):
                 return float(obj)
+            elif isinstance(obj, (bytes, np.bytes_)):
+                # Handle bytes objects (common in HDF5 string data)
+                try:
+                    return obj.decode('utf-8')
+                except UnicodeDecodeError:
+                    return str(obj)
             elif isinstance(obj, dict):
                 return {key: convert_numpy(value) for key, value in obj.items()}
             elif isinstance(obj, list):
