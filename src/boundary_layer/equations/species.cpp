@@ -26,11 +26,6 @@ auto solve_species(
     const auto n_eta = c_previous.cols();
     const auto n_species = c_previous.rows();
     
-    std::cout << "=== SPECIES SOLVER DEBUG ===" << std::endl;
-    std::cout << "Matrix size: " << n_eta << "x" << n_species << std::endl;
-    std::cout << "Station: " << station << ", d_eta: " << d_eta << std::endl;
-    
-    // Validation
     if (n_species != mixture.n_species()) {
         return std::unexpected(EquationError(
             "Species: mixture species count mismatch"
@@ -38,109 +33,28 @@ auto solve_species(
     }
     
     if (!sim_config.chemical_non_equilibrium) {
-        std::cout << "Using equilibrium composition" << std::endl;
         return compute_equilibrium_composition(inputs.T, bc.P_e(), mixture);
     }
     
-    std::cout << "Using non-equilibrium transport equations" << std::endl;
-    
-    // Show input concentrations
-    std::cout << "Input concentrations:" << std::endl;
-    for (std::size_t j = 0; j < n_species; ++j) {
-        std::cout << "  species[" << j << "]: ";
-        for (std::size_t i = 0; i < std::min(n_eta, static_cast<size_t>(3)); ++i) {
-            std::cout << c_previous(j, i) << " ";
-        }
-        std::cout << std::endl;
-    }
-    
-    // Build species coefficients
-    std::cout << "Building species coefficients..." << std::endl;
     auto species_coeffs_result = detail::build_species_coefficients(
         c_previous, inputs, coeffs, bc, xi_der, mixture, sim_config,
         F_field, V_field, station, d_eta
     );
     
     if (!species_coeffs_result) {
-        std::cout << "ERROR: Failed to build species coefficients" << std::endl;
         return std::unexpected(species_coeffs_result.error());
     }
     auto species_coeffs = species_coeffs_result.value();
-    std::cout << "Species coefficients built successfully" << std::endl;
     
-    // Build boundary conditions  
-    std::cout << "Building boundary conditions..." << std::endl;
     auto boundary_result = detail::build_species_boundary_conditions(
         c_previous, coeffs, bc, mixture, sim_config
     );
     
     if (!boundary_result) {
-        std::cout << "ERROR: Failed to build boundary conditions" << std::endl;
         return std::unexpected(boundary_result.error());
     }
     auto boundary_conds = boundary_result.value();
-    std::cout << "Boundary conditions built successfully" << std::endl;
     
-    // DÉBOGAGE: Vérifier les conditions aux limites
-    std::cout << "\nBoundary conditions check:" << std::endl;
-    for (std::size_t j = 0; j < n_species; ++j) {
-        std::cout << "  species[" << j << "]: f_bc=" << boundary_conds.f_bc[j] 
-                  << " g_bc=" << boundary_conds.g_bc[j] 
-                  << " h_bc=" << boundary_conds.h_bc[j] << std::endl;
-    }
-    
-    // DÉBOGAGE: Vérifier les coefficients de la matrice
-    std::cout << "\nMatrix coefficients (first few points):" << std::endl;
-    for (std::size_t i = 0; i < std::min(n_eta, static_cast<size_t>(3)); ++i) {
-        std::cout << "  eta=" << i << ":" << std::endl;
-        for (std::size_t j = 0; j < n_species; ++j) {
-            std::cout << "    species[" << j << "]: a=" << species_coeffs.a(i, j)
-                      << " b=" << species_coeffs.b(i, j) 
-                      << " c=" << species_coeffs.c(i, j)
-                      << " d=" << species_coeffs.d(i, j) << std::endl;
-            
-            // Vérifier les valeurs non-finies
-            if (!std::isfinite(species_coeffs.a(i, j)) || !std::isfinite(species_coeffs.b(i, j)) || 
-                !std::isfinite(species_coeffs.c(i, j)) || !std::isfinite(species_coeffs.d(i, j))) {
-                std::cout << "ERROR: Non-finite coefficient detected!" << std::endl;
-                return std::unexpected(EquationError("Non-finite coefficients detected"));
-            }
-            
-            // Vérifier la dominance diagonale pour les points intérieurs
-            if (i > 0 && i < n_eta-1) {
-                double diag = std::abs(species_coeffs.b(i, j));
-                double off_diag = std::abs(species_coeffs.a(i, j)) + std::abs(species_coeffs.c(i, j));
-                double ratio = diag / (off_diag + 1e-15);  // Éviter division par zéro
-                
-                if (ratio < 1.0) {
-                    std::cout << "      WARNING: Diagonal dominance ratio = " << ratio << " < 1.0" << std::endl;
-                }
-                
-                // Vérifier les coefficients très grands
-                if (diag > 1e12 || off_diag > 1e12) {
-                    std::cout << "      WARNING: Very large coefficients detected!" << std::endl;
-                    std::cout << "        |b| = " << diag << ", |a|+|c| = " << off_diag << std::endl;
-                }
-            }
-        }
-    }
-    
-    // DÉBOGAGE: Vérifier les champs d'entrée
-    std::cout << "\nInput fields check:" << std::endl;
-    std::cout << "  F_field: ";
-    for (std::size_t i = 0; i < std::min(static_cast<size_t>(3), F_field.size()); ++i) {
-        std::cout << F_field[i] << " ";
-    }
-    std::cout << std::endl;
-    
-    std::cout << "  V_field: ";
-    for (std::size_t i = 0; i < std::min(static_cast<size_t>(3), V_field.size()); ++i) {
-        std::cout << V_field[i] << " ";
-    }
-    std::cout << std::endl;
-    
-    // Solve block tridiagonal system
-    std::cout << "\nCalling block tridiagonal solver..." << std::endl;
     auto solution_result = solvers::solve_species_block_tridiagonal(
         c_previous,
         boundary_conds.f_bc,
@@ -154,8 +68,6 @@ auto solve_species(
     );
     
     if (!solution_result) {
-        std::cout << "ERROR: Block tridiagonal solver failed!" << std::endl;
-        std::cout << "Error: " << solution_result.error().message() << std::endl;
         return std::unexpected(EquationError(
             "Species: block tridiagonal solver failed: {}", 
             std::source_location::current(), solution_result.error().message()
@@ -163,49 +75,10 @@ auto solve_species(
     }
     
     auto result = solution_result.value();
-    std::cout << "Block tridiagonal solver completed" << std::endl;
     
-    // DÉBOGAGE: Vérifier le résultat détaillé
-    std::cout << "\nSolver output check:" << std::endl;
-    for (std::size_t i = 0; i < std::min(n_eta, static_cast<size_t>(5)); ++i) {
-        double sum = 0.0;
-        std::cout << "  eta=" << i << ": ";
-        for (std::size_t j = 0; j < n_species; ++j) {
-            std::cout << "species[" << j << "]=" << result(j, i) << " ";
-            sum += result(j, i);
-        }
-        std::cout << " (sum=" << sum << ")" << std::endl;
-        
-        // Vérifier la divergence
-        if (sum > 1000.0 || sum < -1000.0 || !std::isfinite(sum)) {
-            std::cout << "ERROR: Divergence detected at eta=" << i << std::endl;
-            std::cout << "Sum = " << sum << std::endl;
-            
-            // Montrer toutes les espèces pour ce point
-            for (std::size_t j = 0; j < n_species; ++j) {
-                std::cout << "  species[" << j << "] = " << result(j, i) << std::endl;
-            }
-            
-            return std::unexpected(EquationError("Species solver diverged"));
-        }
-        
-        // Vérifier les valeurs négatives importantes
-        for (std::size_t j = 0; j < n_species; ++j) {
-            if (result(j, i) < -0.1) {
-                std::cout << "WARNING: Large negative concentration at eta=" << i 
-                          << " species=" << j << " value=" << result(j, i) << std::endl;
-            }
-        }
-    }
-    
-    // Apply charge neutrality for ionized mixtures
     if (mixture.has_electrons()) {
-        std::cout << "Applying charge neutrality..." << std::endl;
         apply_charge_neutrality(result, mixture);
     }
-    
-    std::cout << "Species solver completed successfully" << std::endl;
-    std::cout << "=== END SPECIES SOLVER DEBUG ===" << std::endl;
     
     return result;
 }
@@ -320,7 +193,6 @@ auto build_species_coefficients(
     species_coeffs.d = core::Matrix<double>(n_eta, n_species);
     
     for (std::size_t i = 0; i < n_eta; ++i) {
-        // std::cout << "l0 " << coeffs.transport.l0[i] << std::endl;
         for (std::size_t j = 0; j < n_species; ++j) {
             
             // a[i][j] = -l0[i]*Le/Pr / d_eta²
@@ -328,8 +200,6 @@ auto build_species_coefficients(
             
             // b[i][j] = (V[i] - Le/Pr*dl0_deta[i]) / d_eta
             species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i]) / d_eta;
-            // std::cout << "V " << V_field[i] << std::endl;
-            // std::cout << "dl0 " << coeffs.transport.dl0_deta[i] << std::endl;
             
             // c[i][j] = 2*xi*F[i]*lambda0
             species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0;
@@ -342,25 +212,7 @@ auto build_species_coefficients(
 
             const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
 
-/*             // DÉBOGAGE DU TERME CHIMIQUE
-            if (i < 3 && j >= 3) {  // Vérifier les espèces qui explosent (N2=3, O2=4)
-                std::cout << "DEBUG wi_term: eta=" << i << " species=" << j << std::endl;
-                std::cout << "  wi=" << coeffs.chemical.wi(i, j) << std::endl;
-                std::cout << "  W_fact=" << factors.W_fact << std::endl;
-                std::cout << "  rho=" << coeffs.thermodynamic.rho[i] << std::endl;
-                std::cout << "  wi_term=" << wi_term << std::endl;
-                std::cout << "  d_term=" << d_term << std::endl;
-                std::cout << "  total_d=" << d_term + wi_term << std::endl;
-            } */
-
             species_coeffs.d(i, j) = d_term + wi_term;
-            
-            // Apply molecular weight normalization
-/*             const double Mw_j = mixture.species_molecular_weight(j);
-            species_coeffs.a(i, j) /= Mw_j;
-            species_coeffs.b(i, j) /= Mw_j;
-            species_coeffs.c(i, j) /= Mw_j;
-            species_coeffs.d(i, j) /= Mw_j; */
         }
     }
     
@@ -393,15 +245,6 @@ auto build_species_boundary_conditions(
     }
     
     boundary_conds.h_bc = eq_wall_result.value();
-        
-    // Apply molecular weight normalization
-/*     for (std::size_t i = 0; i < n_species; ++i) {
-        const double Mw_i = mixture.species_molecular_weight(i);
-        std::cout << Mw_i << std::endl;
-        boundary_conds.f_bc[i] /= Mw_i;
-        boundary_conds.g_bc[i] /= Mw_i;
-        boundary_conds.h_bc[i] /= Mw_i;
-    } */
     
     return boundary_conds;
 }

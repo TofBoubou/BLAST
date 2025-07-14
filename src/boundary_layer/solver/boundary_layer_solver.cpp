@@ -279,14 +279,11 @@ auto BoundaryLayerSolver::iterate_station(
         coeffs = coeffs_updated_result.value();
         
         // 10. Solve species equations
-        std::cout << "Avant solver" << std::endl;
         auto c_result = solve_species_equations(solution, inputs, coeffs, bc_dynamic, station);
-        std::cout << "Après solver" << std::endl;
         if (!c_result) {
             return std::unexpected(c_result.error());
         }
         auto c_new = c_result.value();
-        std::cout << "Après erreur solver" << std::endl;
         
         // 11. Build new solution state
         equations::SolutionState solution_new(n_eta, n_species);

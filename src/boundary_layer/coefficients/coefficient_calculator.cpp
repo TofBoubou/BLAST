@@ -256,7 +256,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         }
         
         transport.l0.push_back(thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()));
-        // std::cout << "l0: " << thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()) << std::endl;
         transport.l3.push_back(transport.l0[i] / Pr);
     }
     

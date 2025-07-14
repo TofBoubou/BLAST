@@ -85,8 +85,6 @@ MutationMixture::MutationMixture(const io::MixtureConfig& config)
     , has_electrons_(mixture_->hasElectrons()) {
     
     try {
-
-        std::cout << "rbcubr" << std::endl;
         
         // Cache species properties
         species_mw_.reserve(n_species_);
@@ -127,7 +125,6 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
     }
     
     const double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
-    // std::cout << "DEBUG: Mass fractions sum = " << sum << std::endl;
     constexpr double tolerance = 1e-6;
     
     if (std::abs(sum - 1.0) > tolerance) {
@@ -158,7 +155,6 @@ auto MutationMixture::mixture_molecular_weight(
     double sum = 0.0;
     for (std::size_t i = 0; i < n_species_; ++i) {
         sum += mass_fractions[i] / species_mw_[i];
-        // std::cout << sum << std::endl;
     }
     
     if (sum <= 0.0 || !std::isfinite(sum)) {
