@@ -7,6 +7,7 @@
 #include <expected>
 #include <source_location>
 #include <format>
+#include <iostream>
 
 namespace blast::boundary_layer::equations {
 
@@ -71,6 +72,7 @@ namespace blast::boundary_layer::equations {
         }
         
         if (bc.d_xi_dx() <= 0.0 || bc.ue() <= 0.0 || bc.r_body() <= 0.0) {
+            std::cout << " bc.d_xi_dx() " << bc.d_xi_dx() << " bc.ue() " << bc.ue() << " bc.r_body() " << bc.r_body() << std::endl;
             return std::unexpected(EquationError("Invalid boundary conditions for downstream station"));
         }
         
@@ -130,6 +132,7 @@ namespace blast::boundary_layer::equations {
         }
         
         if (bc.d_xi_dx() <= 0.0 || bc.r_body() <= 0.0) {
+            std::cout << " bc.d_xi_dx() " << bc.d_xi_dx() << " bc.r_body() " << bc.r_body() << std::endl;
             return std::unexpected(EquationError("Invalid boundary conditions for downstream station"));
         }
         

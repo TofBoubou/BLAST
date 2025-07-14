@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <format>
 #include <expected>
+#include <numeric>
 
 namespace blast::boundary_layer::conditions {
 
@@ -205,7 +206,7 @@ auto interpolate_boundary_conditions(
         return create_stagnation_conditions(edge_config, wall_config, sim_config);
     }
     
-    // Find interpolation interval
+    // Find interpolation interval in xi space
     auto interval_result = search_interval(xi_grid, xi);
     if (!interval_result) {
         return std::unexpected(BoundaryConditionError(
@@ -233,13 +234,50 @@ auto interpolate_boundary_conditions(
     
     const auto [ix1, ix2] = x_interval_result.value();
     
-    // Lambda for standard linear interpolation
+    // =====================================================================
+    // EXTRACTION DES PROPRIÉTÉS POUR LES CALCULS DE GRADIENTS
+    // =====================================================================
+    
+    auto u_edge = extract_edge_property(edge_config.edge_points, 
+                                       &io::OuterEdgeConfig::EdgePoint::velocity);
+    auto h_edge = extract_edge_property(edge_config.edge_points, 
+                                       &io::OuterEdgeConfig::EdgePoint::enthalpy);
+    
+    // =====================================================================
+    // CALCUL AUTOMATIQUE DES GRADIENTS d_ue_dx ET d_he_dx
+    // =====================================================================
+    
+    auto du_dx_result = compute_property_derivatives(u_edge, x_grid);
+    if (!du_dx_result) {
+        return std::unexpected(BoundaryConditionError(
+            std::format("Failed to compute d_ue_dx: {}", du_dx_result.error().message())
+        ));
+    }
+    auto du_dx = du_dx_result.value();
+    
+    auto dh_dx_result = compute_property_derivatives(h_edge, x_grid);
+    if (!dh_dx_result) {
+        return std::unexpected(BoundaryConditionError(
+            std::format("Failed to compute d_he_dx: {}", dh_dx_result.error().message())
+        ));
+    }
+    auto dh_dx = dh_dx_result.value();
+    
+    // Interpoler les gradients calculés
+    const double d_ue_dx_interp = interpolate_property(du_dx, ix1, ix2, x_grid, x_interp);
+    const double d_he_dx_interp = interpolate_property(dh_dx, ix1, ix2, x_grid, x_interp);
+    
+    // =====================================================================
+    // INTERPOLATION DES PROPRIÉTÉS DE BASE
+    // =====================================================================
+    
+    // Lambda pour interpolation linéaire standard
     auto interp_linear = [&](auto member_ptr) {
         auto values = extract_edge_property(edge_config.edge_points, member_ptr);
         return interpolate_property(values, ix1, ix2, x_grid, x_interp);
     };
     
-    // Lambda for high-accuracy Hermite interpolation (for critical properties)
+    // Lambda pour interpolation Hermite haute précision
     auto interp_hermite = [&](auto member_ptr) -> std::expected<double, BoundaryConditionError> {
         auto values = extract_edge_property(edge_config.edge_points, member_ptr);
         auto derivatives_result = compute_property_derivatives(values, x_grid);
@@ -249,76 +287,177 @@ auto interpolate_boundary_conditions(
         return interpolate_property(values, ix1, ix2, x_grid, x_interp, derivatives_result.value());
     };
     
-    // Interpolate edge properties with appropriate method
-    // Use Hermite for critical properties with strong gradients
+    // Interpoler les propriétés critiques avec Hermite (haute précision)
     auto pressure_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::pressure);
     if (!pressure_result) {
         return std::unexpected(pressure_result.error());
     }
+    
     auto velocity_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::velocity);
     if (!velocity_result) {
         return std::unexpected(velocity_result.error());
     }
+    
     auto enthalpy_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::enthalpy);
     if (!enthalpy_result) {
         return std::unexpected(enthalpy_result.error());
     }
+    
     auto density_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::density);
     if (!density_result) {
         return std::unexpected(density_result.error());
     }
     
+    // Propriétés moins critiques avec interpolation linéaire
+    const double viscosity_interp = interp_linear(&io::OuterEdgeConfig::EdgePoint::viscosity);
+    const double radius_interp = interp_linear(&io::OuterEdgeConfig::EdgePoint::radius);
+    
+    // =====================================================================
+    // CALCUL AUTOMATIQUE DE d_xi_dx DEPUIS LA DÉFINITION INTÉGRALE
+    // =====================================================================
+    
+    // Par définition: dξ/dx = ρ_e(x) * μ_e(x) * u_e(x) * r_body(x)²
+    const double d_xi_dx_calculated = density_result.value() * 
+                                     viscosity_interp * 
+                                     velocity_result.value() * 
+                                     radius_interp * radius_interp;
+    
+    // Validation du résultat
+    if (d_xi_dx_calculated <= 0.0 || !std::isfinite(d_xi_dx_calculated)) {
+        return std::unexpected(BoundaryConditionError(
+            std::format("Invalid calculated d_xi_dx={} at x={}", d_xi_dx_calculated, x_interp)
+        ));
+    }
+    
+    // =====================================================================
+    // ASSEMBLAGE DES CONDITIONS D'EDGE
+    // =====================================================================
+    
     EdgeConditions edge{
-        .pressure = pressure_result.value(),    // Critical: strong gradients
-        .viscosity = interp_linear(&io::OuterEdgeConfig::EdgePoint::viscosity),   // Linear sufficient
-        .velocity = velocity_result.value(),    // Critical: momentum boundary layer
-        .enthalpy = enthalpy_result.value(),    // Critical: energy boundary layer
-        .density = density_result.value(),      // Critical: compressible flow
+        .pressure = pressure_result.value(),
+        .viscosity = viscosity_interp,
+        .velocity = velocity_result.value(),
+        .enthalpy = enthalpy_result.value(),
+        .density = density_result.value(),
         .species_fractions = {}, 
-        .d_xi_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_xi_dx),
-        .d_ue_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_ue_dx),
-        .d_he_dx = interp_linear(&io::OuterEdgeConfig::EdgePoint::d_he_dx),
-        .d_he_dxi = 0.0,  // Will be computed below
-        .body_radius = interp_linear(&io::OuterEdgeConfig::EdgePoint::radius)     // Linear sufficient
+        .d_xi_dx = d_xi_dx_calculated,    // ← Calculé automatiquement
+        .d_ue_dx = d_ue_dx_interp,        // ← Calculé automatiquement
+        .d_he_dx = d_he_dx_interp,        // ← Calculé automatiquement
+        .d_he_dxi = 0.0,                  // Sera calculé ci-dessous
+        .body_radius = radius_interp
     };
     
-    // Handle species interpolation
+    // =====================================================================
+    // INTERPOLATION DES FRACTIONS D'ESPÈCES (SI PRÉSENTES)
+    // =====================================================================
+    
     if (!edge_config.edge_points[0].species_fractions.empty()) {
         const auto n_species = edge_config.edge_points[0].species_fractions.size();
         edge.species_fractions.resize(n_species);
         
         for (std::size_t s = 0; s < n_species; ++s) {
             std::vector<double> species_values;
+            species_values.reserve(edge_config.edge_points.size());
+            
             for (const auto& point : edge_config.edge_points) {
-                species_values.push_back(point.species_fractions[s]);
+                if (s < point.species_fractions.size()) {
+                    species_values.push_back(point.species_fractions[s]);
+                } else {
+                    return std::unexpected(BoundaryConditionError(
+                        std::format("Inconsistent species array sizes at species {}", s)
+                    ));
+                }
             }
-            // Use Hermite for species fractions (critical for chemical accuracy)
+            
+            // Utiliser Hermite pour les fractions d'espèces (critique pour la précision chimique)
             auto species_derivatives_result = compute_property_derivatives(species_values, x_grid);
             if (!species_derivatives_result) {
-                return std::unexpected(species_derivatives_result.error());
+                return std::unexpected(BoundaryConditionError(
+                    std::format("Failed to compute species derivatives for species {}: {}", 
+                               s, species_derivatives_result.error().message())
+                ));
             }
+            
             edge.species_fractions[s] = interpolate_property(
                 species_values, ix1, ix2, x_grid, x_interp, species_derivatives_result.value()
             );
+            
+            // Validation des fractions d'espèces
+            if (edge.species_fractions[s] < -1e-12 || edge.species_fractions[s] > 1.0 + 1e-12) {
+                return std::unexpected(BoundaryConditionError(
+                    std::format("Invalid species fraction for species {}: {}", s, edge.species_fractions[s])
+                ));
+            }
+            
+            // Correction pour éviter les valeurs légèrement négatives
+            edge.species_fractions[s] = std::max(0.0, std::min(1.0, edge.species_fractions[s]));
+        }
+        
+        // Vérification de la conservation de masse des espèces
+        const double total_mass_fraction = std::accumulate(
+            edge.species_fractions.begin(), edge.species_fractions.end(), 0.0
+        );
+        
+        constexpr double mass_conservation_tolerance = 1e-6;
+        if (std::abs(total_mass_fraction - 1.0) > mass_conservation_tolerance) {
+            return std::unexpected(BoundaryConditionError(
+                std::format("Species mass fractions sum to {} (should be 1.0)", total_mass_fraction)
+            ));
         }
     }
     
-    // Interpolate wall temperature using Hermite (critical for thermal boundary layer)
+    // =====================================================================
+    // INTERPOLATION DE LA TEMPÉRATURE DE PAROI
+    // =====================================================================
+    
+    if (wall_config.wall_temperatures.size() != edge_config.edge_points.size()) {
+        return std::unexpected(BoundaryConditionError(
+            std::format("Wall temperatures array size ({}) doesn't match edge points size ({})",
+                       wall_config.wall_temperatures.size(), edge_config.edge_points.size())
+        ));
+    }
+    
     auto wall_temp_derivatives_result = compute_property_derivatives(wall_config.wall_temperatures, x_grid);
     if (!wall_temp_derivatives_result) {
-        return std::unexpected(wall_temp_derivatives_result.error());
+        return std::unexpected(BoundaryConditionError(
+            std::format("Failed to compute wall temperature derivatives: {}", 
+                       wall_temp_derivatives_result.error().message())
+        ));
     }
+    
     const double wall_temp = interpolate_property(
         wall_config.wall_temperatures, ix1, ix2, x_grid, x_interp, wall_temp_derivatives_result.value()
     );
+    
+    // Validation de la température de paroi
+    if (wall_temp <= 0.0 || !std::isfinite(wall_temp)) {
+        return std::unexpected(BoundaryConditionError(
+            std::format("Invalid wall temperature: {} K", wall_temp)
+        ));
+    }
     
     WallConditions wall{
         .temperature = wall_temp
     };
     
-    // Compute derivatives
+    // =====================================================================
+    // CALCUL DES DÉRIVÉES FINALES
+    // =====================================================================
+    
+    // Calcul de d_ue_dxi et d_he_dxi
     const double d_ue_dxi = edge.d_ue_dx / edge.d_xi_dx;
     edge.d_he_dxi = edge.d_he_dx / edge.d_xi_dx;
+    
+    // Validation des dérivées
+    if (!std::isfinite(d_ue_dxi) || !std::isfinite(edge.d_he_dxi)) {
+        return std::unexpected(BoundaryConditionError(
+            std::format("Invalid computed derivatives: d_ue_dxi={}, d_he_dxi={}", d_ue_dxi, edge.d_he_dxi)
+        ));
+    }
+    
+    // =====================================================================
+    // ASSEMBLAGE FINAL DES CONDITIONS AUX LIMITES
+    // =====================================================================
     
     return BoundaryConditions{
         .edge = std::move(edge),

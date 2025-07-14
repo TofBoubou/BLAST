@@ -440,7 +440,7 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
             config.edge_points.push_back(point);
         }
         
-        // Scalars
+        // Scalars (inchangés)
         auto vel_grad_result = extract_value<double>(node, "velocity_gradient_stagnation");
         if (!vel_grad_result) return std::unexpected(vel_grad_result.error());
         config.velocity_gradient_stagnation = vel_grad_result.value();
