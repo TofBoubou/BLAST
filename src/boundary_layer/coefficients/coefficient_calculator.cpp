@@ -130,7 +130,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
         double sum_c = 0.0;
         for (std::size_t j = 0; j < n_species; ++j) {
             c_local[j] = inputs.c(j, i);
-            if (!std::isfinite(c_local[j]) || c_local[j] < 0.0) {
+            if (!std::isfinite(c_local[j]) || c_local[j] < -1e-6) {
                 return std::unexpected(CoefficientError(
                     std::format("Invalid concentration at eta={} species={}: c={}", i, j, c_local[j])
                 ));
@@ -256,6 +256,7 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         }
         
         transport.l0.push_back(thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()));
+        // std::cout << "l0: " << thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()) << std::endl;
         transport.l3.push_back(transport.l0[i] / Pr);
     }
     

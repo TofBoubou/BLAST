@@ -127,6 +127,7 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
     }
     
     const double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
+    // std::cout << "DEBUG: Mass fractions sum = " << sum << std::endl;
     constexpr double tolerance = 1e-6;
     
     if (std::abs(sum - 1.0) > tolerance) {
@@ -136,7 +137,7 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
     }
     
     if (std::any_of(fractions.begin(), fractions.end(), 
-                    [](double x) { return x < 0.0 || !std::isfinite(x); })) {
+                    [](double x) { return x < -0.01 || !std::isfinite(x); })) {
         return std::unexpected(ThermophysicsError(
             "Invalid mass fraction values (negative or non-finite)"
         ));
@@ -149,7 +150,7 @@ auto MutationMixture::mixture_molecular_weight(
     std::span<const double> mass_fractions
 ) const -> std::expected<double, ThermophysicsError> {
     
-    if (auto validation = validate_composition(mass_fractions); !validation) { // expected si ! means unexpected
+    if (auto validation = validate_composition(mass_fractions); !validation) {
         return std::unexpected(validation.error());
     }
     

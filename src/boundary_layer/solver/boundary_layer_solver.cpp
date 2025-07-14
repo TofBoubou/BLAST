@@ -187,6 +187,7 @@ auto BoundaryLayerSolver::iterate_station(
     ConvergenceInfo conv_info;
     
     for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
+        std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
         const auto solution_old = solution;
         
         // 1. Solve continuity equation: dV/dη = -solve_continuity
@@ -278,11 +279,14 @@ auto BoundaryLayerSolver::iterate_station(
         coeffs = coeffs_updated_result.value();
         
         // 10. Solve species equations
+        std::cout << "Avant solver" << std::endl;
         auto c_result = solve_species_equations(solution, inputs, coeffs, bc_dynamic, station);
+        std::cout << "Après solver" << std::endl;
         if (!c_result) {
             return std::unexpected(c_result.error());
         }
         auto c_new = c_result.value();
+        std::cout << "Après erreur solver" << std::endl;
         
         // 11. Build new solution state
         equations::SolutionState solution_new(n_eta, n_species);
