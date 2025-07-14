@@ -10,7 +10,7 @@ numerical:
   eta_max: 6.0
   convergence_tolerance: 1.0e-8    
   max_iterations: 10000
-  under_relaxation: 0.01
+  under_relaxation: 1
   step_control:
     lower_bound: 5
     upper_bound: 20
