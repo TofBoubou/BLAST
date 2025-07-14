@@ -7,6 +7,8 @@
 #include <concepts>
 #include <ranges>
 #include <algorithm>
+#include <iostream>
+#include <cmath>
 
 namespace blast::boundary_layer::grid::coordinate_transform {
 using blast::core::TransformError;
@@ -64,6 +66,14 @@ auto simpson_integrate(Values&& f_values, PhysicalQuantity auto dx, PhysicalQuan
     for (auto i : std::views::iota(size_t{2}, n)) {
         result[i] = result[i-2] + (f_values[i-2] + coeff_3pt_2 * f_values[i-1] + 
                                   f_values[i]) * dx / divisor_3pt;
+        
+        if (!std::isfinite(result[i])) {
+            std::cout << "DEBUG: simpson_integrate NaN at i=" << i 
+                      << " | f_values[i-2]=" << f_values[i-2] 
+                      << " | f_values[i-1]=" << f_values[i-1] 
+                      << " | f_values[i]=" << f_values[i] 
+                      << " | dx=" << dx << std::endl;
+        }
     }
     
     return result;

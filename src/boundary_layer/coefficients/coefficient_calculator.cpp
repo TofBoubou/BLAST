@@ -255,7 +255,11 @@ auto CoefficientCalculator::calculate_transport_coefficients(
             return std::unexpected(CoefficientError("Invalid edge conditions: rho_e or mu_e <= 0"));
         }
         
-        transport.l0.push_back(thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e()));
+        double l0_value = thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e());
+        transport.l0.push_back(l0_value);
+        std::cout << std::scientific << "DEBUG: l0[" << i << "] = " << l0_value << std::endl;
+        std::cout << std::scientific << "mu = " <<  mu << ". mu_e = " << bc.mu_e() << std::endl;
+        std::cout << std::scientific << "rho[i] = " <<  thermo.rho[i] << ". rho_e = " << bc.rho_e() << std::endl;
         transport.l3.push_back(transport.l0[i] / Pr);
     }
     

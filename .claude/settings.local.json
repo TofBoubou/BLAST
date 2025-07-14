@@ -4,18 +4,13 @@
       "Bash(cd:*)",
       "Bash(mkdir:*)",
       "Bash(make:*)",
-      "Bash(cd:*)",
-      "Bash(cd:*)",
-      "Bash(cd:*)",
-      "Bash(cd:*)",
       "Bash(rg:*)",
-      "Bash(cd:*)",
-      "Bash(cd:*)",
       "Bash(git checkout:*)",
       "Bash(find:*)",
       "Bash(g++:*)",
       "Bash(grep:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(./blast config/default.yaml test_output)"
     ],
     "deny": []
   }

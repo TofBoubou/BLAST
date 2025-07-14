@@ -104,16 +104,41 @@ auto build_energy_coefficients(
     
     for (std::size_t i = 0; i < n_eta; ++i) {
         
-        // a[i] = l3[i] / d_eta²
-        energy_coeffs.a.push_back(coeffs.transport.l3[i] / d_eta_sq);
-        
-        // b[i] = (dl3_deta[i] - V[i]) / d_eta
-        energy_coeffs.b.push_back((coeffs.transport.dl3_deta[i] - V_field[i]) / d_eta);
-        
-        // c[i] = -2*xi*F[i]*d_he_dxi/he - 2*xi*F[i]*lambda0
-        const double c_term = -2.0 * xi * F_field[i] * bc.d_he_dxi() / bc.he() - 
-                             2.0 * xi * F_field[i] * lambda0;
+        // ----- Coefficient a[i] -----
+        double l3_i = coeffs.transport.l3[i];
+        double a_i = l3_i / d_eta_sq;
+        energy_coeffs.a.push_back(a_i);
+/*         std::cout << "[a] i = " << i
+                << " | l3[i] = " << l3_i
+                << " | d_eta_sq = " << d_eta_sq
+                << " | a[i] = " << a_i << '\n'; */
+
+        // ----- Coefficient b[i] -----
+        double dl3_deta_i = coeffs.transport.dl3_deta[i];
+        double V_i = V_field[i];
+        double b_i = (dl3_deta_i - V_i) / d_eta;
+        energy_coeffs.b.push_back(b_i);
+/*         std::cout << "[b] i = " << i
+                << " | dl3_deta[i] = " << dl3_deta_i
+                << " | V[i] = " << V_i
+                << " | d_eta = " << d_eta
+                << " | b[i] = " << b_i << '\n'; */
+
+        // ----- Coefficient c[i] -----
+        double xi_i = xi;
+        double F_i = F_field[i];
+        double dhe_dxi = bc.d_he_dxi();
+        double he = bc.he();
+        double c_term = -2.0 * xi_i * F_i * dhe_dxi / he - 2.0 * xi_i * F_i * lambda0;
         energy_coeffs.c.push_back(c_term);
+/*         std::cout << "[c] i = " << i
+                << " | xi = " << xi_i
+                << " | F[i] = " << F_i
+                << " | d_he_dxi = " << dhe_dxi
+                << " | he = " << he
+                << " | lambda0 = " << lambda0
+                << " | c[i] = " << c_term << '\n'; */
+
         
         // Compute species enthalpy terms
         auto [tmp1, tmp2] = compute_species_enthalpy_terms(

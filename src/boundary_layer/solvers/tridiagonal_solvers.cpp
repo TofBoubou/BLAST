@@ -145,6 +145,14 @@ auto solve_momentum_energy_tridiagonal(
     D[0] = R * A[1] - R2 * D[1];
     A[n_eta-2] = 0.0;
     
+/*     // Debug: Check for NaN or infinite values in coefficients
+    std::cout << "DEBUG: Checking tridiagonal matrix coefficients..." << std::endl;
+    for (size_t i = 0; i < n_eta; ++i) {
+        if (!std::isfinite(A[i]) || !std::isfinite(B[i]) || !std::isfinite(C[i]) || !std::isfinite(D[i])) {
+            std::cout << "DEBUG: Non-finite coefficient at i=" << i << ": A=" << A[i] << ", B=" << B[i] << ", C=" << C[i] << ", D=" << D[i] << std::endl;
+        }
+    } */
+    
     // Solve tridiagonal system
     std::vector<double> solution(n_eta);
     if (auto result = detail::thomas_algorithm(C, B, A, D, solution); !result) {
