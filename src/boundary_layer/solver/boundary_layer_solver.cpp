@@ -98,6 +98,14 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
                 xi
             );
         }
+
+        if (station > 0) {
+            const auto& prev_solution = result.stations.back();
+            const double prev_xi = result.xi_solved.back();
+            xi_derivatives_->update_station(station-1, prev_xi, 
+                                          prev_solution.F, prev_solution.g, prev_solution.c);
+        }
+        
         
         // Solve this station
         auto station_result = solve_station(station, xi, initial_guess);
@@ -185,9 +193,6 @@ auto BoundaryLayerSolver::iterate_station(
     for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
         std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
         const auto solution_old = solution;
-        
-        // 0. Update xi derivatives for current station (must be done before continuity equation)
-        xi_derivatives_->update_station(station, xi, solution.F, solution.g, solution.c);
         
         // 1. Solve continuity equation: dV/dη = -solve_continuity
         auto V_result = solve_continuity_equation(solution);
@@ -327,18 +332,9 @@ auto BoundaryLayerSolver::solve_continuity_equation(
     // y[i] = -(2ξλ₀ + 1)F[i] - 2ξ∂F/∂ξ
     std::vector<double> y_field(n_eta);
     
-    std::cout << "DEBUG: Continuity equation at station " << xi_derivatives_->station() << std::endl;
-    std::cout << "DEBUG: xi = " << xi << ", lambda0 = " << lambda0 << std::endl;
-    
     for (std::size_t i = 0; i < n_eta; ++i) {
         y_field[i] = -(2.0 * xi * lambda0 + 1.0) * solution.F[i] - 
                       2.0 * xi * F_derivatives[i];
-        
-        if (!std::isfinite(y_field[i])) {
-            std::cout << "DEBUG: y_field[" << i << "] = " << y_field[i] 
-                      << " | F[i] = " << solution.F[i] 
-                      << " | F_derivatives[i] = " << F_derivatives[i] << std::endl;
-        }
     }
     
     // Integrate dV/dη = -y to get V
@@ -396,11 +392,11 @@ auto BoundaryLayerSolver::solve_energy_equation(
     }
     
     auto g_solution = result.value();
-    std::cout << "DEBUG: Energy equation result (station " << station << "): ";
+/*     std::cout << "DEBUG: Energy equation result (station " << station << "): ";
     for (size_t i = 0; i < std::min(g_solution.size(), size_t(5)); ++i) {
         std::cout << g_solution[i] << " ";
     }
-    std::cout << std::endl;
+    std::cout << std::endl; */
     
     return g_solution;
 }
@@ -439,7 +435,7 @@ auto BoundaryLayerSolver::update_temperature_field(
     std::vector<double> enthalpy_field(n_eta);
     
     // Convert g (dimensionless enthalpy) to dimensional enthalpy
-    std::cout << "DEBUG: bc.he() = " << bc.he() << std::endl;
+    // std::cout << "DEBUG: bc.he() = " << bc.he() << std::endl;
     for (std::size_t i = 0; i < n_eta; ++i) {
         enthalpy_field[i] = g_field[i] * bc.he();
 /*         if (!std::isfinite(enthalpy_field[i])) {

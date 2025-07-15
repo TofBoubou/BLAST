@@ -37,8 +37,6 @@ auto EnthalpyTemperatureSolver::brent_method(
     double temp_max
 ) const -> std::expected<double, ThermodynamicSolverError> {
     
-    std::cout << target_enthalpy << std::endl;
-    
     auto enthalpy_residual = [&](double temperature) -> std::expected<double, ThermodynamicSolverError> {
         auto h = mixture_.mixture_enthalpy(composition, temperature, pressure);
         if (!h) {
