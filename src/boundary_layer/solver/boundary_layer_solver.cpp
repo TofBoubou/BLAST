@@ -98,13 +98,6 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
                 xi
             );
         }
-
-        if (station > 0) {
-            const auto& prev_solution = result.stations.back();
-            const double prev_xi = result.xi_solved.back();
-            xi_derivatives_->update_station(station-1, prev_xi, 
-                                          prev_solution.F, prev_solution.g, prev_solution.c);
-        }
         
         
         // Solve this station
@@ -119,9 +112,13 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         // Store results
         result.xi_solved.push_back(xi);
         result.stations.push_back(std::move(station_result.value()));
-        result.total_iterations++; // This would be accumulated from all stations
         
-        // Note: xi derivatives are now updated at the beginning of each iteration
+        xi_derivatives_->update_station(station, xi, 
+                                      result.stations.back().F, 
+                                      result.stations.back().g, 
+                                      result.stations.back().c);
+        
+        result.total_iterations++;
     }
     
     result.converged = true; // All stations solved successfully
