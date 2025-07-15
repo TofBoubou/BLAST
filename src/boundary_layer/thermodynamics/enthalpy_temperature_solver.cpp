@@ -15,11 +15,22 @@ auto EnthalpyTemperatureSolver::solve_single_point(
     const double temp_min = config_.min_temperature;
     const double temp_max = config_.max_temperature;
     
+    // DEBUG: Print input parameters
+/*     std::cout << "[DEBUG] solve_single_point: target_enthalpy=" << target_enthalpy 
+              << ", pressure=" << pressure 
+              << ", initial_temperature=" << initial_temperature
+              << ", temp_min=" << temp_min
+              << ", temp_max=" << temp_max << std::endl; */
+    
     // Check if initial temperature gives exact solution
     auto h_initial = mixture_.mixture_enthalpy(composition, initial_temperature, pressure);
     if (!h_initial) {
         return std::unexpected(ThermodynamicSolverError("Failed to compute initial enthalpy"));
     }
+    
+    // DEBUG: Print initial enthalpy
+/*     std::cout << "[DEBUG] h_initial=" << *h_initial 
+              << ", residual=" << (*h_initial - target_enthalpy) << std::endl; */
     
     if (std::abs(*h_initial - target_enthalpy) < config_.tolerance) {
         return initial_temperature;
@@ -56,28 +67,49 @@ auto EnthalpyTemperatureSolver::brent_method(
     if (!fb_result) return std::unexpected(fb_result.error());
     double fb = *fb_result;
 
+    // DEBUG: Print initial bracket values
+/*     std::cout << "[DEBUG] Initial bracket: a=" << a << ", fa=" << fa 
+              << ", b=" << b << ", fb=" << fb 
+              << ", fa*fb=" << (fa * fb) << std::endl; */
+
     if (fa * fb > 0) {
+        // std::cout << "[DEBUG] Root not initially bracketed, attempting expansion..." << std::endl;
+        
         // Attempt to expand the bracketing interval
         for (int i = 0; i < config_.max_bracket_expansions && fa * fb > 0; ++i) {
+            // std::cout << "[DEBUG] Expansion attempt " << (i+1) << "/" << config_.max_bracket_expansions << std::endl;
+            
             if (fa > 0 && fb > 0) {
                 // Root lies below the current lower bound
+                double old_a = a;
                 a = std::max(1.0, a * 0.5);
                 auto fa_res = enthalpy_residual(a);
                 if (!fa_res) return std::unexpected(fa_res.error());
                 fa = *fa_res;
+                // std::cout << "[DEBUG] Expanded lower bound: " << old_a << " -> " << a 
+                          // << ", fa=" << fa << std::endl;
             } else if (fa < 0 && fb < 0) {
                 // Root lies above the current upper bound
+                double old_b = b;
                 b *= 2.0;
                 auto fb_res = enthalpy_residual(b);
                 if (!fb_res) return std::unexpected(fb_res.error());
                 fb = *fb_res;
+/*                 std::cout << "[DEBUG] Expanded upper bound: " << old_b << " -> " << b 
+                          << ", fb=" << fb << std::endl; */
             }
+            
+            // std::cout << "[DEBUG] After expansion: fa*fb=" << (fa * fb) << std::endl;
         }
 
         if (fa * fb > 0) {
+            // std::cout << "[DEBUG] Failed to bracket root after all expansions!" << std::endl;
             return std::unexpected(ThermodynamicSolverError(
                 "Root not bracketed: f({})={}, f({})={}",
                 std::source_location::current(), a, fa, b, fb));
+        } else {
+            // std::cout << "[DEBUG] Successfully bracketed root: a=" << a << ", fa=" << fa 
+                      // << ", b=" << b << ", fb=" << fb << std::endl;
         }
     }
     

@@ -8,16 +8,16 @@ simulation:
 numerical:
   n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-8    
+  convergence_tolerance: 1.0e-12    
   max_iterations: 10000
   under_relaxation: 1
   step_control:
     lower_bound: 5
     upper_bound: 20
   solvers:
-    h2t_tolerance: 1.0e-8
+    h2t_tolerance: 1.0e-12
     h2t_max_iterations: 50000
-    stefan_tolerance: 1.0e-10
+    stefan_tolerance: 1.0e-12
     stefan_max_iterations: 50000
 
 mixture:
@@ -36,7 +36,7 @@ outer_edge:
     # Point de stagnation (x = 0.0)
     - x: 0.0
       radius: 1.0
-      velocity: 0.0
+      velocity: 100.0
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
@@ -45,7 +45,7 @@ outer_edge:
     
     - x: 0.05
       radius: 1.0
-      velocity: 10
+      velocity: 100
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
@@ -54,7 +54,7 @@ outer_edge:
     
     - x: 0.1
       radius: 1.0
-      velocity: 10
+      velocity: 100
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
@@ -63,7 +63,7 @@ outer_edge:
     
     - x: 0.15
       radius: 1.0
-      velocity: 10
+      velocity: 100
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
@@ -72,7 +72,7 @@ outer_edge:
 
     - x: 0.2
       radius: 1.0
-      velocity: 10
+      velocity: 100
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
@@ -84,4 +84,7 @@ outer_edge:
   freestream_velocity: 3000.0
 
 wall_parameters:
-  temperatures: [500.0, 510.0, 520.0, 530.0, 540.0]
+  temperatures: [500.0, 500.0, 500.0, 500.0, 500.0]
+
+# ./blast config/default.yaml test_output
+# python3 scripts/postprocess_blast.py --input test_outputs/test_output_20250713_232651.h5 --plots all --output results_h5

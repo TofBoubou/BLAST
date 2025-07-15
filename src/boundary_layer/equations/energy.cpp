@@ -153,6 +153,8 @@ auto build_energy_coefficients(
                  bc.beta * bc.rho_e() / coeffs.thermodynamic.rho[i] * F_field[i]) +
             2.0 * xi * F_field[i] * g_derivatives[i] + 
             tmp1 + tmp2;
+
+        // std::cout << " d[i] = " << d_term << '\n';
         
         energy_coeffs.d.push_back(d_term);
     }

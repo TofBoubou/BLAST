@@ -17,7 +17,7 @@ void XiDerivatives::update_station(int station, double xi,
     xi_current_ = xi;    
     double d_xi = xi_current_ - xi_minus_1_;
 
-    std::cout << std::scientific << d_xi << std::endl;
+    std::cout << std::scientific << xi << std::endl;
 
     lambda0_ = 1.0 / d_xi;
     lambda1_ = -1.0 / d_xi;
