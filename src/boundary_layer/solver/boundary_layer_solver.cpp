@@ -78,7 +78,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         
         // CRITICAL: Update xi derivatives BEFORE solving (except for station 0)
         if (station_idx > 0) {
-            xi_derivatives_->update_station(station - 1, prev_xi, prev_F, prev_g, prev_c);
+            xi_derivatives_->update_station(station - 1, xi, prev_F, prev_g, prev_c);
         }
         
         // Create initial guess for this station
