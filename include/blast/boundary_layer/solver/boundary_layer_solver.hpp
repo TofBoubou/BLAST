@@ -94,8 +94,9 @@ private:
     ) -> std::expected<ConvergenceInfo, SolverError>;
     
     // Individual equation solving with proper sequencing
-    [[nodiscard]] auto solve_continuity_equation(
-        const equations::SolutionState& solution
+    auto solve_continuity_equation(
+        const equations::SolutionState& solution,
+        double xi  // <- Ajouter ce paramètre
     ) -> std::expected<std::vector<double>, SolverError>;
     
     [[nodiscard]] auto solve_momentum_equation(

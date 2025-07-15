@@ -203,7 +203,7 @@ auto BoundaryLayerSolver::iterate_station(
         const auto solution_old = solution;
         
         // 1. Solve continuity equation: dV/dη = -solve_continuity
-        auto V_result = solve_continuity_equation(solution);
+        auto V_result = solve_continuity_equation(solution, xi);
         if (!V_result) {
             return std::unexpected(SolverError(
                 "Continuity solver failed at station {} iteration {}: {}", 
@@ -324,15 +324,14 @@ auto BoundaryLayerSolver::iterate_station(
 }
 
 auto BoundaryLayerSolver::solve_continuity_equation(
-    const equations::SolutionState& solution
+    const equations::SolutionState& solution,
+    double xi  // <- Paramètre ajouté
 ) -> std::expected<std::vector<double>, SolverError> {
     
     const auto n_eta = grid_->n_eta();
     const double d_eta = grid_->d_eta();
     
     // Get current xi value and lambda0 from xi_derivatives
-    const double xi = (xi_derivatives_->station() == 0) ? 0.0 : 
-                      grid_->xi_coordinates()[xi_derivatives_->station()];
     const double lambda0 = xi_derivatives_->lambda0();
     const auto F_derivatives = xi_derivatives_->F_derivative();
     
