@@ -8,6 +8,7 @@
 #include <cmath>
 #include <numeric>
 #include <iostream>
+#include <iomanip>
 
 namespace blast::boundary_layer::solver {
 
@@ -211,6 +212,7 @@ auto BoundaryLayerSolver::iterate_station(
             ));
         }
         solution.V = std::move(V_result.value());
+        // std::cout << solution.V[5] << std::endl;
         
         // 2. Compute eta derivatives
         auto derivatives_result = compute_eta_derivatives(solution);
@@ -343,6 +345,8 @@ auto BoundaryLayerSolver::solve_continuity_equation(
         y_field[i] = -(2.0 * xi * lambda0 + 1.0) * solution.F[i] - 
                       2.0 * xi * F_derivatives[i];
     }
+
+    std::cout << std::scientific << "From continuity lambda0 = " << lambda0 << "   -------   " << "xi = " << xi << std::endl;
     
     // Integrate dV/dη = -y to get V
     // Note: The negative sign is handled in the continuity equation solver
@@ -445,10 +449,12 @@ auto BoundaryLayerSolver::update_temperature_field(
     // std::cout << "DEBUG: bc.he() = " << bc.he() << std::endl;
     for (std::size_t i = 0; i < n_eta; ++i) {
         enthalpy_field[i] = g_field[i] * bc.he();
-/*         if (!std::isfinite(enthalpy_field[i])) {
+        if (!std::isfinite(enthalpy_field[i])) {
             std::cout << "DEBUG: NaN detected at i=" << i << ", g_field[i]=" << g_field[i] << ", bc.he()=" << bc.he() << std::endl;
-        } */
+        }
     }
+
+    std::cout << "h_w = " << enthalpy_field[0] << " ---------- " << "h_e = " << enthalpy_field[19] << std::endl;
     
     auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
     if (!result) {

@@ -2,6 +2,8 @@
 #include "blast/boundary_layer/solvers/tridiagonal_solvers.hpp"
 #include <algorithm>
 #include <format>
+#include <iostream>
+#include <iomanip>
 
 namespace blast::boundary_layer::equations {
 
@@ -14,6 +16,8 @@ auto solve_momentum(
     PhysicalQuantity auto xi,
     PhysicalQuantity auto d_eta
 ) -> std::expected<std::vector<double>, EquationError> {
+
+    std::cout << std::scientific << "From solve_momentum xi = " << xi << std::endl;
     
     const auto n_eta = F_previous.size();
     
