@@ -66,10 +66,20 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     
     const auto xi_stations = grid_->xi_coordinates();
     
+    // Variables to store previous station results for xi derivatives
+    double prev_xi = 0.0;
+    std::vector<double> prev_F, prev_g;
+    core::Matrix<double> prev_c;
+    
     // Solve each xi station
     for (std::size_t station_idx = 0; station_idx < xi_stations.size(); ++station_idx) {
         const int station = static_cast<int>(station_idx);
         const double xi = xi_stations[station_idx];
+        
+        // CRITICAL: Update xi derivatives BEFORE solving (except for station 0)
+        if (station_idx > 0) {
+            xi_derivatives_->update_station(station - 1, prev_xi, prev_F, prev_g, prev_c);
+        }
         
         // Create initial guess for this station
         equations::SolutionState initial_guess;
@@ -113,10 +123,11 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         result.xi_solved.push_back(xi);
         result.stations.push_back(std::move(station_result.value()));
         
-        xi_derivatives_->update_station(station, xi, 
-                                      result.stations.back().F, 
-                                      result.stations.back().g, 
-                                      result.stations.back().c);
+        // Store current results for next iteration
+        prev_xi = xi;
+        prev_F = result.stations.back().F;
+        prev_g = result.stations.back().g;
+        prev_c = result.stations.back().c;
         
         result.total_iterations++;
     }
