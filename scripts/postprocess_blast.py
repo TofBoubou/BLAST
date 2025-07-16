@@ -19,6 +19,7 @@ from pathlib import Path
 import json
 from typing import Dict, List, Optional, Union, Tuple
 import warnings
+from scipy.interpolate import griddata
 warnings.filterwarnings('ignore')
 
 # Set publication-quality plot style
@@ -376,6 +377,88 @@ class BLASTPlotter:
         # This would require convergence data to be saved during simulation
         print("Convergence history plotting not implemented (requires convergence data)")
     
+    def plot_F_and_g_map(self, save_path: Optional[Path] = None) -> None:
+        """Plot 2D interpolated maps of F(η, ξ) and g(η, ξ)"""
+        
+        if 'stations' not in self.reader.data:
+            print("No station data available for F and g mapping")
+            return
+        
+        # Collect all F, g, eta, and xi data
+        xi_vals = []
+        eta_vals = []
+        F_vals = []
+        g_vals = []
+        
+        # Get xi coordinates from metadata if available
+        if 'metadata' in self.reader.data and 'grid' in self.reader.data['metadata']:
+            xi_coordinates = np.array(self.reader.data['metadata']['grid']['xi_coordinates'])
+        else:
+            # Create dummy xi coordinates based on number of stations
+            n_stations = len(self.reader.data['stations'])
+            xi_coordinates = np.linspace(0, 1, n_stations)
+        
+        # Collect data from all stations
+        for i, (station_key, station_data) in enumerate(self.reader.data['stations'].items()):
+            if i < len(xi_coordinates):
+                xi_station = xi_coordinates[i]
+                eta_station = np.array(station_data['eta'])
+                F_station = np.array(station_data['F'])
+                g_station = np.array(station_data['g'])
+                
+                # Add data points
+                for j in range(len(eta_station)):
+                    xi_vals.append(xi_station)
+                    eta_vals.append(eta_station[j])
+                    F_vals.append(F_station[j])
+                    g_vals.append(g_station[j])
+        
+        # Convert to numpy arrays
+        xi_vals = np.array(xi_vals)
+        eta_vals = np.array(eta_vals)
+        F_vals = np.array(F_vals)
+        g_vals = np.array(g_vals)
+        
+        # Create interpolation grid
+        xi_min, xi_max = xi_vals.min(), xi_vals.max()
+        eta_min, eta_max = eta_vals.min(), eta_vals.max()
+        
+        xi_grid = np.linspace(xi_min, xi_max, 100)
+        eta_grid = np.linspace(eta_min, eta_max, 100)
+        Xi, Eta = np.meshgrid(xi_grid, eta_grid)
+        
+        # Interpolate F and g
+        points = np.column_stack((xi_vals, eta_vals))
+        F_interp = griddata(points, F_vals, (Xi, Eta), method='linear')
+        g_interp = griddata(points, g_vals, (Xi, Eta), method='linear')
+        
+        # Create the plot
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+        
+        # Plot F(η, ξ)
+        im1 = ax1.contourf(Xi, Eta, F_interp, levels=50, cmap='inferno')
+        ax1.set_xlabel('ξ')
+        ax1.set_ylabel('η')
+        ax1.set_title('F(η, ξ)')
+        cbar1 = plt.colorbar(im1, ax=ax1)
+        cbar1.set_label('F')
+        
+        # Plot g(η, ξ)
+        im2 = ax2.contourf(Xi, Eta, g_interp, levels=50, cmap='inferno')
+        ax2.set_xlabel('ξ')
+        ax2.set_ylabel('η')
+        ax2.set_title('g(η, ξ)')
+        cbar2 = plt.colorbar(im2, ax=ax2)
+        cbar2.set_label('g')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+            print(f"F and g map saved to: {save_path}")
+        else:
+            plt.show()
+    
     def create_summary_report(self, output_dir: Path) -> None:
         """Create a comprehensive summary report"""
         
@@ -454,7 +537,7 @@ def main():
     parser.add_argument('--input', '-i', type=str, required=True,
                        help='Input HDF5 file')
     parser.add_argument('--plots', '-p', type=str, default='all',
-                       choices=['all', 'profiles', 'wall', 'integrated', 'summary'],
+                       choices=['all', 'profiles', 'wall', 'integrated', 'summary', 'f_g_map'],
                        help='Type of plots to generate')
     parser.add_argument('--station', '-s', type=int, default=0,
                        help='Station index for profile plots')
@@ -514,6 +597,10 @@ def main():
             if not output_path:
                 output_path = Path('blast_summary')
             plotter.create_summary_report(output_path)
+            
+        elif args.plots == 'f_g_map':
+            save_path = output_path / 'F_g_eta_xi_map.png' if output_path else None
+            plotter.plot_F_and_g_map(save_path)
         
         print("Post-processing completed successfully!")
         

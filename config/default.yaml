@@ -3,7 +3,7 @@ simulation:
   only_stagnation_point: false      # Résolution complète de la couche limite
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_non_equilibrium: false  
+  chemical_non_equilibrium: true  
 
 numerical:
   n_eta: 20                       
