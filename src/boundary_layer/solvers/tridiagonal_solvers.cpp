@@ -361,6 +361,7 @@ auto solve_species_block_tridiagonal(
     return solution;
 }
 
+
 namespace detail {
 
 auto thomas_algorithm(

@@ -312,6 +312,7 @@ auto BoundaryLayerSolver::iterate_station(
         
         // 12. Apply relaxation AFTER enforcing boundary conditions
         solution = apply_relaxation(solution_old, solution_new, config_.numerical.under_relaxation);
+        // solution = solution_new;
         
         // 12. Check convergence
         conv_info = check_convergence(solution_old, solution);
@@ -595,7 +596,17 @@ auto BoundaryLayerSolver::apply_relaxation(
         for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
             relaxed.c(i, j) = one_minus_alpha * old_solution.c(i, j) + alpha * new_solution.c(i, j);
         }
+        
     }
+
+    for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
+        double sum_at_eta = 0.0;
+        for (std::size_t i = 0; i < relaxed.c.rows(); ++i) {
+            sum_at_eta += relaxed.c(i, j);
+        }
+        std::cout << "Somme des espèces à eta[" << j << "] : " << sum_at_eta << '\n';
+    }
+
     
     return relaxed;
 }
