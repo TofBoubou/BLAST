@@ -398,6 +398,15 @@ auto interpolate_boundary_conditions(
             edge.species_fractions.begin(), edge.species_fractions.end(), 0.0
         );
         
+        // DEBUG: Print species mass fractions sum details
+/*         std::cout << "[DEBUG] boundary_interpolator.cpp:397 - Species mass fractions sum: " << total_mass_fraction 
+                  << " (difference from 1.0: " << std::abs(total_mass_fraction - 1.0) << ")" << std::endl;
+        std::cout << "[DEBUG] Individual species fractions: "; */
+        for (size_t s = 0; s < edge.species_fractions.size(); ++s) {
+            std::cout << edge.species_fractions[s] << " ";
+        }
+        std::cout << std::endl;
+        
         constexpr double mass_conservation_tolerance = 1e-6;
         if (std::abs(total_mass_fraction - 1.0) > mass_conservation_tolerance) {
             return std::unexpected(BoundaryConditionError(

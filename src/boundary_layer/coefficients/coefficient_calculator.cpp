@@ -138,6 +138,17 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
             sum_c += c_local[j];
         }
         
+        // DEBUG: Print concentration sum details
+/*         std::cout << "[DEBUG] coefficient_calculator.cpp:130 - eta=" << i << " sum_c: " << sum_c << std::endl;
+        if (std::abs(sum_c - 1.0) > 1e-6) {
+            std::cout << "[DEBUG] Concentration sum differs from 1.0 by: " << std::abs(sum_c - 1.0) << std::endl;
+            std::cout << "[DEBUG] Individual concentrations: ";
+            for (std::size_t j = 0; j < n_species; ++j) {
+                std::cout << c_local[j] << " ";
+            }
+            std::cout << std::endl;
+        } */
+        
         if (sum_c <= 0.0) {
             return std::unexpected(CoefficientError(
                 std::format("Zero or negative total concentration at eta={}: sum_c={}", i, sum_c)

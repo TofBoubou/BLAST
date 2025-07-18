@@ -457,11 +457,11 @@ auto BoundaryLayerSolver::update_temperature_field(
     // std::cout << "h_w = " << enthalpy_field[0] << " ---------- " << "h_e = " << enthalpy_field[19] << std::endl;
     
     // DEBUG: Print enthalpy field values
-    std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
+/*     std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
     std::cout << "[DEBUG] Enthalpy field values:" << std::endl;
     for (std::size_t i = 0; i < std::min(enthalpy_field.size(), size_t(20)); ++i) {
         std::cout << "[DEBUG] h[" << i << "] = " << enthalpy_field[i] << std::endl;
-    }
+    } */
     
     auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
     if (!result) {
@@ -472,7 +472,7 @@ auto BoundaryLayerSolver::update_temperature_field(
         ));
     }
     
-    std::cout << "[DEBUG] Temperature solve succeeded!" << std::endl;
+    // std::cout << "[DEBUG] Temperature solve succeeded!" << std::endl;
     
     return result.value().temperatures;
 }
@@ -720,11 +720,17 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
         total_mass_fraction += solution.c(j, edge_idx);
     }
     
+    // DEBUG: Print species mass conservation details
+/*     std::cout << "[DEBUG] boundary_layer_solver.cpp:718 - Species mass fraction sum: " << total_mass_fraction 
+              << " (difference from 1.0: " << std::abs(total_mass_fraction - 1.0) << ")" << std::endl; */
+    
     // Normalize if total is significantly different from 1.0
     if (std::abs(total_mass_fraction - 1.0) > 1e-12 && total_mass_fraction > 1e-12) {
+        // std::cout << "[DEBUG] Normalizing species mass fractions..." << std::endl;
         for (std::size_t j = 0; j < n_species; ++j) {
             solution.c(j, edge_idx) /= total_mass_fraction;
         }
+        // std::cout << "[DEBUG] Normalization complete." << std::endl;
     }
 }
 

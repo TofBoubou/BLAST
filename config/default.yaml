@@ -1,16 +1,16 @@
 simulation:
   body_type: axisymmetric
-  only_stagnation_point: false      # Résolution complète de la couche limite
+  only_stagnation_point: true      # Résolution complète de la couche limite
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_non_equilibrium: true  
+  chemical_non_equilibrium: false  
 
 numerical:
   n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-12    
   max_iterations: 10000
-  under_relaxation: 1
+  under_relaxation: 0.1
   step_control:
     lower_bound: 5
     upper_bound: 20
@@ -36,49 +36,51 @@ outer_edge:
     # Point de stagnation (x = 0.0)
     - x: 0.0
       radius: 1.0
-      velocity: 100.0
+      velocity: 10.0
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
       viscosity: 2.0e-5
-      species: [0.0, 0.0, 0.0, 0.767, 0.233]
+      # Espèces: [e-, N+, O+, NO+, N2+, O2+, N, O, NO, N2, O2]
+      species: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.767, 0.233]
+      # species: [0.0, 0.0, 0.0, 0.767, 0.233]
     
     - x: 0.05
       radius: 1.0
-      velocity: 100
+      velocity: 10
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
       viscosity: 2.0e-5
-      species: [0.0, 0.0, 0.0, 0.767, 0.233]
+      species: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.767, 0.233]
     
     - x: 0.1
       radius: 1.0
-      velocity: 100
+      velocity: 10
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
       viscosity: 2.0e-5
-      species: [0.0, 0.0, 0.0, 0.767, 0.233]
+      species: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.767, 0.233]
     
     - x: 0.15
       radius: 1.0
-      velocity: 100
+      velocity: 10
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
       viscosity: 2.0e-5
-      species: [0.0, 0.0, 0.0, 0.767, 0.233]
-
+      species: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.767, 0.233]
+    
     - x: 0.2
       radius: 1.0
-      velocity: 100
+      velocity: 10
       enthalpy: 800000.0
       pressure: 1000.0
       density: 0.01
       viscosity: 2.0e-5
-      species: [0.0, 0.0, 0.0, 0.767, 0.233]
-
+      species: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.767, 0.233]
+  
   velocity_gradient_stagnation: 100000.0
   freestream_density: 0.01
   freestream_velocity: 3000.0

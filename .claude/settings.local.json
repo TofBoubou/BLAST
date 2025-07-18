@@ -10,7 +10,10 @@
       "Bash(g++:*)",
       "Bash(grep:*)",
       "Bash(rm:*)",
-      "Bash(./blast config/default.yaml test_output)"
+      "Bash(./blast config/default.yaml test_output)",
+      "Bash(killall:*)",
+      "Bash(true)",
+      "Bash(./blast config/default.yaml)"
     ],
     "deny": []
   }

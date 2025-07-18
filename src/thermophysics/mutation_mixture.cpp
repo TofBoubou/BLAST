@@ -127,6 +127,15 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
     const double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
     constexpr double tolerance = 1e-6;
     
+    // DEBUG: Print mass fractions sum details
+/*     std::cout << "[DEBUG] mutation_mixture.cpp:127 - Mass fractions sum: " << sum 
+              << " (difference from 1.0: " << std::abs(sum - 1.0) << ")" << std::endl;
+    std::cout << "[DEBUG] Individual fractions: "; */
+/*     for (size_t i = 0; i < fractions.size(); ++i) {
+        std::cout << fractions[i] << " ";
+    }
+    std::cout << std::endl; */
+    
     if (std::abs(sum - 1.0) > tolerance) {
         return std::unexpected(ThermophysicsError(
             std::format("Mass fractions sum to {} (should be 1.0)", sum)
