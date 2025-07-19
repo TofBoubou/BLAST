@@ -346,15 +346,13 @@ auto solve_species_block_tridiagonal(
             sum += solution(i, j);
         }
         
-        if (sum > 1e-15) {
+        if (sum > 1e-9) {
             for (std::size_t i = 0; i < solution.rows(); ++i) {
                 solution(i, j) /= sum;
             }
         } else {
-            const double equal_fraction = 1.0 / solution.rows();
-            for (std::size_t i = 0; i < solution.rows(); ++i) {
-                solution(i, j) = equal_fraction;
-            }
+            std::cout << "PROBLEME FALLBACK, SUM equal to zero" << std::endl;
+            abort();
         }
     }
     

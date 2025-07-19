@@ -16,11 +16,11 @@ auto EnthalpyTemperatureSolver::solve_single_point(
     const double temp_max = config_.max_temperature;
     
     // DEBUG: Print input parameters
-/*     std::cout << "[DEBUG] solve_single_point: target_enthalpy=" << target_enthalpy 
+    std::cout << "[DEBUG] solve_single_point: target_enthalpy=" << target_enthalpy 
               << ", pressure=" << pressure 
               << ", initial_temperature=" << initial_temperature
               << ", temp_min=" << temp_min
-              << ", temp_max=" << temp_max << std::endl; */
+              << ", temp_max=" << temp_max << std::endl;
     
     // Check if initial temperature gives exact solution
     auto h_initial = mixture_.mixture_enthalpy(composition, initial_temperature, pressure);
