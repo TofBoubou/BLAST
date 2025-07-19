@@ -183,6 +183,31 @@ auto MutationMixture::species_charges() const noexcept -> std::span<const double
     return species_charges_;
 }
 
+auto MutationMixture::mass_fractions_to_mole_fractions(
+    std::span<const double> mass_fractions
+) const -> std::expected<std::vector<double>, ThermophysicsError> {
+    
+    if (auto validation = validate_composition(mass_fractions); !validation) {
+        return std::unexpected(validation.error());
+    }
+    
+    try {
+        // Convert span to vector for Mutation++
+        std::vector<double> y_mass(mass_fractions.begin(), mass_fractions.end());
+        std::vector<double> x_mole(n_species_);
+        
+        // Use Mutation++ conversion: Y_TO_X converts mass fractions to mole fractions
+        mixture_->convert<Mutation::Thermodynamics::Y_TO_X>(y_mass.data(), x_mole.data());
+        
+        return x_mole;
+        
+    } catch (const std::exception& e) {
+        return std::unexpected(ThermophysicsError(
+            std::format("Failed to convert mass fractions to mole fractions: {}", e.what())
+        ));
+    }
+}
+
 auto MutationMixture::set_state(
     std::span<const double> mass_fractions,
     double temperature,

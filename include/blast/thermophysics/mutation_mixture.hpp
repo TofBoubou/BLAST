@@ -59,6 +59,10 @@ public:
     [[nodiscard]] auto species_charges() const noexcept 
         -> std::span<const double> override;
     
+    [[nodiscard]] auto mass_fractions_to_mole_fractions(
+        std::span<const double> mass_fractions
+    ) const -> std::expected<std::vector<double>, ThermophysicsError> override;
+    
     [[nodiscard]] auto set_state(
         std::span<const double> mass_fractions,
         double temperature,

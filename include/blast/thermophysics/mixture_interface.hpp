@@ -47,6 +47,11 @@ public:
     [[nodiscard]] virtual auto species_charges() const noexcept 
         -> std::span<const double> = 0;
     
+    // Composition conversions
+    [[nodiscard]] virtual auto mass_fractions_to_mole_fractions(
+        std::span<const double> mass_fractions
+    ) const -> std::expected<std::vector<double>, ThermophysicsError> = 0;
+    
     // State setting
     [[nodiscard]] virtual auto set_state(
         std::span<const double> mass_fractions,
