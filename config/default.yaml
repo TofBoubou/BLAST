@@ -6,11 +6,11 @@ simulation:
   chemical_non_equilibrium: true  
 
 numerical:
-  n_eta: 20                       
+  n_eta: 2000                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-12    
   max_iterations: 10000
-  under_relaxation: 1
+  under_relaxation: 0.01
   step_control:
     lower_bound: 5
     upper_bound: 20
@@ -21,7 +21,7 @@ numerical:
     stefan_max_iterations: 50000
 
 mixture:
-  name: air_5
+  name: air_11
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
   reference_temperature: 0.0
@@ -42,8 +42,8 @@ outer_edge:
       density: 0.01
       viscosity: 2.0e-5
       # Espèces: [e-, N+, O+, NO+, N2+, O2+, N, O, NO, N2, O2]
-      # species: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.767, 0.233]
-      species: [0.0, 0.0, 0.0, 0.767, 0.233]
+      species: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.767, 0.233]
+      # species: [0.0, 0.0, 0.0, 0.767, 0.233]
     
     - x: 0.05
       radius: 1.0

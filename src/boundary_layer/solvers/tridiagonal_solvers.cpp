@@ -352,7 +352,8 @@ auto solve_species_block_tridiagonal(
             }
         } else {
             std::cout << "PROBLEME FALLBACK, SUM equal to zero" << std::endl;
-            abort();
+            // abort();
+            continue;
         }
     }
     

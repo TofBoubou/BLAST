@@ -458,11 +458,11 @@ auto BoundaryLayerSolver::update_temperature_field(
     // std::cout << "h_w = " << enthalpy_field[0] << " ---------- " << "h_e = " << enthalpy_field[19] << std::endl;
     
     // DEBUG: Print enthalpy field values
-/*     std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
+    std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
     std::cout << "[DEBUG] Enthalpy field values:" << std::endl;
     for (std::size_t i = 0; i < std::min(enthalpy_field.size(), size_t(20)); ++i) {
         std::cout << "[DEBUG] h[" << i << "] = " << enthalpy_field[i] << std::endl;
-    } */
+    }
     
     auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
     if (!result) {
