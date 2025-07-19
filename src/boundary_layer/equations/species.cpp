@@ -80,6 +80,19 @@ auto solve_species(
         apply_charge_neutrality(result, mixture);
     }
     
+    // Debug: afficher l'état des fractions massiques à chaque eta
+    std::cout << "\n=== DEBUG SOLVE_SPECIES - Station " << station << " ===\n";
+    for (std::size_t i = 0; i < n_eta; ++i) {
+        std::cout << "eta[" << i << "]: ";
+        double sum = 0.0;
+        for (std::size_t j = 0; j < n_species; ++j) {
+            std::cout << std::format("c[{}]={:.6e} ", j, result(j, i));
+            sum += result(j, i);
+        }
+        std::cout << std::format("(sum={:.6e})\n", sum);
+    }
+    std::cout << "=========================================\n\n";
+    
     return result;
 }
 
@@ -135,6 +148,21 @@ auto apply_charge_neutrality(
         // Set electron concentration to ensure neutrality
         if (std::abs(charges[0]) > 1e-15) {
             species_matrix(0, i) = -charge_sum / charges[0];
+        }
+        
+        // Renormalize composition to preserve mass conservation
+        double sum = 0.0;
+        for (std::size_t j = 0; j < n_species; ++j) {
+/*             if (species_matrix(j, i) < 0.0) {
+                species_matrix(j, i) = 0.0;
+            } */
+            sum += species_matrix(j, i);
+        }
+
+        if (sum > 1e-15) {
+            for (std::size_t j = 0; j < n_species; ++j) {
+                species_matrix(j, i) /= sum;
+            }
         }
     }
 }

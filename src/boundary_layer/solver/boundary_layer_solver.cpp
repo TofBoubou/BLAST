@@ -599,13 +599,13 @@ auto BoundaryLayerSolver::apply_relaxation(
         
     }
 
-    for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
+/*     for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
         double sum_at_eta = 0.0;
         for (std::size_t i = 0; i < relaxed.c.rows(); ++i) {
             sum_at_eta += relaxed.c(i, j);
         }
         std::cout << "Somme des espèces à eta[" << j << "] : " << sum_at_eta << '\n';
-    }
+    } */
 
     
     return relaxed;
