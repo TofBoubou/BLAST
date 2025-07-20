@@ -610,10 +610,10 @@ auto BoundaryLayerSolver::extrapolate_from_previous(
     auto extrapolated = previous_solution;
     
     // Extrapolate F and g fields
-    for (std::size_t i = 0; i < extrapolated.F.size(); ++i) {
+/*     for (std::size_t i = 0; i < extrapolated.F.size(); ++i) {
         extrapolated.F[i] *= factor;
         extrapolated.g[i] = std::max(0.1, extrapolated.g[i] * factor); // Keep positive
-    }
+    } */
     
     return extrapolated;
 }
