@@ -47,7 +47,6 @@ outer_edge:
     
     - x: 0.05
       radius: 1.0
-      # velocity: 10
       velocity: 0
       enthalpy: 800000.0
       pressure: 1000.0
@@ -58,7 +57,6 @@ outer_edge:
     
     - x: 0.1
       radius: 1.0
-      # velocity: 10
       velocity: 0
       enthalpy: 800000.0
       pressure: 1000.0
@@ -69,7 +67,6 @@ outer_edge:
     
     - x: 0.15
       radius: 1.0
-      # velocity: 10
       velocity: 0
       enthalpy: 800000.0
       pressure: 1000.0
@@ -80,7 +77,6 @@ outer_edge:
     
     - x: 0.2
       radius: 1.0
-      # velocity: 10
       velocity: 0
       enthalpy: 800000.0
       pressure: 1000.0
@@ -94,7 +90,6 @@ outer_edge:
   freestream_velocity: 3000.0
 
 wall_parameters:
-  # temperatures: [1000.0, 500.0, 500.0, 500.0, 500.0]
   temperatures: [1000.0, 1000.0, 1000.0, 1000.0, 1000.0]
 
 # ./blast config/default.yaml test_output
