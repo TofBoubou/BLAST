@@ -314,6 +314,10 @@ auto BoundaryLayerSolver::iterate_station(
         // 12. Apply relaxation AFTER enforcing boundary conditions
         solution = apply_relaxation(solution_old, solution_new, config_.numerical.under_relaxation);
         // solution = solution_new;
+
+        std::cout << "DEBUG: bc.he() = " << bc.he() << " (should be 800000)" << std::endl;
+        std::cout << "DEBUG: g[edge] = " << solution.g.back() << " (should be 1.0)" << std::endl;
+        std::cout << "DEBUG: h[edge] = " << solution.g.back() * bc.he() << " (should be 800000)" << std::endl;
         
         // 12. Check convergence
         conv_info = check_convergence(solution_old, solution);

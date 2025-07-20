@@ -6,9 +6,9 @@ simulation:
   chemical_non_equilibrium: false  
 
 numerical:
-  n_eta: 200                       
+  n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-3    
+  convergence_tolerance: 1.0e-12    
   max_iterations: 1000000
   under_relaxation: 1
   step_control:
