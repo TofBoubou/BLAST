@@ -123,6 +123,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         // Store results
         result.xi_solved.push_back(xi);
         result.stations.push_back(std::move(station_result.value()));
+        result.temperature_fields.push_back(result.stations.back().T);
         
         // Store current results for next iteration
         prev_xi = xi;
@@ -189,13 +190,12 @@ auto BoundaryLayerSolver::iterate_station(
     
     const auto n_eta = grid_->n_eta();
     const auto n_species = mixture_.n_species();
-    std::vector<double> temperature_field(n_eta);
     
     // Create a mutable copy of boundary conditions for dynamic updates
     auto bc_dynamic = bc;
     
     // Initialize temperature field from wall temperature
-    std::ranges::fill(temperature_field, bc_dynamic.Tw());
+    std::ranges::fill(solution.T, bc_dynamic.Tw());
     
     ConvergenceInfo conv_info;
     
@@ -235,7 +235,7 @@ auto BoundaryLayerSolver::iterate_station(
             .c = solution.c,
             .dc_deta = concentration_derivatives.dc_deta,
             .dc_deta2 = concentration_derivatives.dc_deta2,
-            .T = temperature_field
+            .T = solution.T
         };
         
         // 4. Calculate all coefficients
@@ -273,14 +273,14 @@ auto BoundaryLayerSolver::iterate_station(
         }
         
         // 7. Update temperature from enthalpy
-        auto T_result = update_temperature_field(g_new, solution.c, bc_dynamic, temperature_field);
+        auto T_result = update_temperature_field(g_new, solution.c, bc_dynamic, solution.T);
         if (!T_result) {
             return std::unexpected(T_result.error());
         }
-        temperature_field = T_result.value();
+        auto T_new = T_result.value();
         
         // 8. Update inputs with new temperature
-        inputs.T = temperature_field;
+        inputs.T = T_new;
         
         // 8.5. Update edge properties dynamically for thermodynamic consistency
         update_edge_properties(bc_dynamic, inputs, solution.c);
@@ -305,6 +305,7 @@ auto BoundaryLayerSolver::iterate_station(
         solution_new.F = std::move(F_new);
         solution_new.g = std::move(g_new);
         solution_new.c = std::move(c_new);
+        solution_new.T = std::move(T_new);
         
         // 11.5. CRITICAL: Enforce boundary conditions BEFORE relaxation
         // This ensures the forced values are not corrupted by relaxation
@@ -585,7 +586,8 @@ auto BoundaryLayerSolver::create_initial_guess(
        guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
        
        // g(η) = 1 - 0.7907 * exp(-4.241 * η/η_max)
-       guess.g[i] = 1.0 - 0.7907 * std::exp(-4.241 * eta / eta_max);
+       // guess.g[i] = 1.0 - 0.7907 * std::exp(-4.241 * eta / eta_max);
+       guess.g[i] = 1.0;
        
        // Species composition
        for (std::size_t j = 0; j < n_species; ++j) {

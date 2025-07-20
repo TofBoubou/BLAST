@@ -24,10 +24,11 @@ struct SolutionState {
     std::vector<double> F;          // Momentum (dimensionless stream function)
     std::vector<double> g;          // Energy (dimensionless enthalpy)
     core::Matrix<double> c;         // Species mass fractions [n_species x n_eta]
+    std::vector<double> T;          // Temperature field [n_eta]
     
     // Constructor for initialization
     SolutionState(std::size_t n_eta, std::size_t n_species) 
-        : V(n_eta), F(n_eta), g(n_eta), c(n_species, n_eta) {}
+        : V(n_eta), F(n_eta), g(n_eta), c(n_species, n_eta), T(n_eta) {}
     
     // Default constructor
     SolutionState() = default;
