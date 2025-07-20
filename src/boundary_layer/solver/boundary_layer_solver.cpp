@@ -516,7 +516,7 @@ auto BoundaryLayerSolver::check_convergence(
     return info;
 }
 
-auto BoundaryLayerSolver::create_initial_guess(
+/* auto BoundaryLayerSolver::create_initial_guess(
     int station,
     double xi,
     const conditions::BoundaryConditions& bc
@@ -553,6 +553,47 @@ auto BoundaryLayerSolver::create_initial_guess(
     }
     
     return guess;
+} */
+
+auto BoundaryLayerSolver::create_initial_guess(
+   int station,
+   double xi,
+   const conditions::BoundaryConditions& bc
+) const -> std::expected<equations::SolutionState, SolverError> {
+   
+   const auto n_eta = grid_->n_eta();
+   const auto n_species = mixture_.n_species();
+   const double eta_max = grid_->eta_max();
+   
+   equations::SolutionState guess(n_eta, n_species);
+   
+   // Get equilibrium composition at wall conditions
+   auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
+   if (!equilibrium_result) {
+       return std::unexpected(SolverError(
+           "Failed to compute equilibrium composition at wall conditions: {}",
+           std::source_location::current(), equilibrium_result.error().message()
+       ));
+   }
+   auto c_wall_equilibrium = equilibrium_result.value();
+   
+   for (std::size_t i = 0; i < n_eta; ++i) {
+       const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
+       
+       // Analytical boundary layer profiles
+       // F(η) = 1 - 1.034 * exp(-5.628 * η/η_max)
+       guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
+       
+       // g(η) = 1 - 0.7907 * exp(-4.241 * η/η_max)
+       guess.g[i] = 1.0 - 0.7907 * std::exp(-4.241 * eta / eta_max);
+       
+       // Species composition
+       for (std::size_t j = 0; j < n_species; ++j) {
+           guess.c(j, i) = c_wall_equilibrium[j]; 
+       }
+   }
+   
+   return guess;
 }
 
 auto BoundaryLayerSolver::extrapolate_from_previous(

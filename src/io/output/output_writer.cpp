@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <iostream>
 
 namespace blast::io::output {
 
@@ -174,6 +175,8 @@ auto OutputWriter::convert_solution(
             station_data.temperature = solution.temperature_fields[station_idx];
         } else {
             station_data.temperature.resize(station_solution.F.size(), 300.0); // Default
+            std::cout << solution.temperature_fields[0] << std::endl;
+            std::cout << "Erreur dans le traitement de la température" << std::endl;
         }
         
         // Initialize pressure and density with placeholder values
