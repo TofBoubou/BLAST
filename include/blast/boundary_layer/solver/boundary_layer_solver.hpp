@@ -8,6 +8,7 @@
 #include "../../thermophysics/mixture_interface.hpp"
 #include "../../io/config_types.hpp"
 #include "../../core/exceptions.hpp"
+#include "adaptive_relaxation_controller.hpp"
 #include <expected>
 #include <memory>
 
@@ -31,18 +32,7 @@ struct SolutionResult {
     int total_iterations = 0;
 };
 
-// Convergence monitoring data
-struct ConvergenceInfo {
-    double residual_F = 1e10;
-    double residual_g = 1e10;
-    double residual_c = 1e10;
-    int iterations = 0;
-    bool converged = false;
-    
-    [[nodiscard]] constexpr auto max_residual() const noexcept -> double {
-        return std::max({residual_F, residual_g, residual_c});
-    }
-};
+// ConvergenceInfo is now defined in adaptive_relaxation_controller.hpp
 
 // Error type for solver operations
 class SolverError : public core::BlastException {
@@ -67,6 +57,7 @@ private:
     std::unique_ptr<coefficients::CoefficientCalculator> coeff_calculator_;
     std::unique_ptr<thermodynamics::EnthalpyTemperatureSolver> h2t_solver_;
     std::unique_ptr<coefficients::XiDerivatives> xi_derivatives_;
+    std::unique_ptr<AdaptiveRelaxationController> relaxation_controller_;
 
 public:
     explicit BoundaryLayerSolver(
@@ -154,6 +145,19 @@ private:
         const equations::SolutionState& old_solution,
         const equations::SolutionState& new_solution,
         double relaxation_factor
+    ) const -> equations::SolutionState;
+
+    [[nodiscard]] auto iterate_station_adaptive(
+        int station,
+        double xi,
+        const conditions::BoundaryConditions& bc,
+        equations::SolutionState& solution
+    ) -> std::expected<ConvergenceInfo, SolverError>;
+
+    [[nodiscard]] auto apply_relaxation_differential(
+        const equations::SolutionState& old_solution,
+        const equations::SolutionState& new_solution,
+        double base_factor
     ) const -> equations::SolutionState;
     
     [[nodiscard]] auto compute_eta_derivatives(

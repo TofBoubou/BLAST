@@ -56,6 +56,10 @@ BoundaryLayerSolver::BoundaryLayerSolver(
     xi_derivatives_ = std::make_unique<coefficients::XiDerivatives>(
         grid_->n_eta(), mixture_.n_species()
     );
+
+    relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
+        AdaptiveRelaxationController::Config::for_stagnation_point()
+    );
 }
 
 auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> {
@@ -164,8 +168,17 @@ auto BoundaryLayerSolver::solve_station(
     auto bc = bc_result.value();
     auto solution = initial_guess;
     
-    // Iterative solution at this station
-    auto convergence_result = iterate_station(station, xi, bc, solution);
+    if (station == 0) {
+        relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
+            AdaptiveRelaxationController::Config::for_stagnation_point()
+        );
+    } else {
+        relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
+            AdaptiveRelaxationController::Config::for_downstream_station()
+        );
+    }
+    
+    auto convergence_result = iterate_station_adaptive(station, xi, bc, solution);
     if (!convergence_result) {
         return std::unexpected(convergence_result.error());
     }
@@ -181,7 +194,7 @@ auto BoundaryLayerSolver::solve_station(
     return solution;
 }
 
-auto BoundaryLayerSolver::iterate_station(
+auto BoundaryLayerSolver::iterate_station_adaptive(
     int station,
     double xi,
     const conditions::BoundaryConditions& bc,
@@ -191,10 +204,7 @@ auto BoundaryLayerSolver::iterate_station(
     const auto n_eta = grid_->n_eta();
     const auto n_species = mixture_.n_species();
     
-    // Create a mutable copy of boundary conditions for dynamic updates
     auto bc_dynamic = bc;
-    
-    // Initialize temperature field from wall temperature
     std::ranges::fill(solution.T, bc_dynamic.Tw());
     
     ConvergenceInfo conv_info;
@@ -311,19 +321,22 @@ auto BoundaryLayerSolver::iterate_station(
         // This ensures the forced values are not corrupted by relaxation
         enforce_edge_boundary_conditions(solution_new, bc_dynamic);
         
-        // 12. Apply relaxation AFTER enforcing boundary conditions
-        solution = apply_relaxation(solution_old, solution_new, config_.numerical.under_relaxation);
-        // solution = solution_new;
-
-/*         std::cout << "DEBUG: bc.he() = " << bc.he() << " (should be 800000)" << std::endl;
-        std::cout << "DEBUG: g[edge] = " << solution.g.back() << " (should be 1.0)" << std::endl;
-        std::cout << "DEBUG: h[edge] = " << solution.g.back() * bc.he() << " (should be 800000)" << std::endl; */
-        
-        // 12. Check convergence
-        conv_info = check_convergence(solution_old, solution);
+        // 12. Check convergence before relaxation
+        conv_info = check_convergence(solution_old, solution_new);
         conv_info.iterations = iter + 1;
         
+        // 13. Adaptation relexation factor
+        double adaptive_factor = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
+        
+        std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) 
+                  << adaptive_factor << " (max residual: " << conv_info.max_residual() << ")" << std::endl;
+        
+        // 14. Apply adaptive relaxation
+        solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
+        
+        // 15. Vérification
         if (conv_info.converged) {
+            std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
             break;
         }
     }
@@ -654,6 +667,34 @@ auto BoundaryLayerSolver::apply_relaxation(
         std::cout << "Somme des espèces à eta[" << j << "] : " << sum_at_eta << '\n';
     } */
 
+    
+    return relaxed;
+}
+
+auto BoundaryLayerSolver::apply_relaxation_differential(
+    const equations::SolutionState& old_solution,
+    const equations::SolutionState& new_solution,
+    double base_factor
+) const -> equations::SolutionState {
+    
+    auto relaxed = new_solution;
+    
+    const double alpha_F = base_factor;         
+    const double alpha_g = base_factor * 0.5;     
+    const double alpha_c = base_factor * 0.5;     
+    const double alpha_T = base_factor * 0.9;   
+    
+    for (std::size_t i = 0; i < relaxed.F.size(); ++i) {
+        relaxed.F[i] = (1.0 - alpha_F) * old_solution.F[i] + alpha_F * new_solution.F[i];
+        relaxed.g[i] = (1.0 - alpha_g) * old_solution.g[i] + alpha_g * new_solution.g[i];
+        relaxed.T[i] = (1.0 - alpha_T) * old_solution.T[i] + alpha_T * new_solution.T[i];
+    }
+    
+    for (std::size_t i = 0; i < relaxed.c.rows(); ++i) {
+        for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
+            relaxed.c(i, j) = (1.0 - alpha_c) * old_solution.c(i, j) + alpha_c * new_solution.c(i, j);
+        }
+    }
     
     return relaxed;
 }

@@ -48,6 +48,7 @@ BOUNDARY_LAYER_SOURCES = \
     $(SRC_DIR)/boundary_layer/grid/coordinate_transform.cpp \
     $(SRC_DIR)/boundary_layer/grid/grid.cpp \
     $(SRC_DIR)/boundary_layer/solver/boundary_layer_solver.cpp \
+    $(SRC_DIR)/boundary_layer/solver/adaptive_relaxation_controller.cpp \
     $(SRC_DIR)/boundary_layer/solvers/tridiagonal_solvers.cpp \
     $(SRC_DIR)/boundary_layer/thermodynamics/enthalpy_temperature_solver.cpp
 
