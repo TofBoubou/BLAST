@@ -635,7 +635,7 @@ auto BoundaryLayerSolver::extrapolate_from_previous(
     return extrapolated;
 }
 
-auto BoundaryLayerSolver::apply_relaxation(
+/* auto BoundaryLayerSolver::apply_relaxation(
     const equations::SolutionState& old_solution,
     const equations::SolutionState& new_solution,
     double relaxation_factor
@@ -669,7 +669,7 @@ auto BoundaryLayerSolver::apply_relaxation(
 
     
     return relaxed;
-}
+} */
 
 auto BoundaryLayerSolver::apply_relaxation_differential(
     const equations::SolutionState& old_solution,
@@ -680,8 +680,8 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
     auto relaxed = new_solution;
     
     const double alpha_F = base_factor;         
-    const double alpha_g = base_factor * 0.5;     
-    const double alpha_c = base_factor * 0.5;     
+    const double alpha_g = base_factor * 0.7;     
+    const double alpha_c = base_factor * 0.7;     
     const double alpha_T = base_factor * 0.9;   
     
     for (std::size_t i = 0; i < relaxed.F.size(); ++i) {

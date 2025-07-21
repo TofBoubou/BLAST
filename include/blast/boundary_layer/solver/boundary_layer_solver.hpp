@@ -141,11 +141,11 @@ private:
     ) const -> equations::SolutionState;
     
     // Utility functions
-    [[nodiscard]] auto apply_relaxation(
+/*     [[nodiscard]] auto apply_relaxation(
         const equations::SolutionState& old_solution,
         const equations::SolutionState& new_solution,
         double relaxation_factor
-    ) const -> equations::SolutionState;
+    ) const -> equations::SolutionState; */
 
     [[nodiscard]] auto iterate_station_adaptive(
         int station,
