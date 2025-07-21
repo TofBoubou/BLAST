@@ -315,9 +315,9 @@ auto BoundaryLayerSolver::iterate_station(
         solution = apply_relaxation(solution_old, solution_new, config_.numerical.under_relaxation);
         // solution = solution_new;
 
-        std::cout << "DEBUG: bc.he() = " << bc.he() << " (should be 800000)" << std::endl;
+/*         std::cout << "DEBUG: bc.he() = " << bc.he() << " (should be 800000)" << std::endl;
         std::cout << "DEBUG: g[edge] = " << solution.g.back() << " (should be 1.0)" << std::endl;
-        std::cout << "DEBUG: h[edge] = " << solution.g.back() * bc.he() << " (should be 800000)" << std::endl;
+        std::cout << "DEBUG: h[edge] = " << solution.g.back() * bc.he() << " (should be 800000)" << std::endl; */
         
         // 12. Check convergence
         conv_info = check_convergence(solution_old, solution);
@@ -343,8 +343,6 @@ auto BoundaryLayerSolver::solve_continuity_equation(
     const double lambda0 = xi_derivatives_->lambda0();
     const auto F_derivatives = xi_derivatives_->F_derivative();
     
-    // Compute y field according to the formula:
-    // y[i] = -(2ξλ₀ + 1)F[i] - 2ξ∂F/∂ξ
     std::vector<double> y_field(n_eta);
     
     for (std::size_t i = 0; i < n_eta; ++i) {
@@ -463,11 +461,11 @@ auto BoundaryLayerSolver::update_temperature_field(
     // std::cout << "h_w = " << enthalpy_field[0] << " ---------- " << "h_e = " << enthalpy_field[19] << std::endl;
     
     // DEBUG: Print enthalpy field values
-    std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
+/*     std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
     std::cout << "[DEBUG] Enthalpy field values:" << std::endl;
     for (std::size_t i = 0; i < std::min(enthalpy_field.size(), size_t(20)); ++i) {
         std::cout << "[DEBUG] h[" << i << "] = " << enthalpy_field[i] << std::endl;
-    }
+    } */
     
     auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
     if (!result) {
@@ -517,6 +515,8 @@ auto BoundaryLayerSolver::check_convergence(
     info.residual_c = std::sqrt(c_sum / c_count);
     
     info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
+
+    std::cout << "info.residual_F = " << info.residual_F << "  info.residual_g = " << info.residual_g << "  info.residual_c = " << info.residual_c << std::endl;
     
     return info;
 }

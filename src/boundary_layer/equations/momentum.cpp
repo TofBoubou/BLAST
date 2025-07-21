@@ -17,7 +17,7 @@ auto solve_momentum(
     PhysicalQuantity auto d_eta
 ) -> std::expected<std::vector<double>, EquationError> {
 
-    std::cout << std::scientific << "From solve_momentum xi = " << xi << std::endl;
+    // std::cout << std::scientific << "From solve_momentum xi = " << xi << std::endl;
     
     const auto n_eta = F_previous.size();
     

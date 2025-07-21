@@ -180,8 +180,8 @@ auto OutputWriter::convert_solution(
         }
         
         // Initialize pressure and density with placeholder values
-        station_data.pressure.resize(station_solution.F.size(), 1000.0);
-        station_data.density.resize(station_solution.F.size(), 0.01);
+        station_data.pressure.resize(station_solution.F.size(), 1000.0); // TODO
+        station_data.density.resize(station_solution.F.size(), 0.01); // TODO
         
         // Species concentrations
         station_data.species_concentrations = station_solution.c;
