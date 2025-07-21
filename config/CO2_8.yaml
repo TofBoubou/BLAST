@@ -1,0 +1,53 @@
+simulation:
+  body_type: axisymmetric
+  only_stagnation_point: true
+  diffusion_type: stefan_maxwell
+  consider_thermal_diffusion: false
+  chemical_non_equilibrium: true  
+
+numerical:
+  n_eta: 20                       
+  eta_max: 6.0
+  convergence_tolerance: 1.0e-12    
+  max_iterations: 10000
+  under_relaxation: 1
+  step_control:
+    lower_bound: 5
+    upper_bound: 20
+  solvers:
+    h2t_tolerance: 1.0e-12
+    h2t_max_iterations: 50000
+    stefan_tolerance: 1.0e-12
+    stefan_max_iterations: 50000
+
+mixture:
+  name: CO2_8
+  thermodynamic_database: RRHO
+  viscosity_algorithm: chapman_enskog_ldlt
+  reference_temperature: 0.0
+
+output:
+  x_stations: [0.0]
+  output_directory: test_outputs
+  generate_lookup_table: false
+
+outer_edge:
+  edge_points:
+    - x: 0.0
+      radius: 0
+      velocity: 0
+      enthalpy: 10843383.82002198
+      pressure: 10386.998246546822
+      density: 0.004916114714198022
+      viscosity: 0.00016834320052693788
+      species: [1.9908323651768685e-09, 3.592496170177808e-05, 1.0206047580605353e-05, 0.006520172760486929, 0.37199094577422465, 0.621102892275212, 0.00010388601731858347, 0.00023597017264301109]
+  
+  velocity_gradient_stagnation: 4027.1213622326
+  freestream_density: 0.0019382429
+  freestream_velocity: 5000000
+
+wall_parameters:
+  temperatures: [5000]
+
+# ./blast config/default.yaml test_output
+# python3 scripts/postprocess_blast.py --input test_outputs/test_output_20250713_232651.h5 --plots all --output results_h5

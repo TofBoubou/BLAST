@@ -1,13 +1,13 @@
 simulation:
   body_type: axisymmetric
-  only_stagnation_point: false      # Résolution complète de la couche limite
+  only_stagnation_point: true      # Résolution complète de la couche limite
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
   chemical_non_equilibrium: false
 
 numerical:
   n_eta: 20                       
-  eta_max: 6.0
+  eta_max: 4.0
   convergence_tolerance: 1.0e-6    
   max_iterations: 1000000
   under_relaxation: 0.01
@@ -88,4 +88,4 @@ outer_edge:
   freestream_velocity: 3000.0
 
 wall_parameters:
-  temperatures: [1000.0, 1000.0, 1000.0, 1000.0, 1000.0]
+  temperatures: [500.0, 1000.0, 1000.0, 1000.0, 1000.0]

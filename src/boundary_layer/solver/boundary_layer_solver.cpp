@@ -573,7 +573,7 @@ auto BoundaryLayerSolver::check_convergence(
     return guess;
 } */
 
-auto BoundaryLayerSolver::create_initial_guess(
+/* auto BoundaryLayerSolver::create_initial_guess(
    int station,
    double xi,
    const conditions::BoundaryConditions& bc
@@ -612,6 +612,186 @@ auto BoundaryLayerSolver::create_initial_guess(
        }
    }
    
+   return guess;
+} */
+
+/* auto BoundaryLayerSolver::create_initial_guess(
+   int station,
+   double xi,
+   const conditions::BoundaryConditions& bc
+) const -> std::expected<equations::SolutionState, SolverError> {
+   
+   const auto n_eta = grid_->n_eta();
+   const auto n_species = mixture_.n_species();
+   const double eta_max = grid_->eta_max();
+   
+   equations::SolutionState guess(n_eta, n_species);
+   
+   // ===== STEP 1: RETRIEVE BOUNDARY COMPOSITIONS =====
+
+   // Compute equilibrium composition at the wall (Tw, P_e)
+   auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
+   if (!equilibrium_result) {
+       return std::unexpected(SolverError(
+           "Failed to compute equilibrium composition at wall conditions: {}",
+           std::source_location::current(), equilibrium_result.error().message()
+       ));
+   }
+   auto c_wall_equilibrium = equilibrium_result.value();
+   
+   // Extract edge composition from input
+   const auto& c_edge = bc.c_e();
+   if (c_edge.size() != n_species) {
+       return std::unexpected(SolverError(
+           "Edge composition size mismatch: expected {}, got {}",
+           std::source_location::current(), n_species, c_edge.size()
+       ));
+   }
+   
+   // ===== STEP 2: TRANSITION FUNCTION (TANH INTERPOLATION) =====
+
+   // Smooth transition function from wall (0) to edge (1)
+   // Centered at 35% of the boundary layer thickness, with steep slope
+   auto transition_function = [](double eta_norm, double eta_center = 0.35, double sharpness = 10.0) -> double {
+       return 0.5 * (1.0 + std::tanh(sharpness * (eta_norm - eta_center)));
+   };
+   
+   // ===== STEP 3: COMPUTE SPECIES PROFILES =====
+
+   for (std::size_t i = 0; i < n_eta; ++i) {
+       const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
+       const double eta_norm = static_cast<double>(i) / (n_eta - 1);  // Normalize to [0,1]
+       
+       // Analytical profiles for velocity F and enthalpy g (unchanged)
+       guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
+       guess.g[i] = 1.0;
+       
+       // ===== STEP 4: INTERPOLATE SPECIES CONCENTRATIONS =====
+       
+       // Compute transition factor from wall to edge
+       const double f = transition_function(eta_norm);
+       
+       // Linear interpolation between wall and edge compositions
+       double sum_interpolated = 0.0;
+       for (std::size_t j = 0; j < n_species; ++j) {
+           guess.c(j, i) = c_wall_equilibrium[j] * (1.0 - f) + c_edge[j] * f;
+           sum_interpolated += guess.c(j, i);
+       }
+       
+       // Enforce mass conservation: normalize so that sum_j c_j = 1
+       if (sum_interpolated > 1e-15) {
+           for (std::size_t j = 0; j < n_species; ++j) {
+               guess.c(j, i) /= sum_interpolated;
+           }
+       } else {
+        std::cout << "GROS BUG" << std::endl;
+        abort();
+       }
+   }
+   return guess;
+} */
+
+
+auto BoundaryLayerSolver::create_initial_guess(
+   int station,
+   double xi,
+   const conditions::BoundaryConditions& bc
+) const -> std::expected<equations::SolutionState, SolverError> {
+   
+   const auto n_eta = grid_->n_eta();
+   const auto n_species = mixture_.n_species();
+   const double eta_max = grid_->eta_max();
+   
+   equations::SolutionState guess(n_eta, n_species);
+   
+   // ===== STEP 1: RETRIEVE BOUNDARY COMPOSITIONS =====
+
+   // Compute equilibrium composition at the wall (Tw, P_e)
+   auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
+   if (!equilibrium_result) {
+       return std::unexpected(SolverError(
+           "Failed to compute equilibrium composition at wall conditions: {}",
+           std::source_location::current(), equilibrium_result.error().message()
+       ));
+   }
+   auto c_wall_equilibrium = equilibrium_result.value();
+   
+   // Extract edge composition from input
+   const auto& c_edge = bc.c_e();
+   if (c_edge.size() != n_species) {
+       return std::unexpected(SolverError(
+           "Edge composition size mismatch: expected {}, got {}",
+           std::source_location::current(), n_species, c_edge.size()
+       ));
+   }
+   
+   // ===== STEP 1.5: COMPUTE WALL EQUILIBRIUM ENTHALPY =====
+   
+   // Calculate enthalpy of equilibrium mixture at wall conditions
+   auto h_wall_eq_result = mixture_.mixture_enthalpy(c_wall_equilibrium, bc.Tw(), bc.P_e());
+   if (!h_wall_eq_result) {
+       return std::unexpected(SolverError(
+           "Failed to compute wall equilibrium enthalpy: {}", 
+           std::source_location::current(), h_wall_eq_result.error().message()
+       ));
+   }
+   double h_wall_equilibrium = h_wall_eq_result.value();
+
+   std::cout << "ENTHALPIE AU MUR = " << h_wall_equilibrium << std::endl;
+   
+   // Compute dimensionless enthalpy at wall
+   double g_wall = h_wall_equilibrium / bc.he();
+   
+   // Verification
+/*    if (g_wall <= 0.0 || !std::isfinite(g_wall)) {
+       return std::unexpected(SolverError(
+           "Invalid wall enthalpy ratio: g_wall = {}", 
+           std::source_location::current(), g_wall
+       ));
+   } */
+   
+   // ===== STEP 2: TRANSITION FUNCTION (TANH INTERPOLATION) =====
+
+   // Smooth transition function from wall (0) to edge (1)
+   // Centered at 35% of the boundary layer thickness, with steep slope
+   auto transition_function = [](double eta_norm, double eta_center = 0.35, double sharpness = 10.0) -> double {
+       return 0.5 * (1.0 + std::tanh(sharpness * (eta_norm - eta_center)));
+   };
+   
+   // ===== STEP 3: COMPUTE SPECIES PROFILES =====
+
+   for (std::size_t i = 0; i < n_eta; ++i) {
+       const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
+       const double eta_norm = static_cast<double>(i) / (n_eta - 1);  // Normalize to [0,1]
+       
+       // Analytical profiles for velocity F (unchanged)
+       guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
+       
+       // Physical enthalpy profile: linear interpolation from wall equilibrium to edge
+       guess.g[i] = g_wall + eta_norm * (1.0 - g_wall);
+       
+       // ===== STEP 4: INTERPOLATE SPECIES CONCENTRATIONS =====
+       
+       // Compute transition factor from wall to edge
+       const double f = transition_function(eta_norm);
+       
+       // Linear interpolation between wall and edge compositions
+       double sum_interpolated = 0.0;
+       for (std::size_t j = 0; j < n_species; ++j) {
+           guess.c(j, i) = c_wall_equilibrium[j] * (1.0 - f) + c_edge[j] * f;
+           sum_interpolated += guess.c(j, i);
+       }
+       
+       // Enforce mass conservation: normalize so that sum_j c_j = 1
+       if (sum_interpolated > 1e-15) {
+           for (std::size_t j = 0; j < n_species; ++j) {
+               guess.c(j, i) /= sum_interpolated;
+           }
+       } else {
+        std::cout << "GROS BUG" << std::endl;
+        abort();
+       }
+   }
    return guess;
 }
 
@@ -684,7 +864,7 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
     const double alpha_c = base_factor * 0.7;     
     const double alpha_T = base_factor * 0.9;   
     
-    for (std::size_t i = 0; i < relaxed.F.size(); ++i) {
+    for (std::size_t i = 0; i < relaxed.F.size() - 1; ++i) {
         relaxed.F[i] = (1.0 - alpha_F) * old_solution.F[i] + alpha_F * new_solution.F[i];
         relaxed.g[i] = (1.0 - alpha_g) * old_solution.g[i] + alpha_g * new_solution.g[i];
         relaxed.T[i] = (1.0 - alpha_T) * old_solution.T[i] + alpha_T * new_solution.T[i];
