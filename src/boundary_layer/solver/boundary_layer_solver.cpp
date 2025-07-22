@@ -907,8 +907,8 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
     auto relaxed = new_solution;
     
     const double alpha_F = base_factor;         
-    const double alpha_g = base_factor * 0.7;     
-    const double alpha_c = base_factor * 0.7;     
+    const double alpha_g = base_factor * 0.8;     
+    const double alpha_c = base_factor * 0.8;     
     const double alpha_T = base_factor * 0.9;   
     
     for (std::size_t i = 0; i < relaxed.F.size() - 1; ++i) {

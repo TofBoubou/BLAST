@@ -3,13 +3,13 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_non_equilibrium: true  
+  chemical_non_equilibrium: false  
 
 numerical:
   n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-12    
-  max_iterations: 10000
+  convergence_tolerance: 1.0e-6    
+  max_iterations: 500000
   under_relaxation: 1
   step_control:
     lower_bound: 5
@@ -35,7 +35,7 @@ outer_edge:
   edge_points:
     # Point de stagnation (x = 0.0)
     - x: 0.0
-      radius: 0
+      radius: 1
       velocity: 0
       enthalpy: 1.429162e+07
       pressure: 7.000000e+03

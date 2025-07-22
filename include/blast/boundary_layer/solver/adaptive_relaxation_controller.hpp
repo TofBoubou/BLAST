@@ -32,7 +32,7 @@ public:
         
         // Thresholds based on your logic
         double excellent_threshold = 0.8;    // Threshold for excellent convergence (< 0.8)
-        double divergence_threshold = 1.01;   // Threshold for divergence (> 1.0)
+        double divergence_threshold = 1.00001;   // Threshold for divergence (> 1.0)
         
         // Adaptation factors
         double strong_increase = 1.1;        // Strong increase for ratio < 0.8 
@@ -43,7 +43,7 @@ public:
         // Specialized configurations
         [[nodiscard]] static auto for_stagnation_point() -> Config {
             Config config;
-            config.initial_factor = 0.01;
+            config.initial_factor = 0.0001;
             config.max_factor = 0.8;         // More conservative
             config.strong_increase = 1.05;   // Slower growth 
             config.moderate_increase = 1.02; // Very moderate 
