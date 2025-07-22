@@ -613,3 +613,13 @@ def main():
 
 if __name__ == '__main__':
     exit(main())
+    
+"""     
+python3 generate_config.py    
+
+make all
+
+./blast config/config_50points.yaml
+
+python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250721_175343.h5 --plots all --output results_h5 
+ """

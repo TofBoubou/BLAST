@@ -692,7 +692,7 @@ auto BoundaryLayerSolver::check_convergence(
 } */
 
 
-auto BoundaryLayerSolver::create_initial_guess(
+/* auto BoundaryLayerSolver::create_initial_guess(
    int station,
    double xi,
    const conditions::BoundaryConditions& bc
@@ -742,14 +742,6 @@ auto BoundaryLayerSolver::create_initial_guess(
    // Compute dimensionless enthalpy at wall
    double g_wall = h_wall_equilibrium / bc.he();
    
-   // Verification
-/*    if (g_wall <= 0.0 || !std::isfinite(g_wall)) {
-       return std::unexpected(SolverError(
-           "Invalid wall enthalpy ratio: g_wall = {}", 
-           std::source_location::current(), g_wall
-       ));
-   } */
-   
    // ===== STEP 2: TRANSITION FUNCTION (TANH INTERPOLATION) =====
 
    // Smooth transition function from wall (0) to edge (1)
@@ -793,7 +785,62 @@ auto BoundaryLayerSolver::create_initial_guess(
        }
    }
    return guess;
+} */
+
+auto BoundaryLayerSolver::create_initial_guess(
+   int station,
+   double xi,
+   const conditions::BoundaryConditions& bc
+) const -> std::expected<equations::SolutionState, SolverError> {
+   
+   const auto n_eta = grid_->n_eta();
+   const auto n_species = mixture_.n_species();
+   const double eta_max = grid_->eta_max();
+   
+   equations::SolutionState guess(n_eta, n_species);
+
+   for (std::size_t i = 0; i < n_eta; ++i) {
+       const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
+       const double eta_norm = eta / eta_max;
+
+       // === F(η): velocity profile (unchanged)
+       guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta_norm);
+
+       // === g(η): enthalpy profile (analytic)
+       guess.g[i] = 1.0 - std::exp(-4.08 * std::pow(eta_norm, 0.53));
+
+       // === c_i(η): species profiles
+       // Species order: CO₂ (0), CO (1), O₂ (2), O (3), C (4)
+
+       // CO₂
+       guess.c(0, i) = 0.0266 - 0.0167 * std::exp(-4.79 * std::pow(eta_norm, 1.08));
+
+       // CO
+       guess.c(1, i) = 0.126 * std::exp(-6.51 * eta_norm) + 0.527;
+
+       // O₂
+       guess.c(2, i) = 0.0180 - 0.0130 * std::exp(-6.02 * std::pow(eta_norm, 1.31));
+
+       // O
+       guess.c(3, i) = 0.4204 - 0.1203 * std::exp(-32.31 * std::pow(eta_norm, 1.78));
+
+       // C
+       guess.c(4, i) = 0.0371 - 0.0071 * std::exp(-5.86 * std::pow(eta_norm, 1.25));
+
+       // === Normalisation (sécurité numérique)
+       double sum = 0.0;
+       for (std::size_t j = 0; j < n_species; ++j) sum += guess.c(j, i);
+       if (sum > 1e-15) {
+           for (std::size_t j = 0; j < n_species; ++j) guess.c(j, i) /= sum;
+       } else {
+           std::cerr << "ERROR: species concentrations sum to zero at eta = " << eta << std::endl;
+           abort();
+       }
+   }
+
+   return guess;
 }
+
 
 auto BoundaryLayerSolver::extrapolate_from_previous(
     const equations::SolutionState& previous_solution,
@@ -802,7 +849,7 @@ auto BoundaryLayerSolver::extrapolate_from_previous(
 ) const -> equations::SolutionState {
     
     // Simple extrapolation - could be improved with higher-order methods
-    const double factor = (xi_current > xi_prev) ? 1.1 : 0.9;
+    const double factor = (xi_current > xi_prev) ? 1 : 1;
     
     auto extrapolated = previous_solution;
     

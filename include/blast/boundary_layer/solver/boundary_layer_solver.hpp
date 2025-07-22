@@ -14,6 +14,32 @@
 
 namespace blast::boundary_layer::solver {
 
+// Configuration for adaptive subdivision strategy
+struct SubdivisionConfig {
+    int max_depth = 10;                      // Maximum subdivision depth
+    double min_step_fraction = 0.000000000000001;        // Minimum step as fraction of total domain
+    int max_retry_attempts = 15;             // Maximum retry attempts per station
+    bool enable_physics_simplification = true;  // Allow temporary physics simplification
+    double subdivision_factor = 0.3;        // Factor for first subdivision attempt (xi_new = xi_start + factor*(xi_end - xi_start))
+    
+    // Factory methods for different strategies
+    [[nodiscard]] static auto conservative() -> SubdivisionConfig {
+        SubdivisionConfig config;
+        config.max_depth = 2;
+        config.subdivision_factor = 0.2;
+        config.max_retry_attempts = 3;
+        return config;
+    }
+    
+    [[nodiscard]] static auto aggressive() -> SubdivisionConfig {
+        SubdivisionConfig config;
+        config.max_depth = 4;
+        config.subdivision_factor = 0.5;
+        config.max_retry_attempts = 8;
+        return config;
+    }
+};
+
 // Structure to hold both first and second derivatives
 struct DerivativeState {
     core::Matrix<double> dc_deta;   // First derivatives [n_species x n_eta]
@@ -30,9 +56,28 @@ struct SolutionResult {
     std::vector<std::vector<double>> temperature_fields;
     bool converged = false;
     int total_iterations = 0;
+    
+    // Subdivision statistics
+    int total_subdivisions = 0;
+    int max_subdivision_depth_used = 0;
+    std::vector<std::pair<double, int>> subdivision_points; // (xi, depth) pairs
 };
 
-// ConvergenceInfo is now defined in adaptive_relaxation_controller.hpp
+// Recovery strategy information
+struct RecoveryInfo {
+    enum class Strategy {
+        None,
+        Subdivision,
+        RelaxationReduction,
+        PhysicsSimplification,
+        Extrapolation
+    };
+    
+    Strategy strategy_used = Strategy::None;
+    int attempts_made = 0;
+    double final_xi_step = 0.0;
+    std::string details;
+};
 
 // Error type for solver operations
 class SolverError : public core::BlastException {
@@ -58,18 +103,34 @@ private:
     std::unique_ptr<thermodynamics::EnthalpyTemperatureSolver> h2t_solver_;
     std::unique_ptr<coefficients::XiDerivatives> xi_derivatives_;
     std::unique_ptr<AdaptiveRelaxationController> relaxation_controller_;
+    
+    // Subdivision configuration
+    SubdivisionConfig subdivision_config_;
 
 public:
     explicit BoundaryLayerSolver(
         const thermophysics::MixtureInterface& mixture,
-        const io::Configuration& config
+        const io::Configuration& config,
+        const SubdivisionConfig& subdivision_config = SubdivisionConfig{}
     );
     
     // Main solving interface
     [[nodiscard]] auto solve() -> std::expected<SolutionResult, SolverError>;
 
 private:
-    // Station-level solving
+    // Adaptive station-level solving with subdivision support
+    [[nodiscard]] auto solve_stations_adaptive() -> std::expected<SolutionResult, SolverError>;
+    
+    // Attempt to solve a specific xi interval with subdivision if needed
+    [[nodiscard]] auto solve_xi_interval(
+        std::size_t start_station_idx,
+        std::size_t end_station_idx,
+        const equations::SolutionState& initial_guess,
+        SolutionResult& result,
+        int depth = 0
+    ) -> std::expected<RecoveryInfo, SolverError>;
+    
+    // Single station solving (existing logic)
     [[nodiscard]] auto solve_station(
         int station,
         double xi,
@@ -77,7 +138,7 @@ private:
     ) -> std::expected<equations::SolutionState, SolverError>;
     
     // Iterative solving at one station
-    [[nodiscard]] auto iterate_station(
+    [[nodiscard]] auto iterate_station_adaptive(
         int station,
         double xi,
         const conditions::BoundaryConditions& bc,
@@ -87,7 +148,7 @@ private:
     // Individual equation solving with proper sequencing
     auto solve_continuity_equation(
         const equations::SolutionState& solution,
-        double xi  // <- Ajouter ce paramètre
+        double xi
     ) -> std::expected<std::vector<double>, SolverError>;
     
     [[nodiscard]] auto solve_momentum_equation(
@@ -140,20 +201,28 @@ private:
         double xi_current
     ) const -> equations::SolutionState;
     
-    // Utility functions
-/*     [[nodiscard]] auto apply_relaxation(
-        const equations::SolutionState& old_solution,
-        const equations::SolutionState& new_solution,
-        double relaxation_factor
-    ) const -> equations::SolutionState; */
-
-    [[nodiscard]] auto iterate_station_adaptive(
+    // Recovery strategies
+    [[nodiscard]] auto attempt_subdivision_recovery(
+        std::size_t start_station_idx,
+        std::size_t end_station_idx,
+        const equations::SolutionState& initial_guess,
+        SolutionResult& result,
+        int depth
+    ) -> std::expected<RecoveryInfo, SolverError>;
+    
+    [[nodiscard]] auto attempt_relaxation_recovery(
         int station,
         double xi,
-        const conditions::BoundaryConditions& bc,
-        equations::SolutionState& solution
-    ) -> std::expected<ConvergenceInfo, SolverError>;
-
+        const equations::SolutionState& initial_guess
+    ) -> std::expected<equations::SolutionState, SolverError>;
+    
+    [[nodiscard]] auto attempt_physics_simplification_recovery(
+        int station,
+        double xi,
+        const equations::SolutionState& initial_guess
+    ) -> std::expected<equations::SolutionState, SolverError>;
+    
+    // Utility functions
     [[nodiscard]] auto apply_relaxation_differential(
         const equations::SolutionState& old_solution,
         const equations::SolutionState& new_solution,
@@ -179,6 +248,20 @@ private:
         conditions::BoundaryConditions& bc,
         const coefficients::CoefficientInputs& inputs,
         const core::Matrix<double>& species_matrix
+    ) const -> void;
+    
+    // Validation and diagnostics
+    [[nodiscard]] auto validate_subdivision_feasibility(
+        double xi_start, 
+        double xi_end, 
+        int depth
+    ) const noexcept -> bool;
+    
+    auto log_subdivision_attempt(
+        double xi_start, 
+        double xi_end, 
+        double xi_new, 
+        int depth
     ) const -> void;
 };
 
