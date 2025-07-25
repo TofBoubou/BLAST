@@ -83,7 +83,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         
         // CRITICAL: Update xi derivatives BEFORE solving (except for station 0)
         if (station_idx > 0) {
-            xi_derivatives_->update_station(station - 1, xi, prev_F, prev_g, prev_c);
+            xi_derivatives_->update_station(station, xi, prev_F, prev_g, prev_c);
         }
         
         // Create initial guess for this station
@@ -194,7 +194,7 @@ auto BoundaryLayerSolver::solve_station(
     return solution;
 }
 
-auto BoundaryLayerSolver::iterate_station_adaptive(
+/* auto BoundaryLayerSolver::iterate_station_adaptive(
     int station,
     double xi,
     const conditions::BoundaryConditions& bc,
@@ -205,7 +205,10 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
     const auto n_species = mixture_.n_species();
     
     auto bc_dynamic = bc;
+    std::cout << std::scientific << "Mu_e avant la boucle : " << bc_dynamic.mu_e() << std::endl;
     std::ranges::fill(solution.T, bc_dynamic.Tw());
+    auto temp = solution.T;
+    std::cout << "Temperature à l'initialisation " << temp[10] << std::endl;
     
     ConvergenceInfo conv_info;
     
@@ -342,11 +345,181 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
     }
     
     return conv_info;
+} */
+
+
+auto BoundaryLayerSolver::iterate_station_adaptive(
+    int station,
+    double xi,
+    const conditions::BoundaryConditions& bc,
+    equations::SolutionState& solution
+) -> std::expected<ConvergenceInfo, SolverError> {
+
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+
+    auto bc_dynamic = bc;
+    std::ranges::fill(solution.T, bc_dynamic.Tw());
+    std::cout << std::scientific << "Mu_e avant la boucle : " << bc_dynamic.mu_e() << std::endl;
+
+    ConvergenceInfo conv_info;
+
+    for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
+        std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
+        const auto solution_old = solution;
+
+        // ✅ Mettre à jour T en tout début d'itération
+        std::cout << "------------------------------------" << std::endl;
+        std::cout << "Print de g : " << solution.g[0] << "  " << solution.g[10] << "  " << solution.g[19] << std::endl;
+        std::cout << "Fractions dans resolution c_10_0: " << solution.c(0,10) << std::endl;
+        std::cout << "Fractions dans resolution c_10_1: " << solution.c(1,10) << std::endl;
+        std::cout << "Fractions dans resolution c_10_2: " << solution.c(2,10) << std::endl;
+        std::cout << "Fractions dans resolution c_10_3: " << solution.c(3,10) << std::endl;
+        std::cout << "Fractions dans resolution c_10_4: " << solution.c(4,10) << std::endl;
+        std::cout << "Fractions dans resolution c_19_0: " << solution.c(0,19) << std::endl;
+        std::cout << "Fractions dans resolution c_19_1: " << solution.c(1,19) << std::endl;
+        std::cout << "Fractions dans resolution c_19_2: " << solution.c(2,19) << std::endl;
+        std::cout << "Fractions dans resolution c_19_3: " << solution.c(3,19) << std::endl;
+        std::cout << "Fractions dans resolution c_19_4: " << solution.c(4,19) << std::endl;
+        std::cout << "Température dans la boucle for au point 10: " << solution.T[10] << std::endl;
+        std::cout << "------------------------------------" << std::endl;
+
+
+        auto T_result = update_temperature_field(solution.g, solution.c, bc_dynamic, solution.T);
+        if (!T_result) {
+            return std::unexpected(SolverError(
+                "Temperature update failed at station {} iteration {}: {}",
+                std::source_location::current(), station, iter, T_result.error().message()
+            ));
+        }
+        solution.T = T_result.value();
+
+        // 1. Solve continuity equation
+        auto V_result = solve_continuity_equation(solution, xi);
+        if (!V_result) {
+            return std::unexpected(SolverError(
+                "Continuity solver failed at station {} iteration {}: {}",
+                std::source_location::current(), station, iter, V_result.error().message()
+            ));
+        }
+        solution.V = std::move(V_result.value());
+
+        std::cout << "-----------------------------------------------------" << std::endl;
+        std::cout << "Continuity after calculation V[0] : " << solution.V[0] << std::endl;
+        std::cout << "Continuity after calculation V[10] : " << solution.V[10] << std::endl;
+        std::cout << "Continuity after calculation V[19] : " << solution.V[19] << std::endl;
+        std::cout << "-----------------------------------------------------" << std::endl;
+
+        // 2. Compute eta derivatives
+        auto derivatives_result = compute_eta_derivatives(solution);
+        if (!derivatives_result) {
+            return std::unexpected(derivatives_result.error());
+        }
+        auto solution_with_derivatives = derivatives_result.value();
+
+        // 2b. Compute concentration derivatives
+        auto conc_derivatives_result = compute_concentration_derivatives(solution);
+        if (!conc_derivatives_result) {
+            return std::unexpected(conc_derivatives_result.error());
+        }
+        auto concentration_derivatives = conc_derivatives_result.value();
+
+        // 3. Create coefficient inputs
+        coefficients::CoefficientInputs inputs{
+            .xi = xi,
+            .F = solution.F,
+            .c = solution.c,
+            .dc_deta = concentration_derivatives.dc_deta,
+            .dc_deta2 = concentration_derivatives.dc_deta2,
+            .T = solution.T
+        };
+
+        // 4. Calculate coefficients
+        auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
+        if (!coeffs_result) {
+            return std::unexpected(SolverError(
+                "Coefficient calculation failed at station {} iteration {}: {}",
+                std::source_location::current(), station, iter, coeffs_result.error().message()
+            ));
+        }
+        auto coeffs = coeffs_result.value();
+
+        // 5. Solve momentum equation
+        auto F_result = solve_momentum_equation(solution, coeffs, bc_dynamic, xi);
+        if (!F_result) return std::unexpected(F_result.error());
+        auto F_new = F_result.value();
+        if (!F_new.empty()) F_new.back() = 1.0;
+        std::cout << "Verification f[10] juste après le calcul : " << F_new[10] << std::endl;
+
+        // 6. Solve energy equation
+        auto g_result = solve_energy_equation(solution, inputs, coeffs, bc_dynamic, station);
+        if (!g_result) return std::unexpected(g_result.error());
+        auto g_new = g_result.value();
+        std::cout << "Print de g après résolution : " << g_new[0] << "  " << g_new[10] << "  " << g_new[19] << std::endl;
+        if (!g_new.empty()) g_new.back() = 1.0;
+
+        // 7. Skip (T update déjà fait au début)
+
+        // 8. Update edge properties
+        update_edge_properties(bc_dynamic, inputs, solution.c);
+
+/*         // 9. Recalculate coefficients
+        auto coeffs_updated_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
+        if (!coeffs_updated_result) {
+            return std::unexpected(SolverError("Coefficient recalculation failed"));
+        }
+        coeffs = coeffs_updated_result.value(); */
+
+        // 10. Solve species equations
+        auto c_result = solve_species_equations(solution, inputs, coeffs, bc_dynamic, station);
+        if (!c_result) {
+            return std::unexpected(c_result.error());
+        }
+        auto c_new = c_result.value();
+
+/*         std::cout << "Fractions tout juste après le calcul c_19_0: " << c_new(0,19) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_19_1: " << c_new(1,19) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_19_2: " << c_new(2,19) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_19_3: " << c_new(3,19) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_19_4: " << c_new(4,19) << std::endl; */
+
+        // 11. Build new solution state
+        equations::SolutionState solution_new(n_eta, n_species);
+        solution_new.V = solution.V;
+        solution_new.F = std::move(F_new);
+        solution_new.g = std::move(g_new);
+        solution_new.c = std::move(c_new);
+        solution_new.T = solution.T;
+
+        // 11.5. Enforce BC
+        // enforce_edge_boundary_conditions(solution_new, bc_dynamic);
+
+        // 12. Check convergence
+        conv_info = check_convergence(solution_old, solution_new);
+        conv_info.iterations = iter + 1;
+
+        // 13. Adapt relaxation
+        double adaptive_factor = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
+        std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3)
+                  << adaptive_factor << " (max residual: " << conv_info.max_residual() << ")" << std::endl;
+
+        // 14. Apply relaxation
+        solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
+
+        // 15. Exit if converged
+        if (conv_info.converged) {
+            std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
+            break;
+        }
+    }
+
+    return conv_info;
 }
+
 
 auto BoundaryLayerSolver::solve_continuity_equation(
     const equations::SolutionState& solution,
-    double xi  // <- Paramètre ajouté
+    double xi
 ) -> std::expected<std::vector<double>, SolverError> {
     
     const auto n_eta = grid_->n_eta();
@@ -362,6 +535,12 @@ auto BoundaryLayerSolver::solve_continuity_equation(
         y_field[i] = -(2.0 * xi * lambda0 + 1.0) * solution.F[i] - 
                       2.0 * xi * F_derivatives[i];
     }
+
+    std::cout << "y_field[0] dans solve_continuity_equation " << y_field[0] << std::endl;
+    std::cout << "y_field[10] dans solve_continuity_equation " << y_field[10] << std::endl;
+    std::cout << "y_field[19] dans solve_continuity_equation " << y_field[19] << std::endl;
+    std::cout << "lambda0 " << lambda0 << std::endl;
+    std::cout << "solution.F[10] " << solution.F[10] << std::endl;
 
     std::cout << std::scientific << "From continuity lambda0 = " << lambda0 << "   -------   " << "xi = " << xi << std::endl;
     
@@ -466,19 +645,21 @@ auto BoundaryLayerSolver::update_temperature_field(
     // std::cout << "DEBUG: bc.he() = " << bc.he() << std::endl;
     for (std::size_t i = 0; i < n_eta; ++i) {
         enthalpy_field[i] = g_field[i] * bc.he();
-        if (!std::isfinite(enthalpy_field[i])) {
+/*         if (!std::isfinite(enthalpy_field[i])) {
             std::cout << "DEBUG: NaN detected at i=" << i << ", g_field[i]=" << g_field[i] << ", bc.he()=" << bc.he() << std::endl;
-        }
+        } */
     }
+
+    // std::cout << "Enthalpie avant le solveur : " << enthalpy_field[10] << std::endl;
 
     // std::cout << "h_w = " << enthalpy_field[0] << " ---------- " << "h_e = " << enthalpy_field[19] << std::endl;
     
     // DEBUG: Print enthalpy field values
-    std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
+/*     std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
     std::cout << "[DEBUG] Enthalpy field values:" << std::endl;
     for (std::size_t i = 0; i < std::min(enthalpy_field.size(), size_t(20)); ++i) {
         std::cout << "[DEBUG] h[" << i << "] = " << enthalpy_field[i] << std::endl;
-    }
+    } */
     
     auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
     if (!result) {
@@ -534,7 +715,7 @@ auto BoundaryLayerSolver::check_convergence(
     return info;
 }
 
-/* auto BoundaryLayerSolver::create_initial_guess(
+auto BoundaryLayerSolver::create_initial_guess(
     int station,
     double xi,
     const conditions::BoundaryConditions& bc
@@ -569,9 +750,19 @@ auto BoundaryLayerSolver::check_convergence(
             guess.c(j, i) = c_wall_equilibrium[j]; 
         }
     }
+
+    std::cout << "Verification IG : " << std::endl;
+    std::cout << "Verification IG F[100]: " << guess.F[10] << std::endl;
+    std::cout << "Verification IG g[100]: " << guess.g[10] << std::endl;
+    std::cout << "Verification IG c_100_0: " << guess.c(0,10) << std::endl;
+    std::cout << "Verification IG c_100_1: " << guess.c(1,10) << std::endl;
+    std::cout << "Verification IG c_100_2: " << guess.c(2,10) << std::endl;
+    std::cout << "Verification IG c_100_3: " << guess.c(3,10) << std::endl;
+    std::cout << "Verification IG c_100_4: " << guess.c(4,10) << std::endl;
+
     
     return guess;
-} */
+}
 
 /* auto BoundaryLayerSolver::create_initial_guess(
    int station,
@@ -787,7 +978,7 @@ auto BoundaryLayerSolver::check_convergence(
    return guess;
 } */
 
-auto BoundaryLayerSolver::create_initial_guess(
+/* auto BoundaryLayerSolver::create_initial_guess(
    int station,
    double xi,
    const conditions::BoundaryConditions& bc
@@ -839,7 +1030,7 @@ auto BoundaryLayerSolver::create_initial_guess(
    }
 
    return guess;
-}
+} */
 
 
 auto BoundaryLayerSolver::extrapolate_from_previous(
@@ -907,9 +1098,15 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
     auto relaxed = new_solution;
     
     const double alpha_F = base_factor;         
-    const double alpha_g = base_factor * 0.8;     
-    const double alpha_c = base_factor * 0.8;     
-    const double alpha_T = base_factor * 0.9;   
+    const double alpha_g = base_factor * 1;     
+    const double alpha_c = base_factor * 1;     
+    const double alpha_T = base_factor * 1;  
+    
+/*     std::cout << "Fractions dans relaxation c_19_0: " << new_solution.c(0,19) << std::endl;
+    std::cout << "Fractions dans relaxation c_19_1: " << new_solution.c(1,19) << std::endl;
+    std::cout << "Fractions dans relaxation c_19_2: " << new_solution.c(2,19) << std::endl;
+    std::cout << "Fractions dans relaxation c_19_3: " << new_solution.c(3,19) << std::endl;
+    std::cout << "Fractions dans relaxation c_19_4: " << new_solution.c(4,19) << std::endl; */
     
     for (std::size_t i = 0; i < relaxed.F.size() - 1; ++i) {
         relaxed.F[i] = (1.0 - alpha_F) * old_solution.F[i] + alpha_F * new_solution.F[i];
@@ -922,7 +1119,9 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
             relaxed.c(i, j) = (1.0 - alpha_c) * old_solution.c(i, j) + alpha_c * new_solution.c(i, j);
         }
     }
-    
+
+
+
     return relaxed;
 }
 
@@ -976,6 +1175,22 @@ auto BoundaryLayerSolver::compute_eta_derivatives(
             derivatives.c(j, i) = dc_deta[i];
         }
     }
+
+    const std::array<std::size_t, 3> indices_to_print{0, 10, 19};
+
+/*     std::cout << "\n=== Derivatives at selected eta points ===\n";
+    for (auto idx : indices_to_print) {
+        std::cout << "eta[" << idx << "]: ";
+        std::cout << "dF/deta = " << derivatives.F[idx] << ", ";
+        std::cout << "dg/deta = " << derivatives.g[idx] << ", ";
+        std::cout << "dV/deta = " << derivatives.V[idx] << "\n";
+        
+        for (std::size_t j = 0; j < n_species; ++j) {
+            std::cout << "  dc[" << j << "]/deta = " << derivatives.c(j, idx) << "\n";
+        }
+        std::cout << "------------------------------------------\n";
+    } */
+
     
     return derivatives;
 }

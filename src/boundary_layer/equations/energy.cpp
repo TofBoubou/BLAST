@@ -160,6 +160,20 @@ auto build_energy_coefficients(
         
         energy_coeffs.d.push_back(d_term);
     }
+
+    const std::array<std::size_t, 3> indices_to_print{0, 10, 19};
+
+    std::cout << "\n=== Energy Coefficients at selected eta points ===\n";
+    for (auto idx : indices_to_print) {
+        if (idx >= n_eta) continue; // Sécurité si n_eta < 20
+        std::cout << "eta[" << idx << "]: "
+                  << "a = " << energy_coeffs.a[idx] << ", "
+                  << "b = " << energy_coeffs.b[idx] << ", "
+                  << "c = " << energy_coeffs.c[idx] << ", "
+                  << "d = " << energy_coeffs.d[idx] << "\n";
+    }
+    std::cout << "----------------------------------------------\n";
+
     
     return energy_coeffs;
 }
@@ -172,6 +186,8 @@ auto build_energy_boundary_conditions(
     int station,
     PhysicalQuantity auto d_eta
 ) -> EnergyBoundaryConditions {
+
+    std::cout << "coeffs.thermodynamic.h_wall " << coeffs.thermodynamic.h_wall << std::endl;
     
         return EnergyBoundaryConditions{
             .f_bc = 0.0,

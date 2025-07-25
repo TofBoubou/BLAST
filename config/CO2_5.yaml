@@ -8,8 +8,8 @@ simulation:
 numerical:
   n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-6    
-  max_iterations: 500000
+  convergence_tolerance: 1.0e-12    
+  max_iterations: 2
   under_relaxation: 1
   step_control:
     lower_bound: 5
@@ -45,10 +45,10 @@ outer_edge:
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429
-  freestream_velocity: 5000000
+  freestream_velocity: 500000
 
 wall_parameters:
-  temperatures: [2100]
+  temperatures: [3100]
 
 # ./blast config/default.yaml test_output
 # python3 scripts/postprocess_blast.py --input test_outputs/test_output_20250713_232651.h5 --plots all --output results_h5

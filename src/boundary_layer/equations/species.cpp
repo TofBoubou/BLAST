@@ -106,6 +106,8 @@ auto compute_equilibrium_composition(
     const auto n_species = mixture.n_species();
     
     core::Matrix<double> c_equilibrium(n_species, n_eta);
+    std::cout << "Pressure dans l'équilibre chimique : " << pressure << std::endl;
+    std::cout << "Temperature dans l'équilibre chimique : " << temperature_field[19] << std::endl;
     
     for (std::size_t i = 0; i < n_eta; ++i) {
         auto eq_result = mixture.equilibrium_composition(temperature_field[i], pressure);
@@ -121,6 +123,12 @@ auto compute_equilibrium_composition(
             c_equilibrium(j, i) = eq_composition[j];
         }
     }
+
+/*     std::cout << "Fractions dans equilibre chimique c_19_0: " << c_equilibrium(0,19) << std::endl;
+    std::cout << "Fractions dans equilibre chimique c_19_1: " << c_equilibrium(1,19) << std::endl;
+    std::cout << "Fractions dans equilibre chimique c_19_2: " << c_equilibrium(2,19) << std::endl;
+    std::cout << "Fractions dans equilibre chimique c_19_3: " << c_equilibrium(3,19) << std::endl;
+    std::cout << "Fractions dans equilibre chimique c_19_4: " << c_equilibrium(4,19) << std::endl; */
     
     return c_equilibrium;
 }

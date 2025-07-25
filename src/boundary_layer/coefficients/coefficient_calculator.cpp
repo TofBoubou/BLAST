@@ -229,6 +229,8 @@ auto CoefficientCalculator::calculate_transport_coefficients(
     TransportCoefficients transport;
     transport.l0.reserve(n_eta);
     transport.l3.reserve(n_eta);
+
+    std::cout << "Concentration à l'edge : " << inputs.c(0, 19) << " " << inputs.c(1, 19) << " "  << inputs.c(2, 19) << " " << inputs.c(3, 19) << " " << inputs.c(4, 19) << std::endl; 
     
     for (std::size_t i = 0; i < n_eta; ++i) {
         // Extract local composition
@@ -236,11 +238,24 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         for (std::size_t j = 0; j < n_species; ++j) {
             c_local[j] = inputs.c(j, i);
         }
+
+        std::vector<double> c_local_e(n_species);
+        for (std::size_t j = 0; j < n_species; ++j) {
+            c_local_e[j] = inputs.c(j, n_eta - 1);
+        }
         
         const double P_edge = bc.P_e();
+
+        const double rho_e_calculated = bc.P_e() * thermo.MW[n_eta - 1] / 
+                            (inputs.T[n_eta - 1] * thermophysics::constants::R_universal);
+
+/*         std::cout << "bc.P_e() : " << bc.P_e() << std::endl;
+        std::cout << "thermo.MW[n_eta - 1] : " << thermo.MW[n_eta - 1] << std::endl; */
+        // std::cout << "Température pour l'edge : " << inputs.T[n_eta - 1] << std::endl;
         
         // Get transport properties
         auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_edge);
+        auto mu_result_e = mixture_.viscosity(c_local_e, inputs.T[n_eta - 1], P_edge);
         auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i], P_edge);
         auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], P_edge);
         
@@ -251,6 +266,7 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         }
         
         const double mu = mu_result.value();
+        const double mu_e = mu_result_e.value();
         const double Cp = cp_result.value();
         const double k_fr = k_result.value();
         
@@ -266,12 +282,19 @@ auto CoefficientCalculator::calculate_transport_coefficients(
             return std::unexpected(CoefficientError("Invalid edge conditions: rho_e or mu_e <= 0"));
         }
         
-        double l0_value = thermo.rho[i] * mu / (bc.rho_e() * bc.mu_e());
+        double l0_value = thermo.rho[i] * mu / (rho_e_calculated * mu_e);
         transport.l0.push_back(l0_value);
-        // std::cout << std::scientific << "DEBUG: l0[" << i << "] = " << l0_value << std::endl;
-/*         std::cout << std::scientific << "mu = " <<  mu << ". mu_e = " << bc.mu_e() << std::endl;
-        std::cout << std::scientific << "rho[i] = " <<  thermo.rho[i] << ". rho_e = " << bc.rho_e() << std::endl; */
         transport.l3.push_back(transport.l0[i] / Pr);
+
+/*         std::cout << "--------------------------------------------------------" << std::endl;
+        std::cout << std::scientific << "DEBUG: l0[" << i << "] = " << l0_value << std::endl;
+        std::cout << std::scientific << "DEBUG: l3[" << i << "] = " << transport.l3[i] << std::endl;
+        // std::cout << std::scientific << "mu = " <<  mu << ". mu_e = " << bc.mu_e() << std::endl;
+        std::cout << std::scientific << "mu = " <<  mu << ". mu_e après calcul = " << mu_e << std::endl;
+        // std::cout << std::scientific << "rho[i] = " <<  thermo.rho[i] << ". rho_e = " << bc.rho_e() << std::endl;
+        std::cout << std::scientific << "rho[i] = " <<  thermo.rho[i] << ". rho_e après calcul = " << rho_e_calculated << std::endl;
+        std::cout << std::scientific << "Pr = " <<  Pr << std::endl;
+        std::cout << "--------------------------------------------------------" << std::endl; */
     }
     
     // Compute derivatives

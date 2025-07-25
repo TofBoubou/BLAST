@@ -26,27 +26,27 @@ class AdaptiveRelaxationController {
 public:
     // Configuration parameters
     struct Config {
-        double initial_factor = 0.01;         // Conservative initial factor
+        double initial_factor = 1;         // Conservative initial factor
         double min_factor = 0.00001;          // Absolute minimum
-        double max_factor = 1.0;             // Reasonable maximum
+        double max_factor = 1;             // Reasonable maximum
         
         // Thresholds based on your logic
-        double excellent_threshold = 0.8;    // Threshold for excellent convergence (< 0.8)
-        double divergence_threshold = 1.00001;   // Threshold for divergence (> 1.0)
+        double excellent_threshold = 1;    // Threshold for excellent convergence (< 0.8)
+        double divergence_threshold = 1;   // Threshold for divergence (> 1.0)
         
         // Adaptation factors
-        double strong_increase = 1.1;        // Strong increase for ratio < 0.8 
-        double moderate_increase = 1.05;     // Moderate increase for [0.8, 1.0] 
-        double decrease_factor = 0.5;        // Decrease for ratio > X
-        double oscillation_penalty = 0.7;    // Penalty factor for oscillations 
+        double strong_increase = 1;        // Strong increase for ratio < 0.8 
+        double moderate_increase = 1;     // Moderate increase for [0.8, 1.0] 
+        double decrease_factor = 1;        // Decrease for ratio > X
+        double oscillation_penalty = 1;    // Penalty factor for oscillations 
         
         // Specialized configurations
         [[nodiscard]] static auto for_stagnation_point() -> Config {
             Config config;
-            config.initial_factor = 0.0001;
-            config.max_factor = 0.8;         // More conservative
-            config.strong_increase = 1.05;   // Slower growth 
-            config.moderate_increase = 1.02; // Very moderate 
+            config.initial_factor = 1;
+            config.max_factor = 1;         // More conservative
+            config.strong_increase = 1;   // Slower growth 
+            config.moderate_increase = 1; // Very moderate 
             return config;
         }
         

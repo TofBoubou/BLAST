@@ -11,7 +11,7 @@ void XiDerivatives::update_station(int station, double xi,
                                   const core::Matrix<double>& c) {
     station_ = station;
     
-    if (station == 0) {
+    if (station == 1) {
     // Stagnation point
     xi_minus_1_ = xi_current_; 
     xi_current_ = xi;    

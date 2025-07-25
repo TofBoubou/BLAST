@@ -39,6 +39,7 @@ namespace {
                 return "Wilke";
             case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG:
             case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_LDLT:
+                return "Chapmann-Enskog_LDLT";
             case io::MixtureConfig::ViscosityAlgorithm::GuptaYos:
                 return "Chapmann-Enskog_CG";
         }
@@ -246,6 +247,7 @@ auto MutationMixture::mixture_enthalpy(
 ) const -> std::expected<double, ThermophysicsError> {
     
     if (auto state_result = set_state(mass_fractions, temperature, pressure); !state_result) {
+        std::cout << "AU REVOIR" << std::endl;
         return std::unexpected(state_result.error());
     }
     

@@ -90,17 +90,32 @@ auto build_momentum_coefficients(
     for (std::size_t i = 0; i < n_eta; ++i) {
         // a[i] = l0[i] / d_eta²
         coeffs_out.a.push_back(coeffs.transport.l0[i] / d_eta_sq);
+        std::cout << "---------------------------------------------------------------" << std::endl;
+        std::cout << "a dans momentum : " << coeffs_out.a[i] << std::endl;
         
         // b[i] = (dl0_deta[i] - V[i]) / d_eta 
         coeffs_out.b.push_back((coeffs.transport.dl0_deta[i] - V_field[i]) / d_eta);
-        
+        std::cout << "b dans momentum : " << coeffs_out.b[i] << std::endl;
+        std::cout << "coeffs.transport.dl0_deta : " << coeffs.transport.dl0_deta[i] << std::endl;
+        std::cout << "V_field : " << V_field[i] << std::endl;
+
         // c[i] = -2*xi*lambda0*F[i]
         coeffs_out.c.push_back(-2.0 * xi * lambda0 * F_previous[i]);
+        // std::cout << "c dans momentum : " << coeffs_out.c[i] << std::endl;
         
         // d[i] = -beta*(rho_e/rho[i] - F[i]^2) + 2*xi*F[i]*F_der[i]
         const double d_term = - bc.beta * (bc.rho_e() / coeffs.thermodynamic.rho[i] - F_previous[i] * F_previous[i]) + 
                              2.0 * xi * F_previous[i] * F_derivatives[i];
         coeffs_out.d.push_back(d_term);
+
+        const double d_term_si_linearisation = - bc.beta * (bc.rho_e() / coeffs.thermodynamic.rho[i]) + 
+                             2.0 * xi * F_previous[i] * F_derivatives[i];
+        
+
+
+        std::cout << bc.rho_e() << std::endl;
+        std::cout << std::scientific << "d dans momentum si linéarisation : " << d_term_si_linearisation << std::endl;
+        std::cout << "---------------------------------------------------------------" << std::endl;
     }
     
     return coeffs_out;

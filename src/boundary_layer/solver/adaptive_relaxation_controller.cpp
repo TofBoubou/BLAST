@@ -80,12 +80,14 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(
     
     // Extra conservative for initial iterations
     if (iteration < 5) {
-        current_factor_ = std::min(current_factor_, 0.3);
+        // current_factor_ = std::min(current_factor_, 0.3);
+        current_factor_ = 1;
     }
     
     // Safety constraint for extremely poor solutions
     if (current_residual > 1e2) {
-        current_factor_ = std::min(current_factor_, 0.1);
+        // current_factor_ = std::min(current_factor_, 0.1);
+        current_factor_ = 1;
     }
     
     previous_residual_ = current_residual;
