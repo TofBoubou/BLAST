@@ -824,6 +824,8 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::
     return derivatives;
 }
 
+
+
 template<std::ranges::sized_range Range>
 auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<double> {
     const auto n = std::ranges::size(values);
@@ -868,6 +870,9 @@ auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<
     
     return second_derivatives;
 }
+
+
+
 
 template<typename Matrix>
 auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) -> std::expected<Matrix, CoefficientError> {

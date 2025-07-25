@@ -434,6 +434,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             .T = solution.T
         };
 
+        
+
         // 4. Calculate coefficients
         auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
         if (!coeffs_result) {

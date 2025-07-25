@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <iomanip>
 
 namespace blast::boundary_layer::equations {
 
@@ -95,6 +96,7 @@ auto build_energy_coefficients(
         return std::unexpected(J_fact_result.error());
     }
     const double J_fact = J_fact_result.value();
+    // const double J_fact = 18.6545;
     
     EnergyCoefficients energy_coeffs;
     energy_coeffs.a.reserve(n_eta);
@@ -156,6 +158,15 @@ auto build_energy_coefficients(
             2.0 * xi * F_field[i] * g_derivatives[i] + 
             tmp1 + tmp2;
 
+/*         std::cout << "d_term = " 
+          << "-(" << bc.ue() << ")^2 / " << bc.he() << " * (" 
+          << coeffs.transport.l0[i] << " * " << dF_deta[i] << "^2 - " 
+          << bc.beta << " * " << bc.rho_e() << " / " << coeffs.thermodynamic.rho[i] 
+          << " * " << F_field[i] << ") + 2 * " << xi << " * " << F_field[i] 
+          << " * " << g_derivatives[i] << " + " << tmp1 << " + " << tmp2 
+          << " = " << d_term << std::endl; */
+
+
         // std::cout << " d[i] = " << d_term << '\n';
         
         energy_coeffs.d.push_back(d_term);
@@ -196,7 +207,7 @@ auto build_energy_boundary_conditions(
         };
 }
 
-auto compute_species_enthalpy_terms(
+/* auto compute_species_enthalpy_terms(
     const coefficients::CoefficientInputs& inputs,
     const coefficients::CoefficientSet& coeffs,
     const conditions::BoundaryConditions& bc,
@@ -231,6 +242,75 @@ auto compute_species_enthalpy_terms(
     
     // Apply multiplication factors
     tmp2 *= J_fact;
+
+    return {tmp1, tmp2};
+} */
+
+auto compute_species_enthalpy_terms(
+    const coefficients::CoefficientInputs& inputs,
+    const coefficients::CoefficientSet& coeffs,
+    const conditions::BoundaryConditions& bc,
+    double J_fact,
+    std::size_t eta_index
+) -> std::tuple<double, double> {
+
+    const auto n_species = inputs.c.rows();
+    double tmp1 = 0.0;
+    double tmp2 = 0.0;
+
+    std::cout << std::scientific << std::setprecision(6);
+    std::cout << "=== compute_species_enthalpy_terms @ eta_index = " << eta_index << " ===\n";
+
+    for (std::size_t j = 0; j < n_species; ++j) {
+
+        const double dc_deta_j      = inputs.dc_deta(j, eta_index);
+        const double dc_deta2_j     = inputs.dc_deta2(j, eta_index);
+        const double h_sp_j         = coeffs.h_species(j, eta_index);
+        const double dh_sp_deta_j   = coeffs.dh_species_deta(j, eta_index);
+        const double dl3_deta       = coeffs.transport.dl3_deta[eta_index];
+        const double l3             = coeffs.transport.l3[eta_index];
+
+        const double J_j            = coeffs.diffusion.J(j, eta_index);
+        const double dJ_deta_j      = coeffs.diffusion.dJ_deta(j, eta_index);
+
+        const double he             = bc.he();
+
+        const double contrib_tmp1 =
+              dc_deta_j * h_sp_j / he * dl3_deta +
+              l3 * h_sp_j / he * dc_deta2_j +
+              l3 * dc_deta_j * dh_sp_deta_j / he;
+
+        const double contrib_tmp2 =
+              J_j * dh_sp_deta_j / he +
+              dJ_deta_j * h_sp_j / he;
+
+        tmp1 += contrib_tmp1;
+        tmp2 += contrib_tmp2;
+
+/*         std::cout << "j = " << j
+                  << " | dc_deta = " << dc_deta_j
+                  << " | dc_deta2 = " << dc_deta2_j
+                  << " | h_sp = " << h_sp_j
+                  << " | dh_sp_deta = " << dh_sp_deta_j << "\n"; */
+
+        std::cout << "j = " << j << " | dc_deta = " << dc_deta_j << " | dc_deta2 = " << dc_deta2_j << "\n";
+
+/*         std::cout << "    l3 = " << l3
+                  << " | dl3_deta = " << dl3_deta
+                  << " | J = " << J_j
+                  << " | dJ_deta = " << dJ_deta_j
+                  << " | he = " << he << "\n"; */
+
+        std::cout << " | J = " << J_j
+                  << " | dJ_deta = " << dJ_deta_j << "\n";
+
+/*         std::cout << "    contrib_tmp1 = " << contrib_tmp1
+                  << " | contrib_tmp2 = " << contrib_tmp2 << "\n"; */
+    }
+
+    tmp2 *= J_fact;
+    std::cout << "Final tmp1 = " << tmp1 << " | Final tmp2 = " << tmp2
+              << " | (before J_fact: " << tmp2 / J_fact << ", J_fact = " << J_fact << ")\n";
 
     return {tmp1, tmp2};
 }
