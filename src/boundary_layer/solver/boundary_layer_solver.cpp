@@ -434,7 +434,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             .T = solution.T
         };
 
-        
+
 
         // 4. Calculate coefficients
         auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
@@ -1197,7 +1197,7 @@ auto BoundaryLayerSolver::compute_eta_derivatives(
     return derivatives;
 }
 
-auto BoundaryLayerSolver::compute_concentration_derivatives(
+/* auto BoundaryLayerSolver::compute_concentration_derivatives(
     const equations::SolutionState& solution
 ) const -> std::expected<DerivativeState, SolverError> {
     
@@ -1229,6 +1229,52 @@ auto BoundaryLayerSolver::compute_concentration_derivatives(
         
         // Compute second derivatives
         auto dc_deta2 = compute_eta_second_derivative(c_row, d_eta);
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            derivatives.dc_deta2(j, i) = dc_deta2[i];
+        }
+    }
+    
+    return derivatives;
+} */
+
+
+auto BoundaryLayerSolver::compute_concentration_derivatives(
+    const equations::SolutionState& solution
+) const -> std::expected<DerivativeState, SolverError> {
+    
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+    const double d_eta = grid_->d_eta();
+    
+    DerivativeState derivatives(n_species, n_eta);
+    
+    // Use cascaded approach: apply the same high-order scheme twice
+    using namespace coefficients::derivatives;
+    
+    for (std::size_t j = 0; j < n_species; ++j) {
+        std::vector<double> c_row(n_eta);
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            c_row[i] = solution.c(j, i);
+        }
+        
+        // Compute first derivatives
+        auto dc_deta_result = compute_eta_derivative(c_row, d_eta);
+        if (!dc_deta_result) {
+            return std::unexpected(SolverError("Failed to compute dc/deta for species {}: {}", 
+                                              std::source_location::current(), j, dc_deta_result.error().message()));
+        }
+        auto dc_deta = dc_deta_result.value();
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            derivatives.dc_deta(j, i) = dc_deta[i];
+        }
+        
+        // Compute second derivatives by applying the same scheme to first derivatives
+        auto dc_deta2_result = compute_eta_derivative(dc_deta, d_eta);
+        if (!dc_deta2_result) {
+            return std::unexpected(SolverError("Failed to compute dc/deta2 for species {}: {}", 
+                                              std::source_location::current(), j, dc_deta2_result.error().message()));
+        }
+        auto dc_deta2 = dc_deta2_result.value();
         for (std::size_t i = 0; i < n_eta; ++i) {
             derivatives.dc_deta2(j, i) = dc_deta2[i];
         }
