@@ -9,7 +9,7 @@ numerical:
   n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-6    
-  max_iterations: 2
+  max_iterations: 50000000
   under_relaxation: 1
   step_control:
     lower_bound: 5
@@ -51,4 +51,4 @@ wall_parameters:
   temperatures: [3100]
 
 # ./blast config/default.yaml test_output
-# python3 scripts/postprocess_blast.py --input test_outputs/test_output_20250713_232651.h5 --plots all --output results_h5
+# python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250713_232651.h5 --plots all --output results_h5

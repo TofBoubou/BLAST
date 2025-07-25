@@ -258,8 +258,8 @@ auto compute_species_enthalpy_terms(
     double tmp1 = 0.0;
     double tmp2 = 0.0;
 
-    std::cout << std::scientific << std::setprecision(6);
-    std::cout << "=== compute_species_enthalpy_terms @ eta_index = " << eta_index << " ===\n";
+    /* std::cout << std::scientific << std::setprecision(6);
+    std::cout << "=== compute_species_enthalpy_terms @ eta_index = " << eta_index << " ===\n"; */
 
     for (std::size_t j = 0; j < n_species; ++j) {
 
@@ -293,7 +293,7 @@ auto compute_species_enthalpy_terms(
                   << " | h_sp = " << h_sp_j
                   << " | dh_sp_deta = " << dh_sp_deta_j << "\n"; */
 
-        std::cout << "j = " << j << " | dc_deta = " << dc_deta_j << " | dc_deta2 = " << dc_deta2_j << "\n";
+        // std::cout << "j = " << j << " | dc_deta = " << dc_deta_j << " | dc_deta2 = " << dc_deta2_j << "\n";
 
 /*         std::cout << "    l3 = " << l3
                   << " | dl3_deta = " << dl3_deta
@@ -301,16 +301,16 @@ auto compute_species_enthalpy_terms(
                   << " | dJ_deta = " << dJ_deta_j
                   << " | he = " << he << "\n"; */
 
-        std::cout << " | J = " << J_j
-                  << " | dJ_deta = " << dJ_deta_j << "\n";
+/*         std::cout << " | J = " << J_j
+                  << " | dJ_deta = " << dJ_deta_j << "\n"; */
 
 /*         std::cout << "    contrib_tmp1 = " << contrib_tmp1
                   << " | contrib_tmp2 = " << contrib_tmp2 << "\n"; */
     }
 
     tmp2 *= J_fact;
-    std::cout << "Final tmp1 = " << tmp1 << " | Final tmp2 = " << tmp2
-              << " | (before J_fact: " << tmp2 / J_fact << ", J_fact = " << J_fact << ")\n";
+/*     std::cout << "Final tmp1 = " << tmp1 << " | Final tmp2 = " << tmp2
+              << " | (before J_fact: " << tmp2 / J_fact << ", J_fact = " << J_fact << ")\n"; */
 
     return {tmp1, tmp2};
 }

@@ -67,7 +67,7 @@ auto calculate_stefan_maxwell_at_point(
     const double sum_c = std::accumulate(c.begin(), c.end(), 0.0);
 
     
-    std::cout << "[DEBUG] Coefficients à eta = 0" << std::endl;
+/*     std::cout << "[DEBUG] Coefficients à eta = 0" << std::endl;
 
     for (std::size_t i = 0; i < n_species; ++i) {
         const double MW_i = mixture.species_molecular_weight(i);
@@ -90,7 +90,7 @@ auto calculate_stefan_maxwell_at_point(
     std::cout << "  P                = " << std::scientific << P << std::endl;
     std::cout << "  der_fact         = " << std::scientific << der_fact << std::endl;
     std::cout << "  full_der_fact    = " << std::scientific << der_fact * rho << std::endl;
-    std::cout << "  sum_c            = " << std::scientific << sum_c << std::endl;
+    std::cout << "  sum_c            = " << std::scientific << sum_c << std::endl; */
     
     // Use Eigen through the wrapper
     auto& D_bin = D_bin_local.eigen();
@@ -170,6 +170,7 @@ auto calculate_stefan_maxwell_at_point(
 }
 
 } // anonymous namespace
+
 
 auto compute_stefan_maxwell_fluxes(
     const CoefficientInputs& inputs,
@@ -262,14 +263,32 @@ auto compute_stefan_maxwell_fluxes(
     
     // Compute eta derivatives of fluxes
     for (std::size_t j = 0; j < n_species; ++j) {
-        auto J_row = J.eigen().row(j);
-        auto dJ_result = derivatives::compute_eta_derivative(
-            std::span(J_row.data(), n_eta), d_eta
-        );
+        
+        // Copy row data to contiguous vector
+        std::vector<double> J_species_data(n_eta);
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            J_species_data[i] = J(j, i);  // Direct access to matrix
+        }
+        
+        // DEBUG: Verify the copied data
+/*         std::cout << "[DEBUG] Copied J data for species " << j << ": ";
+        for (std::size_t i = 0; i < std::min(n_eta, std::size_t(5)); ++i) {
+            std::cout << std::scientific << J_species_data[i] << " ";
+        }
+        std::cout << std::endl; */
+        
+        auto dJ_result = derivatives::compute_eta_derivative(J_species_data, d_eta);
         if (!dJ_result) {
             return std::unexpected(CoefficientError("Failed to compute diffusion flux derivative"));
         }
         auto dJ = dJ_result.value();
+        
+        // DEBUG: Print first few derivatives
+/*         std::cout << "[DEBUG] Computed derivatives for species " << j << ": ";
+        for (std::size_t i = 0; i < std::min(n_eta, std::size_t(5)); ++i) {
+            std::cout << std::scientific << dJ[i] << " ";
+        }
+        std::cout << std::endl; */
         
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_deta(j, i) = dJ[i];

@@ -434,6 +434,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             .T = solution.T
         };
 
+        update_edge_properties(bc_dynamic, inputs, solution.c);
+
 
 
         // 4. Calculate coefficients
@@ -463,7 +465,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         // 7. Skip (T update déjà fait au début)
 
         // 8. Update edge properties
-        update_edge_properties(bc_dynamic, inputs, solution.c);
+        // update_edge_properties(bc_dynamic, inputs, solution.c);
 
 /*         // 9. Recalculate coefficients
         auto coeffs_updated_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
@@ -1113,7 +1115,7 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
     for (std::size_t i = 0; i < relaxed.F.size() - 1; ++i) {
         relaxed.F[i] = (1.0 - alpha_F) * old_solution.F[i] + alpha_F * new_solution.F[i];
         relaxed.g[i] = (1.0 - alpha_g) * old_solution.g[i] + alpha_g * new_solution.g[i];
-        relaxed.T[i] = (1.0 - alpha_T) * old_solution.T[i] + alpha_T * new_solution.T[i];
+        // relaxed.T[i] = (1.0 - alpha_T) * old_solution.T[i] + alpha_T * new_solution.T[i];
     }
     
     for (std::size_t i = 0; i < relaxed.c.rows(); ++i) {
@@ -1122,6 +1124,11 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
         }
     }
 
+/*     std::cout << "---------------------------------------" << std::endl;
+    std::cout << "alpha_g dans la relaxation : " << alpha_g << std::endl;
+    std::cout << "g_old[0] dans la relaxation : " << old_solution.g[0] << std::endl;
+    std::cout << "g[0] dans la relaxation : " << relaxed.g[0] << std::endl;
+    std::cout << "---------------------------------------" << std::endl; */
 
 
     return relaxed;
@@ -1368,6 +1375,10 @@ auto BoundaryLayerSolver::update_edge_properties(
     // Update boundary conditions with new values
     bc.update_edge_density(rho_e_new);
     bc.update_edge_viscosity(mu_e_new);
+    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << "rho_e_new : " << rho_e_new << std::endl;
+    std::cout << "mu_e_new : " << mu_e_new << std::endl;
+    std::cout << "--------------------------------------------------------" << std::endl;
 }
 
 } // namespace blast::boundary_layer::solver
