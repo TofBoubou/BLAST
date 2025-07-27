@@ -24,6 +24,7 @@ constexpr auto compute_derivative_factor(
     // Stagnation point limiting solution
     switch (sim_config.body_type) {
         case io::SimulationConfig::BodyType::Axisymmetric:
+            std::cout << "[AXI] d_ue_dx=" << bc.d_ue_dx() << " rho_e=" << bc.rho_e() << " mu_e=" << bc.mu_e() << " -> " << std::sqrt(2.0 * bc.d_ue_dx() / (bc.rho_e() * bc.mu_e())) << "\n";
             return std::sqrt(2.0 * bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()));
         case io::SimulationConfig::BodyType::TwoD:
             return std::sqrt(bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()));

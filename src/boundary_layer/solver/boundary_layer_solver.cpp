@@ -381,6 +381,13 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         std::cout << "Fractions dans resolution c_19_2: " << solution.c(2,19) << std::endl;
         std::cout << "Fractions dans resolution c_19_3: " << solution.c(3,19) << std::endl;
         std::cout << "Fractions dans resolution c_19_4: " << solution.c(4,19) << std::endl;
+
+        double sum_c19 = 0.0;
+        for (int j = 0; j < 5; ++j) {
+            sum_c19 += solution.c(j, 19);
+        }
+        std::cout << "Somme des fractions massiques au point 19 : " << sum_c19 << std::endl;
+
         std::cout << "Température dans la boucle for au point 10: " << solution.T[10] << std::endl;
         std::cout << "------------------------------------" << std::endl;
 
@@ -434,11 +441,13 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             .T = solution.T
         };
 
+        std::cout << "JUSTE AVANT UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl;
         update_edge_properties(bc_dynamic, inputs, solution.c);
-
+        std::cout << "JUSTE APRES UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl;
 
 
         // 4. Calculate coefficients
+        std::cout << "JUSTE AVANT coeff_calculator_ ---------------------------------------" << std::endl;
         auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
         if (!coeffs_result) {
             return std::unexpected(SolverError(
@@ -447,6 +456,11 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             ));
         }
         auto coeffs = coeffs_result.value();
+        std::cout << "JUSTE APRES coeff_calculator_ ---------------------------------------" << std::endl;
+
+/*         std::cout << "JUSTE AVANT UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl;
+        update_edge_properties(bc_dynamic, inputs, solution.c);
+        std::cout << "JUSTE APRES UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl; */
 
         // 5. Solve momentum equation
         auto F_result = solve_momentum_equation(solution, coeffs, bc_dynamic, xi);
@@ -481,6 +495,12 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         }
         auto c_new = c_result.value();
 
+        std::cout << "Fractions tout juste après le calcul c_10_0: " << c_new(0,10) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_10_1: " << c_new(1,10) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_10_2: " << c_new(2,10) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_10_3: " << c_new(3,10) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_10_4: " << c_new(4,10) << std::endl;
+
 /*         std::cout << "Fractions tout juste après le calcul c_19_0: " << c_new(0,19) << std::endl;
         std::cout << "Fractions tout juste après le calcul c_19_1: " << c_new(1,19) << std::endl;
         std::cout << "Fractions tout juste après le calcul c_19_2: " << c_new(2,19) << std::endl;
@@ -496,7 +516,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         solution_new.T = solution.T;
 
         // 11.5. Enforce BC
-        // enforce_edge_boundary_conditions(solution_new, bc_dynamic);
+        enforce_edge_boundary_conditions(solution_new, bc_dynamic);
 
         // 12. Check convergence
         conv_info = check_convergence(solution_old, solution_new);
@@ -1302,9 +1322,8 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     
     const std::size_t edge_idx = n_eta - 1;  // Last eta point is the edge
     
-    // Force species composition at edge only
-    
-    // Force species composition at edge
+    // Use dynamic edge composition (updated by update_edge_properties)
+    // The edge composition is now calculated from equilibrium conditions
     const auto& edge_composition = bc.c_e();
     for (std::size_t j = 0; j < n_species && j < edge_composition.size(); ++j) {
         solution.c(j, edge_idx) = edge_composition[j];
@@ -1330,7 +1349,7 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     }
 }
 
-auto BoundaryLayerSolver::update_edge_properties(
+/* auto BoundaryLayerSolver::update_edge_properties(
     conditions::BoundaryConditions& bc,
     const coefficients::CoefficientInputs& inputs,
     const core::Matrix<double>& species_matrix
@@ -1363,8 +1382,154 @@ auto BoundaryLayerSolver::update_edge_properties(
     const double MW_edge = MW_result.value();
     const double rho_e_new = P_edge * MW_edge / 
                             (T_edge * thermophysics::constants::R_universal);
+
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "Edge composition dans update_edge_properties : " << edge_composition[0] << " " << edge_composition[1] << " " << edge_composition[2] << " " << edge_composition[3] << " " << edge_composition[4] << " " << rho_e_new << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+
+    auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);
     
-    // Calculate new edge viscosity using mixture properties
+    if (!mu_result) {
+        throw SolverError("Failed to compute edge viscosity: {}", 
+                         std::source_location::current(), mu_result.error().message());
+    }
+    const double mu_e_new = mu_result.value();
+    
+    bc.update_edge_viscosity(mu_e_new);
+    bc.update_edge_density(rho_e_new);
+    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << "rho_e_new : " << rho_e_new << std::endl;
+    std::cout << "mu_e_new : " << mu_e_new << std::endl;
+    std::cout << "--------------------------------------------------------" << std::endl;
+} */
+
+/* auto BoundaryLayerSolver::update_edge_properties(
+    conditions::BoundaryConditions& bc,
+    const coefficients::CoefficientInputs& inputs,
+    const core::Matrix<double>& species_matrix
+) const -> void {
+    
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+    
+    if (n_eta == 0 || inputs.T.empty()) {
+        return; // No data to update
+    }
+    
+    // Get edge conditions (last point in eta grid)
+    const auto edge_idx = n_eta - 1;
+    const double T_edge = inputs.T[edge_idx];
+    const double P_edge = bc.P_e(); // Pressure remains constant
+    
+    // Get edge composition
+    std::vector<double> edge_composition(n_species);
+    for (std::size_t j = 0; j < n_species; ++j) {
+        edge_composition[j] = species_matrix(j, edge_idx);
+    }
+
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "Edge composition dans update_edge_properties : " << edge_composition[0] << " " << edge_composition[1] << " " << edge_composition[2] << " " << edge_composition[3] << " " << edge_composition[4] << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+
+    
+    // Calculate new edge density using equation of state
+    auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
+    if (!MW_result) {
+        throw SolverError("Failed to compute edge molecular weight: {}", 
+                         std::source_location::current(), MW_result.error().message());
+    }
+    const double MW_edge = MW_result.value();
+    const double rho_e_new = P_edge * MW_edge / 
+                            (T_edge * thermophysics::constants::R_universal);
+    
+    // Calculate equilibrium composition at edge conditions
+    auto eq_result = mixture_.equilibrium_composition(T_edge, P_edge);
+    if (!eq_result) {
+        throw SolverError("Failed to compute edge equilibrium composition: {}", 
+                         std::source_location::current(), eq_result.error().message());
+    }
+    auto edge_composition_eq = eq_result.value();
+    
+    // Calculate new edge viscosity using equilibrium composition
+    auto mu_result = mixture_.viscosity(edge_composition_eq, T_edge, P_edge);
+    if (!mu_result) {
+        throw SolverError("Failed to compute edge viscosity: {}", 
+                         std::source_location::current(), mu_result.error().message());
+    }
+    const double mu_e_new = mu_result.value();
+    
+    // Recalculate edge density with equilibrium composition
+    auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition_eq);
+    if (!MW_eq_result) {
+        throw SolverError("Failed to compute equilibrium edge molecular weight: {}", 
+                         std::source_location::current(), MW_eq_result.error().message());
+    }
+    const double MW_edge_eq = MW_eq_result.value();
+    const double rho_e_new_eq = P_edge * MW_edge_eq / 
+                               (T_edge * thermophysics::constants::R_universal);
+
+    std::cout << "Pression temperature et MW à l'edge dans enforce : " << P_edge << " " << MW_edge_eq << " " << MW_edge_eq << " " << T_edge << std::endl;
+    
+    // Update boundary conditions with new equilibrium values
+    bc.update_edge_density(rho_e_new_eq);
+    bc.update_edge_viscosity(mu_e_new);
+    bc.edge.species_fractions = edge_composition_eq;
+    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << std::scientific << std::setprecision(15)
+          << "rho_e_new_eq : " << rho_e_new_eq << " " << rho_e_new << std::endl;
+    std::cout << "mu_e_new : " << mu_e_new << std::endl;
+    std::cout << "--------------------------------------------------------" << std::endl;
+} */
+
+
+auto BoundaryLayerSolver::update_edge_properties(
+    conditions::BoundaryConditions& bc,
+    const coefficients::CoefficientInputs& inputs,
+    const core::Matrix<double>& species_matrix
+) const -> void {
+    
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+    
+    if (n_eta == 0 || inputs.T.empty()) {
+        return; // No data to update
+    }
+    
+    // Get edge conditions (last point in eta grid)
+    const auto edge_idx = n_eta - 1;
+    const double T_edge = inputs.T[edge_idx];
+    const double P_edge = bc.P_e(); // Pressure remains constant
+    
+    // Get edge composition
+    std::vector<double> edge_composition(n_species);
+    for (std::size_t j = 0; j < n_species; ++j) {
+        edge_composition[j] = species_matrix(j, edge_idx);
+    }
+
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "Edge composition dans update_edge_properties : " << edge_composition[0] << " " << edge_composition[1] << " " << edge_composition[2] << " " << edge_composition[3] << " " << edge_composition[4] << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+
+    
+    // Calculate new edge density using equation of state
+    auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
+    if (!MW_result) {
+        throw SolverError("Failed to compute edge molecular weight: {}", 
+                         std::source_location::current(), MW_result.error().message());
+    }
+    const double MW_edge = MW_result.value();
+    const double rho_e_new = P_edge * MW_edge / 
+                            (T_edge * thermophysics::constants::R_universal);
+    
+    // Calculate equilibrium composition at edge conditions
+    auto eq_result = mixture_.equilibrium_composition(T_edge, P_edge);
+    if (!eq_result) {
+        throw SolverError("Failed to compute edge equilibrium composition: {}", 
+                         std::source_location::current(), eq_result.error().message());
+    }
+    auto edge_composition_eq = eq_result.value();
+    
+    // Calculate new edge viscosity using equilibrium composition
     auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);
     if (!mu_result) {
         throw SolverError("Failed to compute edge viscosity: {}", 
@@ -1372,11 +1537,25 @@ auto BoundaryLayerSolver::update_edge_properties(
     }
     const double mu_e_new = mu_result.value();
     
-    // Update boundary conditions with new values
+    // Recalculate edge density with equilibrium composition
+    auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition_eq);
+    if (!MW_eq_result) {
+        throw SolverError("Failed to compute equilibrium edge molecular weight: {}", 
+                         std::source_location::current(), MW_eq_result.error().message());
+    }
+    const double MW_edge_eq = MW_eq_result.value();
+    const double rho_e_new_eq = P_edge * MW_edge_eq / 
+                               (T_edge * thermophysics::constants::R_universal);
+
+    std::cout << "Pression temperature et MW à l'edge dans enforce : " << P_edge << " " << MW_edge_eq << " " << MW_edge_eq << " " << T_edge << std::endl;
+    
+    // Update boundary conditions with new equilibrium values
     bc.update_edge_density(rho_e_new);
     bc.update_edge_viscosity(mu_e_new);
+    bc.edge.species_fractions = edge_composition_eq;
     std::cout << "--------------------------------------------------------" << std::endl;
-    std::cout << "rho_e_new : " << rho_e_new << std::endl;
+    std::cout << std::scientific << std::setprecision(15)
+          << "rho_e_new_eq : " << rho_e_new_eq << " " << rho_e_new << std::endl;
     std::cout << "mu_e_new : " << mu_e_new << std::endl;
     std::cout << "--------------------------------------------------------" << std::endl;
 }

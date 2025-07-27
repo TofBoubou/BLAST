@@ -131,11 +131,13 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
     // DEBUG: Print mass fractions sum details
 /*     std::cout << "[DEBUG] mutation_mixture.cpp:127 - Mass fractions sum: " << sum 
               << " (difference from 1.0: " << std::abs(sum - 1.0) << ")" << std::endl;
-    std::cout << "[DEBUG] Individual fractions: "; */
-/*     for (size_t i = 0; i < fractions.size(); ++i) {
+    std::cout << "[DEBUG] Individual fractions: ";
+    for (size_t i = 0; i < fractions.size(); ++i) {
         std::cout << fractions[i] << " ";
     }
     std::cout << std::endl; */
+
+    // std::cout << "SOMME : " << sum << std::endl;
     
     if (std::abs(sum - 1.0) > tolerance) {
         return std::unexpected(ThermophysicsError(
@@ -216,6 +218,7 @@ auto MutationMixture::set_state(
 ) const -> std::expected<void, ThermophysicsError> {
     
     if (auto validation = validate_composition(mass_fractions); !validation) {
+        // std::cout << "BONJOUR A TOUS" << std::endl;
         return std::unexpected(validation.error());
     }
     
@@ -247,7 +250,7 @@ auto MutationMixture::mixture_enthalpy(
 ) const -> std::expected<double, ThermophysicsError> {
     
     if (auto state_result = set_state(mass_fractions, temperature, pressure); !state_result) {
-        std::cout << "AU REVOIR" << std::endl;
+        // std::cout << "AU REVOIR" << std::endl;
         return std::unexpected(state_result.error());
     }
     

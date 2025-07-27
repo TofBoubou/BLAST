@@ -81,7 +81,7 @@ auto solve_species(
     }
     
     // Debug: afficher l'état des fractions massiques à chaque eta
-    std::cout << "\n=== DEBUG SOLVE_SPECIES - Station " << station << " ===\n";
+/*     std::cout << "\n=== DEBUG SOLVE_SPECIES - Station " << station << " ===\n";
     for (std::size_t i = 0; i < n_eta; ++i) {
         std::cout << "eta[" << i << "]: ";
         double sum = 0.0;
@@ -91,7 +91,7 @@ auto solve_species(
         }
         std::cout << std::format("(sum={:.6e})\n", sum);
     }
-    std::cout << "=========================================\n\n";
+    std::cout << "=========================================\n\n"; */
     
     return result;
 }
@@ -305,13 +305,26 @@ auto build_species_coefficients(
         for (std::size_t j = 0; j < n_species; ++j) {
             
             // a[i][j] = -l0[i]*Le/Pr / d_eta²
-            species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr / d_eta_sq;
+/*             species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr / d_eta_sq;
             
             // b[i][j] = (V[i] - Le/Pr*dl0_deta[i]) / d_eta
             species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i]) / d_eta;
             
             // c[i][j] = 2*xi*F[i]*lambda0
+            species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0; */
+
+/*             std::cout << "-------------------------------------------------------------------" << std::endl;
+            std::cout << "COEF DANS SPECIES : " << std::endl; */
+
+            species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr / d_eta_sq;
+            // std::cout << "[i=" << i << "][j=" << j << "] a = " << std::scientific << species_coeffs.a(i, j) << std::endl;
+
+            species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i]) / d_eta;
+            // std::cout << "[i=" << i << "][j=" << j << "] b = " << std::scientific << species_coeffs.b(i, j) << std::endl;
+
             species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0;
+            // std::cout << "[i=" << i << "][j=" << j << "] c = " << std::scientific << species_coeffs.c(i, j) << std::endl;
+            // std::cout << "-------------------------------------------------------------------" << std::endl;
             
             // d[i][j] = -dJ_fake_deta[j][i] - dJ_deta[j][i]*J_fact - 2*xi*c_der[j][i]*F[i]
             const double d_term = 
@@ -322,6 +335,8 @@ auto build_species_coefficients(
             const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
 
             species_coeffs.d(i, j) = d_term + wi_term;
+/*             std::cout << "[i=" << i << "][j=" << j << "] d = " << std::scientific << species_coeffs.d(i, j) << std::endl;
+            std::cout << "-------------------------------------------------------------------" << std::endl; */
         }
     }
     

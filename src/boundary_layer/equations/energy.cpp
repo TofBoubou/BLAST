@@ -174,7 +174,7 @@ auto build_energy_coefficients(
 
     const std::array<std::size_t, 3> indices_to_print{0, 10, 19};
 
-    std::cout << "\n=== Energy Coefficients at selected eta points ===\n";
+/*     std::cout << "\n=== Energy Coefficients at selected eta points ===\n";
     for (auto idx : indices_to_print) {
         if (idx >= n_eta) continue; // Sécurité si n_eta < 20
         std::cout << "eta[" << idx << "]: "
@@ -183,7 +183,7 @@ auto build_energy_coefficients(
                   << "c = " << energy_coeffs.c[idx] << ", "
                   << "d = " << energy_coeffs.d[idx] << "\n";
     }
-    std::cout << "----------------------------------------------\n";
+    std::cout << "----------------------------------------------\n"; */
 
     
     return energy_coeffs;
@@ -299,8 +299,8 @@ auto compute_species_enthalpy_terms(
                   << " | dl3_deta = " << dl3_deta
                   << " | J = " << J_j
                   << " | dJ_deta = " << dJ_deta_j
-                  << " | he = " << he << "\n"; */
-
+                  << " | he = " << he << "\n";
+ */
 /*         std::cout << " | J = " << J_j
                   << " | dJ_deta = " << dJ_deta_j << "\n"; */
 

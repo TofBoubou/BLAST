@@ -559,10 +559,11 @@ auto EnthalpyTemperatureSolver::solve(
 
         result.temperatures[i] = *temp_result;  // T[i] = get_temp(c_temp, h, P, T[i]);
 
-        std::cout << "T[" << i << "] : " << result.temperatures[i] << std::endl;
+        // std::cout << "T[" << i << "] : " << result.temperatures[i] << std::endl;
+        // std::cout << "POUR VOIR" << std::endl;
     }
 
-    std::cout << "Terminer T[19] : " << result.temperatures[19] << std::endl;
+    // std::cout << "Terminer T[19] : " << result.temperatures[19] << std::endl;
 
     // result.temperatures[19] = 5000.5;
 
