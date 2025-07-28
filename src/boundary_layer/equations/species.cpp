@@ -384,6 +384,66 @@ auto build_species_boundary_conditions(
     return boundary_conds;
 }
 
+/* auto compute_fake_fluxes(
+    const core::Matrix<double>& dc_deta_fixed,
+    const coefficients::CoefficientSet& coeffs,
+    PhysicalQuantity auto d_eta,
+    double Le,
+    double Pr
+) -> std::pair<core::Matrix<double>, core::Matrix<double>> {
+    
+    const auto n_species = dc_deta_fixed.rows();
+    const auto n_eta = dc_deta_fixed.cols();
+    
+    core::Matrix<double> J_fake(n_species, n_eta);
+    core::Matrix<double> dJ_fake_deta(n_species, n_eta);
+    
+    // Compute fake fluxes: J_fake[j][i] = Le/Pr * l0[i] * dc_deta_fix[j][i]
+    for (std::size_t i = 0; i < n_eta; ++i) {
+        for (std::size_t j = 0; j < n_species; ++j) {
+            J_fake(j, i) = Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i);
+            // std::cout << std::scientific << std::setprecision(8)
+                // << "[J_fake] j=" << j << ", i=" << i << "\n"
+                // << "  Le         = " << Le << "\n"
+                // << "  Pr         = " << Pr << "\n"
+                // << "  l0[i]      = " << coeffs.transport.l0[i] << "\n"
+                // << "  dc_deta    = " << dc_deta_fixed(j, i) << "\n"
+                // << "  -> J_fake  = " << Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i) << "\n";
+        }
+    }
+    
+    // Compute derivatives of fake fluxes
+    for (std::size_t j = 0; j < n_species; ++j) {
+        auto J_row = J_fake.eigen().row(j);
+        auto dJ_result = coefficients::derivatives::compute_eta_derivative(
+            std::span(J_row.data(), n_eta), d_eta
+        );
+
+        if (!dJ_result) {
+            throw std::runtime_error("Failed to compute diffusion flux derivative");
+        }
+        auto dJ = dJ_result.value();
+        
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            dJ_fake_deta(j, i) = dJ[i];
+        }
+
+    }
+
+    std::cout << std::scientific << std::setprecision(8);
+    std::cout << "[dJ_fake_deta] tableau complet (n_species=" << n_species
+            << ", n_eta=" << n_eta << ")\n";
+    for (std::size_t j = 0; j < n_species; ++j) {
+        std::cout << "species " << j << " : ";
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            std::cout << dJ_fake_deta(j, i) << " ";
+        }
+        std::cout << "\n";
+    }
+    
+    return std::make_pair(std::move(J_fake), std::move(dJ_fake_deta));
+} */
+
 auto compute_fake_fluxes(
     const core::Matrix<double>& dc_deta_fixed,
     const coefficients::CoefficientSet& coeffs,
@@ -402,21 +462,19 @@ auto compute_fake_fluxes(
     for (std::size_t i = 0; i < n_eta; ++i) {
         for (std::size_t j = 0; j < n_species; ++j) {
             J_fake(j, i) = Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i);
-/*             std::cout << std::scientific << std::setprecision(8)
-                << "[J_fake] j=" << j << ", i=" << i << "\n"
-                << "  Le         = " << Le << "\n"
-                << "  Pr         = " << Pr << "\n"
-                << "  l0[i]      = " << coeffs.transport.l0[i] << "\n"
-                << "  dc_deta    = " << dc_deta_fixed(j, i) << "\n"
-                << "  -> J_fake  = " << Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i) << "\n"; */
         }
     }
     
     // Compute derivatives of fake fluxes
     for (std::size_t j = 0; j < n_species; ++j) {
-        auto J_row = J_fake.eigen().row(j);
+        // Copie élément par élément pour garantir la contiguïté
+        std::vector<double> J_row_data(n_eta);
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            J_row_data[i] = J_fake(j, i);
+        }
+        
         auto dJ_result = coefficients::derivatives::compute_eta_derivative(
-            std::span(J_row.data(), n_eta), d_eta
+            std::span(J_row_data.data(), n_eta), d_eta
         );
 
         if (!dJ_result) {
@@ -426,11 +484,18 @@ auto compute_fake_fluxes(
         
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_fake_deta(j, i) = dJ[i];
-            std::cout << std::scientific << std::setprecision(8)
-                << "[dJ_fake_deta] j=" << j << ", i=" << i << "\n"
-                << "  dJ[i]             = " << dJ[i] << "\n"
-                << "  -> dJ_fake_deta   = " << dJ_fake_deta(j, i) << "\n";
         }
+    }
+
+    std::cout << std::scientific << std::setprecision(8);
+    std::cout << "[dJ_fake_deta] tableau complet (n_species=" << n_species
+            << ", n_eta=" << n_eta << ")\n";
+    for (std::size_t j = 0; j < n_species; ++j) {
+        std::cout << "species " << j << " : ";
+        for (std::size_t i = 0; i < n_eta; ++i) {
+            std::cout << dJ_fake_deta(j, i) << " ";
+        }
+        std::cout << "\n";
     }
     
     return std::make_pair(std::move(J_fake), std::move(dJ_fake_deta));
