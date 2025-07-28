@@ -1344,7 +1344,7 @@ auto BoundaryLayerSolver::compute_concentration_derivatives(
     return derivatives;
 }
 
-/* auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
+auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     equations::SolutionState& solution,
     const conditions::BoundaryConditions& bc
 ) const -> void {
@@ -1386,9 +1386,9 @@ auto BoundaryLayerSolver::compute_concentration_derivatives(
     std::cout << std::endl;
     std::cout << "------------------------------------------------------------------------------" << std::endl;
 
-} */
+}
 
-auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
+/* auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     equations::SolutionState& solution,
     const conditions::BoundaryConditions& bc
 ) const -> void {
@@ -1429,7 +1429,7 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     }
     std::cout << std::endl;
     std::cout << "------------------------------------------------------------------------------" << std::endl;
-}
+} */
 
 
 /* auto BoundaryLayerSolver::update_edge_properties(
