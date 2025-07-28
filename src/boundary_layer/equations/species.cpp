@@ -6,6 +6,7 @@
 #include <cmath>
 #include <format>
 #include <iostream>
+#include <iomanip>
 
 namespace blast::boundary_layer::equations {
 
@@ -335,8 +336,18 @@ auto build_species_coefficients(
             const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
 
             species_coeffs.d(i, j) = d_term + wi_term;
-/*             std::cout << "[i=" << i << "][j=" << j << "] d = " << std::scientific << species_coeffs.d(i, j) << std::endl;
-            std::cout << "-------------------------------------------------------------------" << std::endl; */
+
+/*             std::cout << std::scientific << std::setprecision(8)
+                    << "[d_coef] i=" << i << ", j=" << j << "\n"
+                    << "  - dJ_fake_deta      = " << -dJ_fake_deta(j, i) << "\n"
+                    << "  - J_term            = " << -coeffs.diffusion.dJ_deta(j, i) * factors.J_fact << "\n"
+                    << "  - c_derivative_term = " << -2.0 * xi * c_derivatives(j, i) * F_field[i] << "\n"
+                    << "  = d_term            = " << d_term << "\n"
+                    << "  + wi_term           = " << wi_term << "\n"
+                    << "  => species_coeffs.d = " << species_coeffs.d(i, j) << "\n"; */
+
+            // std::cout << "[i=" << i << "][j=" << j << "] d = " << std::scientific << species_coeffs.d(i, j) << std::endl;
+            // std::cout << "-------------------------------------------------------------------" << std::endl;
         }
     }
     
@@ -391,6 +402,13 @@ auto compute_fake_fluxes(
     for (std::size_t i = 0; i < n_eta; ++i) {
         for (std::size_t j = 0; j < n_species; ++j) {
             J_fake(j, i) = Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i);
+/*             std::cout << std::scientific << std::setprecision(8)
+                << "[J_fake] j=" << j << ", i=" << i << "\n"
+                << "  Le         = " << Le << "\n"
+                << "  Pr         = " << Pr << "\n"
+                << "  l0[i]      = " << coeffs.transport.l0[i] << "\n"
+                << "  dc_deta    = " << dc_deta_fixed(j, i) << "\n"
+                << "  -> J_fake  = " << Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i) << "\n"; */
         }
     }
     
@@ -400,6 +418,7 @@ auto compute_fake_fluxes(
         auto dJ_result = coefficients::derivatives::compute_eta_derivative(
             std::span(J_row.data(), n_eta), d_eta
         );
+
         if (!dJ_result) {
             throw std::runtime_error("Failed to compute diffusion flux derivative");
         }
@@ -407,6 +426,10 @@ auto compute_fake_fluxes(
         
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_fake_deta(j, i) = dJ[i];
+            std::cout << std::scientific << std::setprecision(8)
+                << "[dJ_fake_deta] j=" << j << ", i=" << i << "\n"
+                << "  dJ[i]             = " << dJ[i] << "\n"
+                << "  -> dJ_fake_deta   = " << dJ_fake_deta(j, i) << "\n";
         }
     }
     

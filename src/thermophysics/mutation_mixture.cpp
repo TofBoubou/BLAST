@@ -145,12 +145,12 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
         ));
     }
     
-    if (std::any_of(fractions.begin(), fractions.end(), 
+/*     if (std::any_of(fractions.begin(), fractions.end(), 
                     [](double x) { return x < -0.01 || !std::isfinite(x); })) {
         return std::unexpected(ThermophysicsError(
             "Invalid mass fraction values (negative or non-finite)"
         ));
-    }
+    } */
     
     return {};
 }
@@ -218,7 +218,7 @@ auto MutationMixture::set_state(
 ) const -> std::expected<void, ThermophysicsError> {
     
     if (auto validation = validate_composition(mass_fractions); !validation) {
-        // std::cout << "BONJOUR A TOUS" << std::endl;
+        std::cout << "BONJOUR A TOUS" << std::endl;
         return std::unexpected(validation.error());
     }
     
@@ -250,7 +250,7 @@ auto MutationMixture::mixture_enthalpy(
 ) const -> std::expected<double, ThermophysicsError> {
     
     if (auto state_result = set_state(mass_fractions, temperature, pressure); !state_result) {
-        // std::cout << "AU REVOIR" << std::endl;
+        std::cout << "AU REVOIR" << std::endl;
         return std::unexpected(state_result.error());
     }
     

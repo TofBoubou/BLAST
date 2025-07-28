@@ -4,6 +4,7 @@
 #include <numeric>
 #include <cmath>
 #include <iostream>
+#include <iomanip>
 
 namespace blast::boundary_layer::coefficients::diffusion {
 
@@ -24,7 +25,12 @@ constexpr auto compute_derivative_factor(
     // Stagnation point limiting solution
     switch (sim_config.body_type) {
         case io::SimulationConfig::BodyType::Axisymmetric:
-            std::cout << "[AXI] d_ue_dx=" << bc.d_ue_dx() << " rho_e=" << bc.rho_e() << " mu_e=" << bc.mu_e() << " -> " << std::sqrt(2.0 * bc.d_ue_dx() / (bc.rho_e() * bc.mu_e())) << "\n";
+            std::cout << std::scientific << std::setprecision(12);
+            std::cout << "[AXI] d_ue_dx=" << bc.d_ue_dx()
+                    << " rho_e=" << bc.rho_e()
+                    << " mu_e=" << bc.mu_e()
+                    << " -> " << std::sqrt(2.0 * bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()))
+                    << "\n";
             return std::sqrt(2.0 * bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()));
         case io::SimulationConfig::BodyType::TwoD:
             return std::sqrt(bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()));
@@ -68,7 +74,7 @@ auto calculate_stefan_maxwell_at_point(
     const double sum_c = std::accumulate(c.begin(), c.end(), 0.0);
 
     
-/*     std::cout << "[DEBUG] Coefficients à eta = 0" << std::endl;
+    std::cout << "[DEBUG] Coefficients à eta = 0" << std::endl;
 
     for (std::size_t i = 0; i < n_species; ++i) {
         const double MW_i = mixture.species_molecular_weight(i);
@@ -91,7 +97,7 @@ auto calculate_stefan_maxwell_at_point(
     std::cout << "  P                = " << std::scientific << P << std::endl;
     std::cout << "  der_fact         = " << std::scientific << der_fact << std::endl;
     std::cout << "  full_der_fact    = " << std::scientific << der_fact * rho << std::endl;
-    std::cout << "  sum_c            = " << std::scientific << sum_c << std::endl; */
+    std::cout << "  sum_c            = " << std::scientific << sum_c << std::endl;
     
     // Use Eigen through the wrapper
     auto& D_bin = D_bin_local.eigen();

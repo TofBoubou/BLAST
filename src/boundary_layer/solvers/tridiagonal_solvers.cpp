@@ -364,11 +364,11 @@ auto solve_species_block_tridiagonal(
     }
     
     for (std::size_t j = 0; j < solution.cols(); ++j) {
-        for (std::size_t i = 0; i < solution.rows(); ++i) {
+/*         for (std::size_t i = 0; i < solution.rows(); ++i) {
             if (solution(i, j) < 0.0) {
                 solution(i, j) = 0.0;
             }
-        }
+        } */
         
         double sum = 0.0;
         for (std::size_t i = 0; i < solution.rows(); ++i) {

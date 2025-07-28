@@ -115,6 +115,8 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
     ThermodynamicCoefficients thermo;
     thermo.rho.reserve(n_eta);
     thermo.MW.reserve(n_eta);
+
+    std::cout << "Edge composition dans update_edge_properties : " << inputs.c(0, n_eta - 1) << " " << inputs.c(1, n_eta - 1) << " " << inputs.c(2, n_eta - 1) << " " << inputs.c(3, n_eta - 1) << " " << inputs.c(4, n_eta - 1) << std::endl;
     
     // Calculate molecular weights and densities
     for (std::size_t i = 0; i < n_eta; ++i) {
@@ -130,16 +132,16 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
         double sum_c = 0.0;
         for (std::size_t j = 0; j < n_species; ++j) {
             c_local[j] = inputs.c(j, i);
-            if (!std::isfinite(c_local[j]) || c_local[j] < -1e-6) {
+/*             if (!std::isfinite(c_local[j]) || c_local[j] < -1e-6) {
                 return std::unexpected(CoefficientError(
                     std::format("Invalid concentration at eta={} species={}: c={}", i, j, c_local[j])
                 ));
-            }
+            } */
             sum_c += c_local[j];
         }
         
-        // DEBUG: Print concentration sum details
-/*         std::cout << "[DEBUG] coefficient_calculator.cpp:130 - eta=" << i << " sum_c: " << sum_c << std::endl;
+/*         // DEBUG: Print concentration sum details
+        std::cout << "[DEBUG] coefficient_calculator.cpp:130 - eta=" << i << " sum_c: " << sum_c << std::endl;
         if (std::abs(sum_c - 1.0) > 1e-6) {
             std::cout << "[DEBUG] Concentration sum differs from 1.0 by: " << std::abs(sum_c - 1.0) << std::endl;
             std::cout << "[DEBUG] Individual concentrations: ";

@@ -401,7 +401,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         }
         solution.T = T_result.value();
 
-        // 1. Solve continuity equation
+/*         // 1. Solve continuity equation
         auto V_result = solve_continuity_equation(solution, xi);
         if (!V_result) {
             return std::unexpected(SolverError(
@@ -415,7 +415,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         std::cout << "Continuity after calculation V[0] : " << solution.V[0] << std::endl;
         std::cout << "Continuity after calculation V[10] : " << solution.V[10] << std::endl;
         std::cout << "Continuity after calculation V[19] : " << solution.V[19] << std::endl;
-        std::cout << "-----------------------------------------------------" << std::endl;
+        std::cout << "-----------------------------------------------------" << std::endl; */
 
         // 2. Compute eta derivatives
         auto derivatives_result = compute_eta_derivatives(solution);
@@ -462,6 +462,26 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         update_edge_properties(bc_dynamic, inputs, solution.c);
         std::cout << "JUSTE APRES UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl; */
 
+
+
+        // 1. Solve continuity equation
+        auto V_result = solve_continuity_equation(solution, xi);
+        if (!V_result) {
+            return std::unexpected(SolverError(
+                "Continuity solver failed at station {} iteration {}: {}",
+                std::source_location::current(), station, iter, V_result.error().message()
+            ));
+        }
+        solution.V = std::move(V_result.value());
+
+        std::cout << "-----------------------------------------------------" << std::endl;
+        std::cout << "Continuity after calculation V[0] : " << solution.V[0] << std::endl;
+        std::cout << "Continuity after calculation V[10] : " << solution.V[10] << std::endl;
+        std::cout << "Continuity after calculation V[19] : " << solution.V[19] << std::endl;
+        std::cout << "-----------------------------------------------------" << std::endl;
+
+
+
         // 5. Solve momentum equation
         auto F_result = solve_momentum_equation(solution, coeffs, bc_dynamic, xi);
         if (!F_result) return std::unexpected(F_result.error());
@@ -501,11 +521,11 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         std::cout << "Fractions tout juste après le calcul c_10_3: " << c_new(3,10) << std::endl;
         std::cout << "Fractions tout juste après le calcul c_10_4: " << c_new(4,10) << std::endl;
 
-/*         std::cout << "Fractions tout juste après le calcul c_19_0: " << c_new(0,19) << std::endl;
+        std::cout << "Fractions tout juste après le calcul c_19_0: " << c_new(0,19) << std::endl;
         std::cout << "Fractions tout juste après le calcul c_19_1: " << c_new(1,19) << std::endl;
         std::cout << "Fractions tout juste après le calcul c_19_2: " << c_new(2,19) << std::endl;
         std::cout << "Fractions tout juste après le calcul c_19_3: " << c_new(3,19) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_19_4: " << c_new(4,19) << std::endl; */
+        std::cout << "Fractions tout juste après le calcul c_19_4: " << c_new(4,19) << std::endl;
 
         // 11. Build new solution state
         equations::SolutionState solution_new(n_eta, n_species);
@@ -1125,6 +1145,20 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
     const double alpha_g = base_factor * 1;     
     const double alpha_c = base_factor * 1;     
     const double alpha_T = base_factor * 1;  
+
+    // DEBUG : impression de c_old[:,19] et c_new[:,19]
+    std::cout << "old_solution.c[:,19] = ";
+    for (std::size_t i = 0; i < old_solution.c.rows(); ++i) {
+        std::cout << old_solution.c(i, 19) << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "new_solution.c[:,19] = ";
+    for (std::size_t i = 0; i < new_solution.c.rows(); ++i) {
+        std::cout << new_solution.c(i, 19) << " ";
+    }
+    std::cout << std::endl;
+
     
 /*     std::cout << "Fractions dans relaxation c_19_0: " << new_solution.c(0,19) << std::endl;
     std::cout << "Fractions dans relaxation c_19_1: " << new_solution.c(1,19) << std::endl;
@@ -1310,7 +1344,7 @@ auto BoundaryLayerSolver::compute_concentration_derivatives(
     return derivatives;
 }
 
-auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
+/* auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     equations::SolutionState& solution,
     const conditions::BoundaryConditions& bc
 ) const -> void {
@@ -1335,10 +1369,6 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
         total_mass_fraction += solution.c(j, edge_idx);
     }
     
-    // DEBUG: Print species mass conservation details
-/*     std::cout << "[DEBUG] boundary_layer_solver.cpp:718 - Species mass fraction sum: " << total_mass_fraction 
-              << " (difference from 1.0: " << std::abs(total_mass_fraction - 1.0) << ")" << std::endl; */
-    
     // Normalize if total is significantly different from 1.0
     if (std::abs(total_mass_fraction - 1.0) > 1e-12 && total_mass_fraction > 1e-12) {
         // std::cout << "[DEBUG] Normalizing species mass fractions..." << std::endl;
@@ -1347,7 +1377,60 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
         }
         // std::cout << "[DEBUG] Normalization complete." << std::endl;
     }
+        // DEBUG : impression finale des concentrations à l’edge
+    std::cout << "enforce_edge_boundary_conditions ---------------------------------------------" << std::endl;
+    std::cout << "solution.c[:, " << edge_idx << "] = ";
+    for (std::size_t j = 0; j < n_species; ++j) {
+        std::cout << solution.c(j, edge_idx) << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "------------------------------------------------------------------------------" << std::endl;
+
+} */
+
+auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
+    equations::SolutionState& solution,
+    const conditions::BoundaryConditions& bc
+) const -> void {
+    
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+
+    if (n_eta == 0) return;
+
+    const std::size_t edge_idx = n_eta - 1;  // Last eta point is the edge
+
+    // Composition imposée à l'edge (valeurs fixées manuellement)
+    const std::array<double, 5> imposed_edge_composition = {
+        2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02
+    };
+
+    for (std::size_t j = 0; j < n_species && j < imposed_edge_composition.size(); ++j) {
+        solution.c(j, edge_idx) = imposed_edge_composition[j];
+    }
+
+    // Vérification de la conservation de masse
+    double total_mass_fraction = 0.0;
+    for (std::size_t j = 0; j < n_species; ++j) {
+        total_mass_fraction += solution.c(j, edge_idx);
+    }
+
+    if (std::abs(total_mass_fraction - 1.0) > 1e-12 && total_mass_fraction > 1e-12) {
+        for (std::size_t j = 0; j < n_species; ++j) {
+            solution.c(j, edge_idx) /= total_mass_fraction;
+        }
+    }
+
+    // DEBUG final
+    std::cout << "enforce_edge_boundary_conditions ---------------------------------------------" << std::endl;
+    std::cout << "solution.c[:, " << edge_idx << "] = ";
+    for (std::size_t j = 0; j < n_species; ++j) {
+        std::cout << solution.c(j, edge_idx) << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "------------------------------------------------------------------------------" << std::endl;
 }
+
 
 /* auto BoundaryLayerSolver::update_edge_properties(
     conditions::BoundaryConditions& bc,
@@ -1507,7 +1590,13 @@ auto BoundaryLayerSolver::update_edge_properties(
     }
 
     std::cout << "----------------------------------------" << std::endl;
-    std::cout << "Edge composition dans update_edge_properties : " << edge_composition[0] << " " << edge_composition[1] << " " << edge_composition[2] << " " << edge_composition[3] << " " << edge_composition[4] << std::endl;
+    std::cout << std::scientific << std::setprecision(8)
+          << "Edge composition dans update_edge_properties : "
+          << edge_composition[0] << " "
+          << edge_composition[1] << " "
+          << edge_composition[2] << " "
+          << edge_composition[3] << " "
+          << edge_composition[4] << std::endl;
     std::cout << "----------------------------------------" << std::endl;
 
     
@@ -1538,7 +1627,8 @@ auto BoundaryLayerSolver::update_edge_properties(
     const double mu_e_new = mu_result.value();
     
     // Recalculate edge density with equilibrium composition
-    auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition_eq);
+    // auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition_eq);
+    auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition);
     if (!MW_eq_result) {
         throw SolverError("Failed to compute equilibrium edge molecular weight: {}", 
                          std::source_location::current(), MW_eq_result.error().message());
