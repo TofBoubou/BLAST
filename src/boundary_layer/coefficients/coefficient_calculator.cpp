@@ -116,8 +116,6 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
     thermo.rho.reserve(n_eta);
     thermo.MW.reserve(n_eta);
 
-    std::cout << "Edge composition dans update_edge_properties : " << inputs.c(0, n_eta - 1) << " " << inputs.c(1, n_eta - 1) << " " << inputs.c(2, n_eta - 1) << " " << inputs.c(3, n_eta - 1) << " " << inputs.c(4, n_eta - 1) << std::endl;
-    
     // Calculate molecular weights and densities
     for (std::size_t i = 0; i < n_eta; ++i) {
         // Validate temperature
@@ -139,17 +137,6 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(
             } */
             sum_c += c_local[j];
         }
-        
-/*         // DEBUG: Print concentration sum details
-        std::cout << "[DEBUG] coefficient_calculator.cpp:130 - eta=" << i << " sum_c: " << sum_c << std::endl;
-        if (std::abs(sum_c - 1.0) > 1e-6) {
-            std::cout << "[DEBUG] Concentration sum differs from 1.0 by: " << std::abs(sum_c - 1.0) << std::endl;
-            std::cout << "[DEBUG] Individual concentrations: ";
-            for (std::size_t j = 0; j < n_species; ++j) {
-                std::cout << c_local[j] << " ";
-            }
-            std::cout << std::endl;
-        } */
         
         if (sum_c <= 0.0) {
             return std::unexpected(CoefficientError(
@@ -250,10 +237,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(
 
         const double rho_e_calculated = bc.P_e() * thermo.MW[n_eta - 1] / 
                             (inputs.T[n_eta - 1] * thermophysics::constants::R_universal);
-
-/*         std::cout << "bc.P_e() : " << bc.P_e() << std::endl;
-        std::cout << "thermo.MW[n_eta - 1] : " << thermo.MW[n_eta - 1] << std::endl; */
-        // std::cout << "Température pour l'edge : " << inputs.T[n_eta - 1] << std::endl;
         
         // Get transport properties
         auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_edge);
@@ -287,16 +270,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(
         double l0_value = thermo.rho[i] * mu / (rho_e_calculated * mu_e);
         transport.l0.push_back(l0_value);
         transport.l3.push_back(transport.l0[i] / Pr);
-
-/*         std::cout << "--------------------------------------------------------" << std::endl;
-        std::cout << std::scientific << "DEBUG: l0[" << i << "] = " << l0_value << std::endl;
-        std::cout << std::scientific << "DEBUG: l3[" << i << "] = " << transport.l3[i] << std::endl;
-        std::cout << std::scientific << "mu = " <<  mu << ". mu_e = " << bc.mu_e() << std::endl;
-        std::cout << std::scientific << "mu = " <<  mu << ". mu_e après calcul = " << mu_e << std::endl;
-        std::cout << std::scientific << "rho[i] = " <<  thermo.rho[i] << ". rho_e = " << bc.rho_e() << std::endl;
-        std::cout << std::scientific << "rho[i] = " <<  thermo.rho[i] << ". rho_e après calcul = " << rho_e_calculated << std::endl;
-        std::cout << std::scientific << "Pr = " <<  Pr << std::endl;
-        std::cout << "--------------------------------------------------------" << std::endl; */
     }
     
     // Compute derivatives
@@ -779,7 +752,7 @@ auto CoefficientCalculator::calculate_wall_properties(
 // Derivative computation implementations
 namespace derivatives {
 
-/* template<std::ranges::sized_range Range>
+template<std::ranges::sized_range Range>
 auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
     const auto n = std::ranges::size(values);
     std::vector<double> derivatives(n);
@@ -824,40 +797,10 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::
     derivatives[n - 1] = derivatives[n - 2]; // Same as n-2 for stability
     
     return derivatives;
-} */
-
-
-template<std::ranges::sized_range Range>
-auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
-   const auto n = std::ranges::size(values);
-   std::vector<double> derivatives(n);
-   
-   const double dx12 = 12.0 * d_eta;
-   
-   derivatives[0] = (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] + 
-                     16.0 * values[3] - 3.0 * values[4]) / dx12;
-   derivatives[1] = (-3.0 * values[0] - 10.0 * values[1] + 18.0 * values[2] - 
-                     6.0 * values[3] + 1.0 * values[4]) / dx12;
-   
-   for (std::size_t i = 2; i < n - 2; ++i) {
-       derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] + 
-                        8.0 * values[i + 1] - values[i + 2]) / dx12;
-   }
-   
-   derivatives[n - 2] = (3.0 * values[n - 6] - 16.0 * values[n - 5] + 
-                        36.0 * values[n - 4] - 48.0 * values[n - 3] + 
-                        25.0 * values[n - 2]) / dx12;
-   derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 
-                        36.0 * values[n - 3] - 48.0 * values[n - 2] + 
-                        25.0 * values[n - 1]) / dx12;
-   
-   return derivatives;
 }
 
 
-
-
-template<std::ranges::sized_range Range>
+/* template<std::ranges::sized_range Range>
 auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<double> {
     const auto n = std::ranges::size(values);
     std::vector<double> second_derivatives(n);
@@ -900,12 +843,12 @@ auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<
     second_derivatives[n-1] = (2.0 * values[n-1] - 5.0 * values[n-2] + 4.0 * values[n-3] - values[n-4]) / d_eta_sq;
     
     return second_derivatives;
-}
+} */
 
 
 
 
-template<typename Matrix>
+/* template<typename Matrix>
 auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) -> std::expected<Matrix, CoefficientError> {
     const auto n_rows = values.rows();
     const auto n_cols = values.cols();
@@ -927,7 +870,7 @@ auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) ->
     }
     
     return result;
-}
+} */
 
 // Explicit instantiations
 template auto compute_eta_derivative(std::span<const double>&&, double) -> std::expected<std::vector<double>, CoefficientError>;
@@ -935,11 +878,6 @@ template auto compute_eta_derivative(const std::vector<double>&, double) -> std:
 template auto compute_eta_derivative(std::vector<double>&&, double) -> std::expected<std::vector<double>, CoefficientError>;
 template auto compute_eta_derivative(std::span<double>&&, double) -> std::expected<std::vector<double>, CoefficientError>;
 
-template auto compute_eta_second_derivative(std::span<const double>&&, double) -> std::vector<double>;
-template auto compute_eta_second_derivative(const std::vector<double>&, double) -> std::vector<double>;
-template auto compute_eta_second_derivative(std::vector<double>&&, double) -> std::vector<double>;
-template auto compute_eta_second_derivative(std::vector<double>&, double) -> std::vector<double>;
-template auto compute_eta_second_derivative(std::span<double>&&, double) -> std::vector<double>;
 
 } // namespace derivatives
 

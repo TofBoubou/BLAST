@@ -128,29 +128,11 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
     const double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
     constexpr double tolerance = 1e-6;
     
-    // DEBUG: Print mass fractions sum details
-/*     std::cout << "[DEBUG] mutation_mixture.cpp:127 - Mass fractions sum: " << sum 
-              << " (difference from 1.0: " << std::abs(sum - 1.0) << ")" << std::endl;
-    std::cout << "[DEBUG] Individual fractions: ";
-    for (size_t i = 0; i < fractions.size(); ++i) {
-        std::cout << fractions[i] << " ";
-    }
-    std::cout << std::endl; */
-
-    // std::cout << "SOMME : " << sum << std::endl;
-    
     if (std::abs(sum - 1.0) > tolerance) {
         return std::unexpected(ThermophysicsError(
             std::format("Mass fractions sum to {} (should be 1.0)", sum)
         ));
     }
-    
-/*     if (std::any_of(fractions.begin(), fractions.end(), 
-                    [](double x) { return x < -0.01 || !std::isfinite(x); })) {
-        return std::unexpected(ThermophysicsError(
-            "Invalid mass fraction values (negative or non-finite)"
-        ));
-    } */
     
     return {};
 }
@@ -218,7 +200,6 @@ auto MutationMixture::set_state(
 ) const -> std::expected<void, ThermophysicsError> {
     
     if (auto validation = validate_composition(mass_fractions); !validation) {
-        std::cout << "BONJOUR A TOUS" << std::endl;
         return std::unexpected(validation.error());
     }
     
@@ -250,7 +231,6 @@ auto MutationMixture::mixture_enthalpy(
 ) const -> std::expected<double, ThermophysicsError> {
     
     if (auto state_result = set_state(mass_fractions, temperature, pressure); !state_result) {
-        std::cout << "AU REVOIR" << std::endl;
         return std::unexpected(state_result.error());
     }
     
@@ -355,14 +335,7 @@ auto MutationMixture::binary_diffusion_coefficients(
         return std::unexpected(ThermophysicsError("Invalid T,P for diffusion coefficients"));
     }
     
-    try {
-/*         // Set state with dummy composition (not needed for binary coefficients)
-        double vars[2] = {pressure, temperature};
-        mixture_->setState(nullptr, vars, 2);
-        
-        core::Matrix<double> dij(n_species_, n_species_);
-        dij.setZero(); */
-        
+    try {       
         // Create uniform composition for setState (required by Mutation++ even if not used)
         std::vector<double> uniform_composition(n_species_, 1.0 / n_species_);
         double vars[2] = {pressure, temperature};

@@ -81,19 +81,6 @@ auto solve_species(
         apply_charge_neutrality(result, mixture);
     }
     
-    // Debug: afficher l'état des fractions massiques à chaque eta
-/*     std::cout << "\n=== DEBUG SOLVE_SPECIES - Station " << station << " ===\n";
-    for (std::size_t i = 0; i < n_eta; ++i) {
-        std::cout << "eta[" << i << "]: ";
-        double sum = 0.0;
-        for (std::size_t j = 0; j < n_species; ++j) {
-            std::cout << std::format("c[{}]={:.6e} ", j, result(j, i));
-            sum += result(j, i);
-        }
-        std::cout << std::format("(sum={:.6e})\n", sum);
-    }
-    std::cout << "=========================================\n\n"; */
-    
     return result;
 }
 
@@ -107,8 +94,6 @@ auto compute_equilibrium_composition(
     const auto n_species = mixture.n_species();
     
     core::Matrix<double> c_equilibrium(n_species, n_eta);
-    std::cout << "Pressure dans l'équilibre chimique : " << pressure << std::endl;
-    std::cout << "Temperature dans l'équilibre chimique : " << temperature_field[19] << std::endl;
     
     for (std::size_t i = 0; i < n_eta; ++i) {
         auto eq_result = mixture.equilibrium_composition(temperature_field[i], pressure);
@@ -125,12 +110,6 @@ auto compute_equilibrium_composition(
         }
     }
 
-/*     std::cout << "Fractions dans equilibre chimique c_19_0: " << c_equilibrium(0,19) << std::endl;
-    std::cout << "Fractions dans equilibre chimique c_19_1: " << c_equilibrium(1,19) << std::endl;
-    std::cout << "Fractions dans equilibre chimique c_19_2: " << c_equilibrium(2,19) << std::endl;
-    std::cout << "Fractions dans equilibre chimique c_19_3: " << c_equilibrium(3,19) << std::endl;
-    std::cout << "Fractions dans equilibre chimique c_19_4: " << c_equilibrium(4,19) << std::endl; */
-    
     return c_equilibrium;
 }
 
@@ -305,28 +284,17 @@ auto build_species_coefficients(
     for (std::size_t i = 0; i < n_eta; ++i) {
         for (std::size_t j = 0; j < n_species; ++j) {
             
+            // ----- Coefficient a[i] -----
             // a[i][j] = -l0[i]*Le/Pr / d_eta²
-/*             species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr / d_eta_sq;
-            
-            // b[i][j] = (V[i] - Le/Pr*dl0_deta[i]) / d_eta
-            species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i]) / d_eta;
-            
-            // c[i][j] = 2*xi*F[i]*lambda0
-            species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0; */
-
-/*             std::cout << "-------------------------------------------------------------------" << std::endl;
-            std::cout << "COEF DANS SPECIES : " << std::endl; */
-
             species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr / d_eta_sq;
-            // std::cout << "[i=" << i << "][j=" << j << "] a = " << std::scientific << species_coeffs.a(i, j) << std::endl;
 
+            // ----- Coefficient b[i] -----
             species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i]) / d_eta;
-            // std::cout << "[i=" << i << "][j=" << j << "] b = " << std::scientific << species_coeffs.b(i, j) << std::endl;
 
+            // ----- Coefficient [i] -----
             species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0;
-            // std::cout << "[i=" << i << "][j=" << j << "] c = " << std::scientific << species_coeffs.c(i, j) << std::endl;
-            // std::cout << "-------------------------------------------------------------------" << std::endl;
             
+            // ----- Coefficient d[i] -----
             // d[i][j] = -dJ_fake_deta[j][i] - dJ_deta[j][i]*J_fact - 2*xi*c_der[j][i]*F[i]
             const double d_term = 
                 -dJ_fake_deta(j, i) - 
@@ -336,18 +304,6 @@ auto build_species_coefficients(
             const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
 
             species_coeffs.d(i, j) = d_term + wi_term;
-
-/*             std::cout << std::scientific << std::setprecision(8)
-                    << "[d_coef] i=" << i << ", j=" << j << "\n"
-                    << "  - dJ_fake_deta      = " << -dJ_fake_deta(j, i) << "\n"
-                    << "  - J_term            = " << -coeffs.diffusion.dJ_deta(j, i) * factors.J_fact << "\n"
-                    << "  - c_derivative_term = " << -2.0 * xi * c_derivatives(j, i) * F_field[i] << "\n"
-                    << "  = d_term            = " << d_term << "\n"
-                    << "  + wi_term           = " << wi_term << "\n"
-                    << "  => species_coeffs.d = " << species_coeffs.d(i, j) << "\n"; */
-
-            // std::cout << "[i=" << i << "][j=" << j << "] d = " << std::scientific << species_coeffs.d(i, j) << std::endl;
-            // std::cout << "-------------------------------------------------------------------" << std::endl;
         }
     }
     
@@ -383,66 +339,6 @@ auto build_species_boundary_conditions(
     
     return boundary_conds;
 }
-
-/* auto compute_fake_fluxes(
-    const core::Matrix<double>& dc_deta_fixed,
-    const coefficients::CoefficientSet& coeffs,
-    PhysicalQuantity auto d_eta,
-    double Le,
-    double Pr
-) -> std::pair<core::Matrix<double>, core::Matrix<double>> {
-    
-    const auto n_species = dc_deta_fixed.rows();
-    const auto n_eta = dc_deta_fixed.cols();
-    
-    core::Matrix<double> J_fake(n_species, n_eta);
-    core::Matrix<double> dJ_fake_deta(n_species, n_eta);
-    
-    // Compute fake fluxes: J_fake[j][i] = Le/Pr * l0[i] * dc_deta_fix[j][i]
-    for (std::size_t i = 0; i < n_eta; ++i) {
-        for (std::size_t j = 0; j < n_species; ++j) {
-            J_fake(j, i) = Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i);
-            // std::cout << std::scientific << std::setprecision(8)
-                // << "[J_fake] j=" << j << ", i=" << i << "\n"
-                // << "  Le         = " << Le << "\n"
-                // << "  Pr         = " << Pr << "\n"
-                // << "  l0[i]      = " << coeffs.transport.l0[i] << "\n"
-                // << "  dc_deta    = " << dc_deta_fixed(j, i) << "\n"
-                // << "  -> J_fake  = " << Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i) << "\n";
-        }
-    }
-    
-    // Compute derivatives of fake fluxes
-    for (std::size_t j = 0; j < n_species; ++j) {
-        auto J_row = J_fake.eigen().row(j);
-        auto dJ_result = coefficients::derivatives::compute_eta_derivative(
-            std::span(J_row.data(), n_eta), d_eta
-        );
-
-        if (!dJ_result) {
-            throw std::runtime_error("Failed to compute diffusion flux derivative");
-        }
-        auto dJ = dJ_result.value();
-        
-        for (std::size_t i = 0; i < n_eta; ++i) {
-            dJ_fake_deta(j, i) = dJ[i];
-        }
-
-    }
-
-    std::cout << std::scientific << std::setprecision(8);
-    std::cout << "[dJ_fake_deta] tableau complet (n_species=" << n_species
-            << ", n_eta=" << n_eta << ")\n";
-    for (std::size_t j = 0; j < n_species; ++j) {
-        std::cout << "species " << j << " : ";
-        for (std::size_t i = 0; i < n_eta; ++i) {
-            std::cout << dJ_fake_deta(j, i) << " ";
-        }
-        std::cout << "\n";
-    }
-    
-    return std::make_pair(std::move(J_fake), std::move(dJ_fake_deta));
-} */
 
 auto compute_fake_fluxes(
     const core::Matrix<double>& dc_deta_fixed,
@@ -485,17 +381,6 @@ auto compute_fake_fluxes(
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_fake_deta(j, i) = dJ[i];
         }
-    }
-
-    std::cout << std::scientific << std::setprecision(8);
-    std::cout << "[dJ_fake_deta] tableau complet (n_species=" << n_species
-            << ", n_eta=" << n_eta << ")\n";
-    for (std::size_t j = 0; j < n_species; ++j) {
-        std::cout << "species " << j << " : ";
-        for (std::size_t i = 0; i < n_eta; ++i) {
-            std::cout << dJ_fake_deta(j, i) << " ";
-        }
-        std::cout << "\n";
     }
     
     return std::make_pair(std::move(J_fake), std::move(dJ_fake_deta));

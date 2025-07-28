@@ -328,35 +328,6 @@ auto solve_species_block_tridiagonal(
         D(n_eta-2, j) -= A[n_eta-2](j-start_idx, j-start_idx) * prev_solution(j, n_eta-1);
     }
     A[n_eta-2].setZero();
-
-    // Debug: vérifier les matrices avant Thomas
-    std::cout << "\n=== DEBUG: Matrices avant Thomas (C++) ===" << std::endl;
-    std::cout << "n_eta=" << n_eta << ", n_heavy=" << n_heavy << ", start_idx=" << start_idx << std::endl;
-
-    // Points clés : début, milieu, fin
-    std::vector<std::size_t> debug_points = {0, 1, 2, 9, 10, 17, 18};
-
-    for (auto i : debug_points) {
-        if (i < n_eta) {
-            std::cout << "eta[" << i << "]:" << std::endl;
-            std::cout << "  lower[" << i << "](0,0) = " << std::scientific << std::setprecision(8) 
-                    << C[i](0, 0) << std::endl;
-            std::cout << "  main[" << i << "](0,0) = " << std::scientific << std::setprecision(8) 
-                    << B[i](0, 0) << std::endl;
-            std::cout << "  upper[" << i << "](0,0) = " << std::scientific << std::setprecision(8) 
-                    << A[i](0, 0) << std::endl;
-            std::cout << "  D(" << i << "," << start_idx << ") = " << std::scientific << std::setprecision(8) 
-                    << D(i, start_idx) << std::endl;
-            if (n_heavy > 1) {
-                std::cout << "  lower[" << i << "](1,1) = " << std::scientific << std::setprecision(8) 
-                        << C[i](1, 1) << std::endl;
-                std::cout << "  main[" << i << "](1,1) = " << std::scientific << std::setprecision(8) 
-                        << B[i](1, 1) << std::endl;
-                std::cout << "  upper[" << i << "](1,1) = " << std::scientific << std::setprecision(8) 
-                        << A[i](1, 1) << std::endl;
-            }
-        }
-    }
     
     core::Matrix<double> solution(n_species, n_eta);
     if (auto result = detail::block_thomas_algorithm(C, B, A, D, solution, start_idx); !result) {
@@ -364,11 +335,6 @@ auto solve_species_block_tridiagonal(
     }
     
     for (std::size_t j = 0; j < solution.cols(); ++j) {
-/*         for (std::size_t i = 0; i < solution.rows(); ++i) {
-            if (solution(i, j) < 0.0) {
-                solution(i, j) = 0.0;
-            }
-        } */
         
         double sum = 0.0;
         for (std::size_t i = 0; i < solution.rows(); ++i) {
@@ -380,32 +346,10 @@ auto solve_species_block_tridiagonal(
                 solution(i, j) /= sum;
             }
         } else {
-            std::cout << "PROBLEME FALLBACK, SUM equal to zero" << std::endl;
-            // abort();
             continue;
         }
     }
 
-/*     double sum19 = 0.0;
-    for (std::size_t i = 0; i < solution.rows(); ++i) {
-        sum19 += solution(i, 19);
-    }
-
-    std::cout << "------------------------------------" << std::endl;
-    std::cout << "[DEBUG] Somme des concentrations à η=19 : " << sum19 << std::endl;
-    std::cout << "------------------------------------" << std::endl; */
-
-    std::cout << "===== Résultat final de la solution dans tridiag =====" << std::endl;
-    for (std::size_t j = 0; j < solution.cols(); ++j) {
-        std::cout << "η[" << j << "]: ";
-        for (std::size_t i = 0; i < solution.rows(); ++i) {
-            std::cout << std::scientific << std::setprecision(6) << solution(i, j) << "  ";
-        }
-        std::cout << std::endl;
-    }
-
-
-    
     return solution;
 }
 
@@ -462,152 +406,6 @@ auto thomas_algorithm(
     return {};
 }
 
-/* auto block_thomas_algorithm(
-    std::vector<core::Matrix<double>>& lower_blocks,
-    std::vector<core::Matrix<double>>& main_blocks,
-    std::vector<core::Matrix<double>>& upper_blocks,
-    core::Matrix<double>& rhs,
-    core::Matrix<double>& solution,
-    int start_species
-) -> std::expected<void, SolverError> {
-    
-    const auto n_eta = main_blocks.size();
-    const auto n_heavy = main_blocks[0].rows();
-    
-    if (n_eta < 2) {
-        return std::unexpected(SolverError("System too small for block Thomas algorithm"));
-    }
-    
-    if (lower_blocks.size() != n_eta || upper_blocks.size() != n_eta) {
-        return std::unexpected(SolverError("Incompatible block matrix sizes"));
-    }
-    
-    if (n_heavy == 0) {
-        return std::unexpected(SolverError("Empty block matrices"));
-    }
-    
-    for (std::size_t i = 0; i < n_eta; ++i) {
-        if (main_blocks[i].rows() != n_heavy || main_blocks[i].cols() != n_heavy ||
-            lower_blocks[i].rows() != n_heavy || lower_blocks[i].cols() != n_heavy ||
-            upper_blocks[i].rows() != n_heavy || upper_blocks[i].cols() != n_heavy) {
-            return std::unexpected(SolverError(
-                std::format("Inconsistent block matrix dimensions at position {}", i)
-            ));
-        }
-    }
-    
-    try {
-        Eigen::PartialPivLU<Eigen::MatrixXd> lu_B0(main_blocks[0].eigen());
-        
-        if (lu_B0.info() != Eigen::Success) {
-            return std::unexpected(SolverError("Singular matrix B[0] in initial conditions"));
-        }
-        
-        Eigen::MatrixXd beta_0 = lu_B0.solve(upper_blocks[0].eigen());
-        upper_blocks[0].eigen() = beta_0;
-        
-        Eigen::VectorXd rhs_0(n_heavy);
-        for (std::size_t j = 0; j < n_heavy; ++j) {
-            rhs_0[j] = rhs(0, j + start_species);
-        }
-        
-        Eigen::VectorXd cy_0 = lu_B0.solve(rhs_0);
-        
-        for (std::size_t j = 0; j < n_heavy; ++j) {
-            solution(j + start_species, 0) = cy_0[j];
-        }
-        
-    } catch (const std::exception& e) {
-        return std::unexpected(SolverError("Failed to solve boundary conditions at i=0"));
-    }
-    
-    for (std::size_t i = 1; i < n_eta; ++i) {
-        try {
-            auto product = lower_blocks[i].eigen() * upper_blocks[i-1].eigen();
-            Eigen::MatrixXd new_main = main_blocks[i].eigen() - product;
-            main_blocks[i].eigen() = new_main;
-            
-            for (std::size_t j = 0; j < n_heavy; ++j) {
-                double temp = 0.0;
-                for (std::size_t k = 0; k < n_heavy; ++k) {
-                    temp += lower_blocks[i](j, k) * solution(k + start_species, i-1);
-                }
-                rhs(i, j + start_species) -= temp;
-            }
-            
-            if (i < n_eta - 1) {
-                Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[i].eigen());
-                
-                if (lu_B.info() != Eigen::Success) {
-                    return std::unexpected(SolverError(
-                        std::format("Singular matrix at block position {}", i)
-                    ));
-                }
-                
-                Eigen::MatrixXd beta_i = lu_B.solve(upper_blocks[i].eigen());
-                upper_blocks[i].eigen() = beta_i;
-                
-                Eigen::VectorXd rhs_vec(n_heavy);
-                for (std::size_t k = 0; k < n_heavy; ++k) {
-                    rhs_vec[k] = rhs(i, k + start_species);
-                }
-                
-                Eigen::VectorXd cy = lu_B.solve(rhs_vec);
-                
-                for (std::size_t j = 0; j < n_heavy; ++j) {
-                    solution(j + start_species, i) = cy[j];
-                }
-                
-            } else {
-                Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[i].eigen());
-                
-                if (lu_B.info() != Eigen::Success) {
-                    return std::unexpected(SolverError(
-                        std::format("Singular matrix at final block position {}", i)
-                    ));
-                }
-                
-                Eigen::VectorXd rhs_vec(n_heavy);
-                for (std::size_t k = 0; k < n_heavy; ++k) {
-                    rhs_vec[k] = rhs(i, k + start_species);
-                }
-                
-                Eigen::VectorXd cy = lu_B.solve(rhs_vec);
-                
-                for (std::size_t j = 0; j < n_heavy; ++j) {
-                    solution(j + start_species, i) = cy[j];
-                }
-            }
-            
-        } catch (const std::exception& e) {
-            return std::unexpected(SolverError(
-                std::format("Matrix operation failed at block {}: {}", i, e.what())
-            ));
-        }
-    }
-    
-    try {
-        for (std::ptrdiff_t i = static_cast<std::ptrdiff_t>(n_eta) - 2; i >= 0; --i) {
-            for (std::size_t j = 0; j < n_heavy; ++j) {
-                double correction = 0.0;
-                for (std::size_t k = 0; k < n_heavy; ++k) {
-                    correction += upper_blocks[i](j, k) * solution(k + start_species, i+1);
-                }
-                
-                double cy_val = solution(j + start_species, i);
-                double new_val = cy_val - correction;
-                solution(j + start_species, i) = new_val;
-            }
-        }
-        
-    } catch (const std::exception& e) {
-        return std::unexpected(SolverError(
-            std::format("Back substitution failed: {}", e.what())
-        ));
-    }
-    
-    return {};
-} */
 
 auto block_thomas_algorithm(
     std::vector<core::Matrix<double>>& lower_blocks,
@@ -617,8 +415,6 @@ auto block_thomas_algorithm(
     core::Matrix<double>& solution,
     int start_species
 ) -> std::expected<void, SolverError> {
-    
-    std::cout << "\n=== BLOCK THOMAS CORRECTED DEBUG ===" << std::endl;
     
     const auto n_eta = main_blocks.size();
     const auto n_heavy = main_blocks[0].rows();
@@ -661,16 +457,7 @@ auto block_thomas_algorithm(
                 }
                 rhs(i, j + start_species) -= temp;
             }
-            
-            // Debug les dernières étapes
-            if(i >= n_eta-3) {
-                std::cout << "Step i=" << i << ": B(0,0)=" << std::scientific << std::setprecision(8) 
-                          << main_blocks[i](0,0) << ", B(1,1)=" << main_blocks[i](1,1) << std::endl;
-                std::cout << "  RHS[0]=" << rhs(i, start_species) 
-                          << ", RHS[1]=" << rhs(i, start_species+1) << std::endl;
-            }
-            
-            std::cout << "  Calling LU solve for i=" << i << std::endl;
+
             Eigen::PartialPivLU<Eigen::MatrixXd> lu_B(main_blocks[i].eigen());
             if (lu_B.info() != Eigen::Success) {
                 return std::unexpected(SolverError("Singular matrix"));
@@ -685,21 +472,13 @@ auto block_thomas_algorithm(
             }
             
             Eigen::VectorXd cy = lu_B.solve(rhs_vec);
-            
-            if(i >= n_eta-3) {
-                std::cout << "  After solve: beta(0,0)=" << beta_i(0,0) 
-                          << ", beta(1,1)=" << beta_i(1,1) << std::endl;
-                std::cout << "  cy[0]=" << cy[0] << ", cy[1]=" << cy[1] << std::endl;
-            }
-            
+
             for (std::size_t j = 0; j < n_heavy; ++j) {
                 solution(j + start_species, i) = cy[j];
             }
         }
         
-        // Final step (i = n_eta-1, equivalent to final step in C code)
         std::size_t i = n_eta - 1;
-        std::cout << "\n=== FINAL STEP (C++) i=" << i << " ===" << std::endl;
         
         // Apply same modifications as other steps
         auto product = lower_blocks[i].eigen() * upper_blocks[i-1].eigen();
@@ -714,34 +493,17 @@ auto block_thomas_algorithm(
             rhs(i, j + start_species) -= temp;
         }
         
-        std::cout << "BEFORE final solve:" << std::endl;
-        std::cout << "  main_blocks[" << i << "](0,0) = " << std::setprecision(12) 
-                  << main_blocks[i](0,0) << std::endl;
-        std::cout << "  main_blocks[" << i << "](1,1) = " << main_blocks[i](1,1) << std::endl;
-        std::cout << "  rhs(" << i << ",0) = " << rhs(i, start_species) << std::endl;
-        std::cout << "  rhs(" << i << ",1) = " << rhs(i, start_species+1) << std::endl;
-        
-        // Final solve (equivalent to inv_vec in C code)
         Eigen::PartialPivLU<Eigen::MatrixXd> lu_B_final(main_blocks[i].eigen());
         if (lu_B_final.info() != Eigen::Success) {
-            std::cout << "  ERROR: Singular final matrix!" << std::endl;
             return std::unexpected(SolverError("Singular final matrix"));
         }
-        
-        std::cout << "  Matrix determinant = " << lu_B_final.determinant() << std::endl;
         
         Eigen::VectorXd rhs_vec_final(n_heavy);
         for (std::size_t k = 0; k < n_heavy; ++k) {
             rhs_vec_final[k] = rhs(i, k + start_species);
         }
         
-        std::cout << "  RHS vector: [" << rhs_vec_final[0] << ", " << rhs_vec_final[1] << "]" << std::endl;
-        
         Eigen::VectorXd cy_final = lu_B_final.solve(rhs_vec_final);
-        
-        std::cout << "AFTER final solve:" << std::endl;
-        std::cout << "  cy[0] = " << cy_final[0] << std::endl;
-        std::cout << "  cy[1] = " << cy_final[1] << std::endl;
         
         for (std::size_t j = 0; j < n_heavy; ++j) {
             solution(j + start_species, i) = cy_final[j];
@@ -763,30 +525,6 @@ auto block_thomas_algorithm(
     } catch (const std::exception& e) {
         return std::unexpected(SolverError("Matrix operation failed"));
     }
-    
-    std::cout << "\n=== FINAL RESULTS (C++) ===" << std::endl;
-    std::cout << "Final solution after back substitution:" << std::endl;
-    for(std::size_t i = 0; i < n_eta; i++) {
-        std::cout << "eta[" << i << "]: ";
-        for(std::size_t j = 0; j < n_heavy; j++) {
-            std::cout << "res[" << j << "]=" << std::setw(12) << std::setprecision(8) 
-                      << std::scientific << solution(j + start_species, i) << " ";
-        }
-        std::cout << std::endl;
-    }
-    
-    // Check sum at each eta point
-    std::cout << "\nSum check at each eta:" << std::endl;
-    for(std::size_t i = 0; i < n_eta; i++) {
-        double sum = 0.0;
-        for(std::size_t j = 0; j < n_heavy; j++) {
-            sum += solution(j + start_species, i);
-        }
-        std::cout << "eta[" << i << "]: sum = " << std::setw(12) << std::setprecision(8) 
-                  << std::scientific << sum << std::endl;
-    }
-    
-    std::cout << "=== BLOCK THOMAS END ===" << std::endl;
     
     return {};
 }

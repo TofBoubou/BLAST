@@ -318,10 +318,10 @@ auto interpolate_boundary_conditions(
         .enthalpy = enthalpy_result.value(),
         .density = density_result.value(),
         .species_fractions = {}, 
-        .d_xi_dx = d_xi_dx_calculated,    // ← Calculé automatiquement
-        .d_ue_dx = d_ue_dx_interp,        // ← Calculé automatiquement
-        .d_he_dx = d_he_dx_interp,        // ← Calculé automatiquement
-        .d_he_dxi = 0.0,                  // Sera calculé ci-dessous
+        .d_xi_dx = d_xi_dx_calculated,    
+        .d_ue_dx = d_ue_dx_interp,       
+        .d_he_dx = d_he_dx_interp,        
+        .d_he_dxi = 0.0,                 
         .body_radius = radius_interp
     };
     
@@ -368,11 +368,7 @@ auto interpolate_boundary_conditions(
         const double total_mass_fraction = std::accumulate(
             edge.species_fractions.begin(), edge.species_fractions.end(), 0.0
         );
-        
-        // DEBUG: Print species mass fractions sum details
-/*         std::cout << "[DEBUG] boundary_interpolator.cpp:397 - Species mass fractions sum: " << total_mass_fraction 
-                  << " (difference from 1.0: " << std::abs(total_mass_fraction - 1.0) << ")" << std::endl;
-        std::cout << "[DEBUG] Individual species fractions: "; */
+
         for (size_t s = 0; s < edge.species_fractions.size(); ++s) {
             std::cout << edge.species_fractions[s] << " ";
         }

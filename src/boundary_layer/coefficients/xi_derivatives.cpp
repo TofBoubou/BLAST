@@ -23,8 +23,6 @@ void XiDerivatives::update_station(int station, double xi,
     lambda1_ = -1.0 / d_xi;
     lambda2_ = 0.0;  // No second-order term for 2-point formula
 
-    // std::cout << std::scientific << "From update station 0 lambda0 = " << lambda0_ << std::endl;
-
     F_minus_2_ = std::move(F_minus_1_);
     g_minus_2_ = std::move(g_minus_1_);
     c_minus_2_ = std::move(c_minus_1_);
@@ -38,14 +36,10 @@ void XiDerivatives::update_station(int station, double xi,
     compute_derivatives();
         
     } else {
-        // std::cout << std::scientific << "From update station else lambda0 = " << lambda0_ << std::endl;
-
         xi_minus_2_ = xi_minus_1_;
         xi_minus_1_ = xi_current_;
         xi_current_ = xi;
-
-        // std::cout << std::scientific << "From update station else : " << "x2 = " << xi_minus_2_ << " x1 = " << xi_minus_1_ << " xc = " << xi_current_ << std::endl;
-        
+   
         lambda0_ = 1.0 / (xi_current_ - xi_minus_1_) + 1.0 / (xi_current_ - xi_minus_2_);
         lambda1_ = (xi_current_ - xi_minus_2_) / 
                    ((xi_minus_1_ - xi_current_) * (xi_minus_1_ - xi_minus_2_));

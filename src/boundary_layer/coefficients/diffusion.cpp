@@ -25,12 +25,6 @@ constexpr auto compute_derivative_factor(
     // Stagnation point limiting solution
     switch (sim_config.body_type) {
         case io::SimulationConfig::BodyType::Axisymmetric:
-            std::cout << std::scientific << std::setprecision(12);
-            std::cout << "[AXI] d_ue_dx=" << bc.d_ue_dx()
-                    << " rho_e=" << bc.rho_e()
-                    << " mu_e=" << bc.mu_e()
-                    << " -> " << std::sqrt(2.0 * bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()))
-                    << "\n";
             return std::sqrt(2.0 * bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()));
         case io::SimulationConfig::BodyType::TwoD:
             return std::sqrt(bc.d_ue_dx() / (bc.rho_e() * bc.mu_e()));
@@ -72,32 +66,6 @@ auto calculate_stefan_maxwell_at_point(
     const auto n_species = c.size();
     const double full_der_fact = der_fact * rho;
     const double sum_c = std::accumulate(c.begin(), c.end(), 0.0);
-
-    
-    std::cout << "[DEBUG] Coefficients à eta = 0" << std::endl;
-
-    for (std::size_t i = 0; i < n_species; ++i) {
-        const double MW_i = mixture.species_molecular_weight(i);
-
-        std::cout << "  espèce[" << i << "]" << std::endl;
-        std::cout << "    c[i]         = " << std::scientific << c[i] << std::endl;
-        std::cout << "    dc_deta[i]   = " << std::scientific << dc_deta[i] << std::endl;
-        std::cout << "    x[i]         = " << std::scientific << x[i] << std::endl;
-        std::cout << "    MW_i         = " << std::scientific << MW_i << std::endl;
-
-        if (mixture.has_electrons()) {
-            auto charges = mixture.species_charges();
-            std::cout << "    charge[i]    = " << std::scientific << charges[i] << std::endl;
-        }
-    }
-
-    std::cout << "  MW (mélange)     = " << std::scientific << MW << std::endl;
-    std::cout << "  dMW_deta         = " << std::scientific << dMW_deta << std::endl;
-    std::cout << "  rho              = " << std::scientific << rho << std::endl;
-    std::cout << "  P                = " << std::scientific << P << std::endl;
-    std::cout << "  der_fact         = " << std::scientific << der_fact << std::endl;
-    std::cout << "  full_der_fact    = " << std::scientific << der_fact * rho << std::endl;
-    std::cout << "  sum_c            = " << std::scientific << sum_c << std::endl;
     
     // Use Eigen through the wrapper
     auto& D_bin = D_bin_local.eigen();
@@ -167,11 +135,6 @@ auto calculate_stefan_maxwell_at_point(
     for (std::size_t i = 0; i < n_species; ++i) {
         J_result[i] = J_vec[i] - c[i] / sum_c * sum_J;
     }
-
-/*     std::cout << "[DEBUG] Stefan-Maxwell flux J_result:" << std::endl;
-        for (std::size_t i = 0; i < J_result.size(); ++i) {
-            std::cout << "  J[" << i << "] = " << std::scientific << J_result[i] << std::endl;
-        } */
     
     return J_result;
 }
@@ -277,26 +240,12 @@ auto compute_stefan_maxwell_fluxes(
             J_species_data[i] = J(j, i);  // Direct access to matrix
         }
         
-        // DEBUG: Verify the copied data
-/*         std::cout << "[DEBUG] Copied J data for species " << j << ": ";
-        for (std::size_t i = 0; i < std::min(n_eta, std::size_t(5)); ++i) {
-            std::cout << std::scientific << J_species_data[i] << " ";
-        }
-        std::cout << std::endl; */
-        
         auto dJ_result = derivatives::compute_eta_derivative(J_species_data, d_eta);
         if (!dJ_result) {
             return std::unexpected(CoefficientError("Failed to compute diffusion flux derivative"));
         }
         auto dJ = dJ_result.value();
-        
-        // DEBUG: Print first few derivatives
-/*         std::cout << "[DEBUG] Computed derivatives for species " << j << ": ";
-        for (std::size_t i = 0; i < std::min(n_eta, std::size_t(5)); ++i) {
-            std::cout << std::scientific << dJ[i] << " ";
-        }
-        std::cout << std::endl; */
-        
+
         for (std::size_t i = 0; i < n_eta; ++i) {
             dJ_deta(j, i) = dJ[i];
         }

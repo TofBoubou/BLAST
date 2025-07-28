@@ -96,8 +96,7 @@ auto build_energy_coefficients(
         return std::unexpected(J_fact_result.error());
     }
     const double J_fact = J_fact_result.value();
-    // const double J_fact = 18.6545;
-    
+ 
     EnergyCoefficients energy_coeffs;
     energy_coeffs.a.reserve(n_eta);
     energy_coeffs.b.reserve(n_eta);
@@ -110,23 +109,12 @@ auto build_energy_coefficients(
         double l3_i = coeffs.transport.l3[i];
         double a_i = l3_i / d_eta_sq;
         energy_coeffs.a.push_back(a_i);
-/*         std::cout << "[a] i = " << i
-                << " | l3[i] = " << l3_i
-                << " | d_eta_sq = " << d_eta_sq
-                << " | a[i] = " << a_i << '\n'; */
-/*         std::cout << "[a] i = " << i
-                << " | a[i] = " << a_i << '\n'; */
 
         // ----- Coefficient b[i] -----
         double dl3_deta_i = coeffs.transport.dl3_deta[i];
         double V_i = V_field[i];
         double b_i = (dl3_deta_i - V_i) / d_eta;
         energy_coeffs.b.push_back(b_i);
-/*         std::cout << "[b] i = " << i
-                << " | dl3_deta[i] = " << dl3_deta_i
-                << " | V[i] = " << V_i
-                << " | d_eta = " << d_eta
-                << " | b[i] = " << b_i << '\n'; */
 
         // ----- Coefficient c[i] -----
         double xi_i = xi;
@@ -135,57 +123,23 @@ auto build_energy_coefficients(
         double he = bc.he();
         double c_term = -2.0 * xi_i * F_i * dhe_dxi / he - 2.0 * xi_i * F_i * lambda0;
         energy_coeffs.c.push_back(c_term);
-        // std::cout << "[c] i = " << i
- /*                << " | xi = " << xi_i
-                << " | F[i] = " << F_i
-                << " | d_he_dxi = " << dhe_dxi
-                << " | he = " << he
-                << " | lambda0 = " << lambda0 */
-                // << " | c[i] = " << c_term << '\n';
-
-        
+ 
         // Compute species enthalpy terms
         auto [tmp1, tmp2] = compute_species_enthalpy_terms(
             inputs, coeffs, bc, J_fact, i
         );
         
-        // d[i] = -ue²/he * [l0[i]*dF_deta[i]² - beta*rho_e/rho[i]*F[i]] + 
-        //        2*xi*F[i]*g_der[i] + tmp1 + tmp2
+        // ----- Coefficient d[i] -----
         const double d_term = 
             -bc.ue() * bc.ue() / bc.he() * 
                 (coeffs.transport.l0[i] * dF_deta[i] * dF_deta[i] - 
                  bc.beta * bc.rho_e() / coeffs.thermodynamic.rho[i] * F_field[i]) +
             2.0 * xi * F_field[i] * g_derivatives[i] + 
             tmp1 + tmp2;
-
-/*         std::cout << "d_term = " 
-          << "-(" << bc.ue() << ")^2 / " << bc.he() << " * (" 
-          << coeffs.transport.l0[i] << " * " << dF_deta[i] << "^2 - " 
-          << bc.beta << " * " << bc.rho_e() << " / " << coeffs.thermodynamic.rho[i] 
-          << " * " << F_field[i] << ") + 2 * " << xi << " * " << F_field[i] 
-          << " * " << g_derivatives[i] << " + " << tmp1 << " + " << tmp2 
-          << " = " << d_term << std::endl; */
-
-
-        // std::cout << " d[i] = " << d_term << '\n';
         
         energy_coeffs.d.push_back(d_term);
     }
-
-    const std::array<std::size_t, 3> indices_to_print{0, 10, 19};
-
-/*     std::cout << "\n=== Energy Coefficients at selected eta points ===\n";
-    for (auto idx : indices_to_print) {
-        if (idx >= n_eta) continue; // Sécurité si n_eta < 20
-        std::cout << "eta[" << idx << "]: "
-                  << "a = " << energy_coeffs.a[idx] << ", "
-                  << "b = " << energy_coeffs.b[idx] << ", "
-                  << "c = " << energy_coeffs.c[idx] << ", "
-                  << "d = " << energy_coeffs.d[idx] << "\n";
-    }
-    std::cout << "----------------------------------------------\n"; */
-
-    
+ 
     return energy_coeffs;
 }
 
@@ -207,7 +161,7 @@ auto build_energy_boundary_conditions(
         };
 }
 
-/* auto compute_species_enthalpy_terms(
+auto compute_species_enthalpy_terms(
     const coefficients::CoefficientInputs& inputs,
     const coefficients::CoefficientSet& coeffs,
     const conditions::BoundaryConditions& bc,
@@ -230,7 +184,7 @@ auto build_energy_boundary_conditions(
         const double l3 = coeffs.transport.l3[eta_index];
         
         tmp1 += dc_deta_j * h_sp_j / bc.he() * dl3_deta + 
-                l3 * h_sp_j / bc.he() * dc_deta2_j +                    // Missing term from original BLAST
+                l3 * h_sp_j / bc.he() * dc_deta2_j +                 
                 l3 * dc_deta_j * dh_sp_deta_j / bc.he();
         
         // tmp2: diffusion flux terms
@@ -242,75 +196,6 @@ auto build_energy_boundary_conditions(
     
     // Apply multiplication factors
     tmp2 *= J_fact;
-
-    return {tmp1, tmp2};
-} */
-
-auto compute_species_enthalpy_terms(
-    const coefficients::CoefficientInputs& inputs,
-    const coefficients::CoefficientSet& coeffs,
-    const conditions::BoundaryConditions& bc,
-    double J_fact,
-    std::size_t eta_index
-) -> std::tuple<double, double> {
-
-    const auto n_species = inputs.c.rows();
-    double tmp1 = 0.0;
-    double tmp2 = 0.0;
-
-    /* std::cout << std::scientific << std::setprecision(6);
-    std::cout << "=== compute_species_enthalpy_terms @ eta_index = " << eta_index << " ===\n"; */
-
-    for (std::size_t j = 0; j < n_species; ++j) {
-
-        const double dc_deta_j      = inputs.dc_deta(j, eta_index);
-        const double dc_deta2_j     = inputs.dc_deta2(j, eta_index);
-        const double h_sp_j         = coeffs.h_species(j, eta_index);
-        const double dh_sp_deta_j   = coeffs.dh_species_deta(j, eta_index);
-        const double dl3_deta       = coeffs.transport.dl3_deta[eta_index];
-        const double l3             = coeffs.transport.l3[eta_index];
-
-        const double J_j            = coeffs.diffusion.J(j, eta_index);
-        const double dJ_deta_j      = coeffs.diffusion.dJ_deta(j, eta_index);
-
-        const double he             = bc.he();
-
-        const double contrib_tmp1 =
-              dc_deta_j * h_sp_j / he * dl3_deta +
-              l3 * h_sp_j / he * dc_deta2_j +
-              l3 * dc_deta_j * dh_sp_deta_j / he;
-
-        const double contrib_tmp2 =
-              J_j * dh_sp_deta_j / he +
-              dJ_deta_j * h_sp_j / he;
-
-        tmp1 += contrib_tmp1;
-        tmp2 += contrib_tmp2;
-
-/*         std::cout << "j = " << j
-                  << " | dc_deta = " << dc_deta_j
-                  << " | dc_deta2 = " << dc_deta2_j
-                  << " | h_sp = " << h_sp_j
-                  << " | dh_sp_deta = " << dh_sp_deta_j << "\n"; */
-
-        // std::cout << "j = " << j << " | dc_deta = " << dc_deta_j << " | dc_deta2 = " << dc_deta2_j << "\n";
-
-/*         std::cout << "    l3 = " << l3
-                  << " | dl3_deta = " << dl3_deta
-                  << " | J = " << J_j
-                  << " | dJ_deta = " << dJ_deta_j
-                  << " | he = " << he << "\n";
- */
-/*         std::cout << " | J = " << J_j
-                  << " | dJ_deta = " << dJ_deta_j << "\n"; */
-
-/*         std::cout << "    contrib_tmp1 = " << contrib_tmp1
-                  << " | contrib_tmp2 = " << contrib_tmp2 << "\n"; */
-    }
-
-    tmp2 *= J_fact;
-/*     std::cout << "Final tmp1 = " << tmp1 << " | Final tmp2 = " << tmp2
-              << " | (before J_fact: " << tmp2 / J_fact << ", J_fact = " << J_fact << ")\n"; */
 
     return {tmp1, tmp2};
 }

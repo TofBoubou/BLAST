@@ -16,8 +16,6 @@ auto solve_momentum(
     PhysicalQuantity auto xi,
     PhysicalQuantity auto d_eta
 ) -> std::expected<std::vector<double>, EquationError> {
-
-    // std::cout << std::scientific << "From solve_momentum xi = " << xi << std::endl;
     
     const auto n_eta = F_previous.size();
     
@@ -96,41 +94,28 @@ auto build_momentum_coefficients(
                                (T_edge * R_universal);
     
     for (std::size_t i = 0; i < n_eta; ++i) {
+
+        // ----- Coefficient a[i] -----
         // a[i] = l0[i] / d_eta²
         coeffs_out.a.push_back(coeffs.transport.l0[i] / d_eta_sq);
-/*         std::cout << "---------------------------------------------------------------" << std::endl;
-        std::cout << "a dans momentum : " << coeffs_out.a[i] << std::endl; */
         
+        // ----- Coefficient b[i] -----
         // b[i] = (dl0_deta[i] - V[i]) / d_eta 
         coeffs_out.b.push_back((coeffs.transport.dl0_deta[i] - V_field[i]) / d_eta);
-/*         std::cout << "b dans momentum : " << coeffs_out.b[i] << std::endl;
-        std::cout << "coeffs.transport.dl0_deta : " << coeffs.transport.dl0_deta[i] << std::endl;
-        std::cout << "V_field : " << V_field[i] << std::endl; */
 
+        // ----- Coefficient c[i] -----
         // c[i] = -2*xi*lambda0*F[i]
         coeffs_out.c.push_back(-2.0 * xi * lambda0 * F_previous[i]);
-        // std::cout << "c dans momentum : " << coeffs_out.c[i] << std::endl;
         
+        // ----- Coefficient d[i] -----
         // d[i] = -beta*(rho_e/rho[i] - F[i]^2) + 2*xi*F[i]*F_der[i]
-/*         const double d_term = - bc.beta * (bc.rho_e() / coeffs.thermodynamic.rho[i] - F_previous[i] * F_previous[i]) + 
-                             2.0 * xi * F_previous[i] * F_derivatives[i];
-        coeffs_out.d.push_back(d_term); */
-
-/*         const double d_term_si_linearisation = - bc.beta * (bc.rho_e() / coeffs.thermodynamic.rho[i]) + 
-                             2.0 * xi * F_previous[i] * F_derivatives[i]; */
-
         const double d_term = - bc.beta * (rho_e_actual / coeffs.thermodynamic.rho[i] - F_previous[i] * F_previous[i]) + 
                              2.0 * xi * F_previous[i] * F_derivatives[i];
         coeffs_out.d.push_back(d_term);
 
         const double d_term_si_linearisation = - bc.beta * (rho_e_actual / coeffs.thermodynamic.rho[i]) + 
                              2.0 * xi * F_previous[i] * F_derivatives[i];
-        
 
-
-/*         std::cout << rho_e_actual << std::endl;
-        std::cout << std::scientific << "d dans momentum si linéarisation : " << d_term_si_linearisation << std::endl;
-        std::cout << "---------------------------------------------------------------" << std::endl; */
     }
     
     return coeffs_out;

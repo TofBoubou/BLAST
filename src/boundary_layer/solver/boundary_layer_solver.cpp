@@ -113,8 +113,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
                 xi
             );
         }
-        
-        
+             
         // Solve this station
         auto station_result = solve_station(station, xi, initial_guess);
         if (!station_result) {
@@ -194,160 +193,6 @@ auto BoundaryLayerSolver::solve_station(
     return solution;
 }
 
-/* auto BoundaryLayerSolver::iterate_station_adaptive(
-    int station,
-    double xi,
-    const conditions::BoundaryConditions& bc,
-    equations::SolutionState& solution
-) -> std::expected<ConvergenceInfo, SolverError> {
-    
-    const auto n_eta = grid_->n_eta();
-    const auto n_species = mixture_.n_species();
-    
-    auto bc_dynamic = bc;
-    std::cout << std::scientific << "Mu_e avant la boucle : " << bc_dynamic.mu_e() << std::endl;
-    std::ranges::fill(solution.T, bc_dynamic.Tw());
-    auto temp = solution.T;
-    std::cout << "Temperature à l'initialisation " << temp[10] << std::endl;
-    
-    ConvergenceInfo conv_info;
-    
-    for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
-        std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
-        const auto solution_old = solution;
-        
-        // 1. Solve continuity equation: dV/dη = -solve_continuity
-        auto V_result = solve_continuity_equation(solution, xi);
-        if (!V_result) {
-            return std::unexpected(SolverError(
-                "Continuity solver failed at station {} iteration {}: {}", 
-                std::source_location::current(), station, iter, V_result.error().message()
-            ));
-        }
-        solution.V = std::move(V_result.value());
-        // std::cout << solution.V[5] << std::endl;
-        
-        // 2. Compute eta derivatives
-        auto derivatives_result = compute_eta_derivatives(solution);
-        if (!derivatives_result) {
-            return std::unexpected(derivatives_result.error());
-        }
-        auto solution_with_derivatives = derivatives_result.value();
-        
-        // 2b. Compute concentration derivatives (first and second)
-        auto conc_derivatives_result = compute_concentration_derivatives(solution);
-        if (!conc_derivatives_result) {
-            return std::unexpected(conc_derivatives_result.error());
-        }
-        auto concentration_derivatives = conc_derivatives_result.value();
-        
-        // 3. Create coefficient inputs
-        coefficients::CoefficientInputs inputs{
-            .xi = xi,
-            .F = solution.F,
-            .c = solution.c,
-            .dc_deta = concentration_derivatives.dc_deta,
-            .dc_deta2 = concentration_derivatives.dc_deta2,
-            .T = solution.T
-        };
-        
-        // 4. Calculate all coefficients
-        auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
-        if (!coeffs_result) {
-            return std::unexpected(SolverError(
-                "Coefficient calculation failed at station {} iteration {}: {}", 
-                std::source_location::current(), station, iter, coeffs_result.error().message()
-            ));
-        }
-        auto coeffs = coeffs_result.value();
-        
-        // 5. Solve momentum equation
-        auto F_result = solve_momentum_equation(solution, coeffs, bc_dynamic, xi);
-        if (!F_result) {
-            return std::unexpected(F_result.error());
-        }
-        auto F_new = F_result.value();
-        
-        // 5.5. CRITICAL: Force F[edge] = 1.0 immediately after momentum solve
-        if (!F_new.empty()) {
-            F_new.back() = 1.0;  // Force dimensionless velocity = 1 at edge
-        }
-        
-        // 6. Solve energy equation  
-        auto g_result = solve_energy_equation(solution, inputs, coeffs, bc_dynamic, station);
-        if (!g_result) {
-            return std::unexpected(g_result.error());
-        }
-        auto g_new = g_result.value();
-        
-        // 6.5. CRITICAL: Force boundary conditions BEFORE temperature update
-        if (!g_new.empty()) {
-            g_new.back() = 1.0;  // Force dimensionless enthalpy = 1 at edge
-        }
-        
-        // 7. Update temperature from enthalpy
-        auto T_result = update_temperature_field(g_new, solution.c, bc_dynamic, solution.T);
-        if (!T_result) {
-            return std::unexpected(T_result.error());
-        }
-        auto T_new = T_result.value();
-        
-        // 8. Update inputs with new temperature
-        inputs.T = T_new;
-        
-        // 8.5. Update edge properties dynamically for thermodynamic consistency
-        update_edge_properties(bc_dynamic, inputs, solution.c);
-        
-        // 9. Recalculate coefficients with updated temperature
-        auto coeffs_updated_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
-        if (!coeffs_updated_result) {
-            return std::unexpected(SolverError("Coefficient recalculation failed"));
-        }
-        coeffs = coeffs_updated_result.value();
-        
-        // 10. Solve species equations
-        auto c_result = solve_species_equations(solution, inputs, coeffs, bc_dynamic, station);
-        if (!c_result) {
-            return std::unexpected(c_result.error());
-        }
-        auto c_new = c_result.value();
-        
-        // 11. Build new solution state
-        equations::SolutionState solution_new(n_eta, n_species);
-        solution_new.V = solution.V;
-        solution_new.F = std::move(F_new);
-        solution_new.g = std::move(g_new);
-        solution_new.c = std::move(c_new);
-        solution_new.T = std::move(T_new);
-        
-        // 11.5. CRITICAL: Enforce boundary conditions BEFORE relaxation
-        // This ensures the forced values are not corrupted by relaxation
-        enforce_edge_boundary_conditions(solution_new, bc_dynamic);
-        
-        // 12. Check convergence before relaxation
-        conv_info = check_convergence(solution_old, solution_new);
-        conv_info.iterations = iter + 1;
-        
-        // 13. Adaptation relexation factor
-        double adaptive_factor = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
-        
-        std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) 
-                  << adaptive_factor << " (max residual: " << conv_info.max_residual() << ")" << std::endl;
-        
-        // 14. Apply adaptive relaxation
-        solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
-        
-        // 15. Vérification
-        if (conv_info.converged) {
-            std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
-            break;
-        }
-    }
-    
-    return conv_info;
-} */
-
-
 auto BoundaryLayerSolver::iterate_station_adaptive(
     int station,
     double xi,
@@ -360,37 +205,12 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
 
     auto bc_dynamic = bc;
     std::ranges::fill(solution.T, bc_dynamic.Tw());
-    std::cout << std::scientific << "Mu_e avant la boucle : " << bc_dynamic.mu_e() << std::endl;
 
     ConvergenceInfo conv_info;
 
     for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
         std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
         const auto solution_old = solution;
-
-        // ✅ Mettre à jour T en tout début d'itération
-        std::cout << "------------------------------------" << std::endl;
-        std::cout << "Print de g : " << solution.g[0] << "  " << solution.g[10] << "  " << solution.g[19] << std::endl;
-        std::cout << "Fractions dans resolution c_10_0: " << solution.c(0,10) << std::endl;
-        std::cout << "Fractions dans resolution c_10_1: " << solution.c(1,10) << std::endl;
-        std::cout << "Fractions dans resolution c_10_2: " << solution.c(2,10) << std::endl;
-        std::cout << "Fractions dans resolution c_10_3: " << solution.c(3,10) << std::endl;
-        std::cout << "Fractions dans resolution c_10_4: " << solution.c(4,10) << std::endl;
-        std::cout << "Fractions dans resolution c_19_0: " << solution.c(0,19) << std::endl;
-        std::cout << "Fractions dans resolution c_19_1: " << solution.c(1,19) << std::endl;
-        std::cout << "Fractions dans resolution c_19_2: " << solution.c(2,19) << std::endl;
-        std::cout << "Fractions dans resolution c_19_3: " << solution.c(3,19) << std::endl;
-        std::cout << "Fractions dans resolution c_19_4: " << solution.c(4,19) << std::endl;
-
-        double sum_c19 = 0.0;
-        for (int j = 0; j < 5; ++j) {
-            sum_c19 += solution.c(j, 19);
-        }
-        std::cout << "Somme des fractions massiques au point 19 : " << sum_c19 << std::endl;
-
-        std::cout << "Température dans la boucle for au point 10: " << solution.T[10] << std::endl;
-        std::cout << "------------------------------------" << std::endl;
-
 
         auto T_result = update_temperature_field(solution.g, solution.c, bc_dynamic, solution.T);
         if (!T_result) {
@@ -400,22 +220,6 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             ));
         }
         solution.T = T_result.value();
-
-/*         // 1. Solve continuity equation
-        auto V_result = solve_continuity_equation(solution, xi);
-        if (!V_result) {
-            return std::unexpected(SolverError(
-                "Continuity solver failed at station {} iteration {}: {}",
-                std::source_location::current(), station, iter, V_result.error().message()
-            ));
-        }
-        solution.V = std::move(V_result.value());
-
-        std::cout << "-----------------------------------------------------" << std::endl;
-        std::cout << "Continuity after calculation V[0] : " << solution.V[0] << std::endl;
-        std::cout << "Continuity after calculation V[10] : " << solution.V[10] << std::endl;
-        std::cout << "Continuity after calculation V[19] : " << solution.V[19] << std::endl;
-        std::cout << "-----------------------------------------------------" << std::endl; */
 
         // 2. Compute eta derivatives
         auto derivatives_result = compute_eta_derivatives(solution);
@@ -441,13 +245,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             .T = solution.T
         };
 
-        std::cout << "JUSTE AVANT UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl;
-        update_edge_properties(bc_dynamic, inputs, solution.c);
-        std::cout << "JUSTE APRES UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl;
-
-
         // 4. Calculate coefficients
-        std::cout << "JUSTE AVANT coeff_calculator_ ---------------------------------------" << std::endl;
         auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
         if (!coeffs_result) {
             return std::unexpected(SolverError(
@@ -456,13 +254,6 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             ));
         }
         auto coeffs = coeffs_result.value();
-        std::cout << "JUSTE APRES coeff_calculator_ ---------------------------------------" << std::endl;
-
-/*         std::cout << "JUSTE AVANT UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl;
-        update_edge_properties(bc_dynamic, inputs, solution.c);
-        std::cout << "JUSTE APRES UPDATE_EDGE_PROPERTIES ---------------------------------------" << std::endl; */
-
-
 
         // 1. Solve continuity equation
         auto V_result = solve_continuity_equation(solution, xi);
@@ -473,14 +264,6 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             ));
         }
         solution.V = std::move(V_result.value());
-
-        std::cout << "-----------------------------------------------------" << std::endl;
-        std::cout << "Continuity after calculation V[0] : " << solution.V[0] << std::endl;
-        std::cout << "Continuity after calculation V[10] : " << solution.V[10] << std::endl;
-        std::cout << "Continuity after calculation V[19] : " << solution.V[19] << std::endl;
-        std::cout << "-----------------------------------------------------" << std::endl;
-
-
 
         // 5. Solve momentum equation
         auto F_result = solve_momentum_equation(solution, coeffs, bc_dynamic, xi);
@@ -496,17 +279,6 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         std::cout << "Print de g après résolution : " << g_new[0] << "  " << g_new[10] << "  " << g_new[19] << std::endl;
         if (!g_new.empty()) g_new.back() = 1.0;
 
-        // 7. Skip (T update déjà fait au début)
-
-        // 8. Update edge properties
-        // update_edge_properties(bc_dynamic, inputs, solution.c);
-
-/*         // 9. Recalculate coefficients
-        auto coeffs_updated_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
-        if (!coeffs_updated_result) {
-            return std::unexpected(SolverError("Coefficient recalculation failed"));
-        }
-        coeffs = coeffs_updated_result.value(); */
 
         // 10. Solve species equations
         auto c_result = solve_species_equations(solution, inputs, coeffs, bc_dynamic, station);
@@ -514,18 +286,6 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
             return std::unexpected(c_result.error());
         }
         auto c_new = c_result.value();
-
-        std::cout << "Fractions tout juste après le calcul c_10_0: " << c_new(0,10) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_10_1: " << c_new(1,10) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_10_2: " << c_new(2,10) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_10_3: " << c_new(3,10) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_10_4: " << c_new(4,10) << std::endl;
-
-        std::cout << "Fractions tout juste après le calcul c_19_0: " << c_new(0,19) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_19_1: " << c_new(1,19) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_19_2: " << c_new(2,19) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_19_3: " << c_new(3,19) << std::endl;
-        std::cout << "Fractions tout juste après le calcul c_19_4: " << c_new(4,19) << std::endl;
 
         // 11. Build new solution state
         equations::SolutionState solution_new(n_eta, n_species);
@@ -579,14 +339,6 @@ auto BoundaryLayerSolver::solve_continuity_equation(
         y_field[i] = -(2.0 * xi * lambda0 + 1.0) * solution.F[i] - 
                       2.0 * xi * F_derivatives[i];
     }
-
-    std::cout << "y_field[0] dans solve_continuity_equation " << y_field[0] << std::endl;
-    std::cout << "y_field[10] dans solve_continuity_equation " << y_field[10] << std::endl;
-    std::cout << "y_field[19] dans solve_continuity_equation " << y_field[19] << std::endl;
-    std::cout << "lambda0 " << lambda0 << std::endl;
-    std::cout << "solution.F[10] " << solution.F[10] << std::endl;
-
-    std::cout << std::scientific << "From continuity lambda0 = " << lambda0 << "   -------   " << "xi = " << xi << std::endl;
     
     // Integrate dV/dη = -y to get V
     // Note: The negative sign is handled in the continuity equation solver
@@ -643,11 +395,6 @@ auto BoundaryLayerSolver::solve_energy_equation(
     }
     
     auto g_solution = result.value();
-/*     std::cout << "DEBUG: Energy equation result (station " << station << "): ";
-    for (size_t i = 0; i < std::min(g_solution.size(), size_t(5)); ++i) {
-        std::cout << g_solution[i] << " ";
-    }
-    std::cout << std::endl; */
     
     return g_solution;
 }
@@ -686,35 +433,17 @@ auto BoundaryLayerSolver::update_temperature_field(
     std::vector<double> enthalpy_field(n_eta);
     
     // Convert g (dimensionless enthalpy) to dimensional enthalpy
-    // std::cout << "DEBUG: bc.he() = " << bc.he() << std::endl;
     for (std::size_t i = 0; i < n_eta; ++i) {
         enthalpy_field[i] = g_field[i] * bc.he();
-/*         if (!std::isfinite(enthalpy_field[i])) {
-            std::cout << "DEBUG: NaN detected at i=" << i << ", g_field[i]=" << g_field[i] << ", bc.he()=" << bc.he() << std::endl;
-        } */
     }
 
-    // std::cout << "Enthalpie avant le solveur : " << enthalpy_field[10] << std::endl;
-
-    // std::cout << "h_w = " << enthalpy_field[0] << " ---------- " << "h_e = " << enthalpy_field[19] << std::endl;
-    
-    // DEBUG: Print enthalpy field values
-/*     std::cout << "[DEBUG] update_temperature_field: Starting temperature solve..." << std::endl;
-    std::cout << "[DEBUG] Enthalpy field values:" << std::endl;
-    for (std::size_t i = 0; i < std::min(enthalpy_field.size(), size_t(20)); ++i) {
-        std::cout << "[DEBUG] h[" << i << "] = " << enthalpy_field[i] << std::endl;
-    } */
-    
     auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
     if (!result) {
-        // std::cout << "[DEBUG] Temperature solve failed!" << std::endl;
         return std::unexpected(SolverError(
             "Temperature solve failed: {}", 
             std::source_location::current(), result.error().message()
         ));
     }
-    
-    // std::cout << "[DEBUG] Temperature solve succeeded!" << std::endl;
     
     return result.value().temperatures;
 }
@@ -754,8 +483,6 @@ auto BoundaryLayerSolver::check_convergence(
     
     info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
-    std::cout << "info.residual_F = " << info.residual_F << "  info.residual_g = " << info.residual_g << "  info.residual_c = " << info.residual_c << std::endl;
-    
     return info;
 }
 
@@ -795,136 +522,8 @@ auto BoundaryLayerSolver::create_initial_guess(
         }
     }
 
-    std::cout << "Verification IG : " << std::endl;
-    std::cout << "Verification IG F[100]: " << guess.F[10] << std::endl;
-    std::cout << "Verification IG g[100]: " << guess.g[10] << std::endl;
-    std::cout << "Verification IG c_100_0: " << guess.c(0,10) << std::endl;
-    std::cout << "Verification IG c_100_1: " << guess.c(1,10) << std::endl;
-    std::cout << "Verification IG c_100_2: " << guess.c(2,10) << std::endl;
-    std::cout << "Verification IG c_100_3: " << guess.c(3,10) << std::endl;
-    std::cout << "Verification IG c_100_4: " << guess.c(4,10) << std::endl;
-
-    
     return guess;
 }
-
-/* auto BoundaryLayerSolver::create_initial_guess(
-   int station,
-   double xi,
-   const conditions::BoundaryConditions& bc
-) const -> std::expected<equations::SolutionState, SolverError> {
-   
-   const auto n_eta = grid_->n_eta();
-   const auto n_species = mixture_.n_species();
-   const double eta_max = grid_->eta_max();
-   
-   equations::SolutionState guess(n_eta, n_species);
-   
-   // Get equilibrium composition at wall conditions
-   auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
-   if (!equilibrium_result) {
-       return std::unexpected(SolverError(
-           "Failed to compute equilibrium composition at wall conditions: {}",
-           std::source_location::current(), equilibrium_result.error().message()
-       ));
-   }
-   auto c_wall_equilibrium = equilibrium_result.value();
-   
-   for (std::size_t i = 0; i < n_eta; ++i) {
-       const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
-       
-       // Analytical boundary layer profiles
-       // F(η) = 1 - 1.034 * exp(-5.628 * η/η_max)
-       guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
-       
-       // g(η) = 1 - 0.7907 * exp(-4.241 * η/η_max)
-       // guess.g[i] = 1.0 - 0.7907 * std::exp(-4.241 * eta / eta_max);
-       guess.g[i] = 1.0;
-       
-       // Species composition
-       for (std::size_t j = 0; j < n_species; ++j) {
-           guess.c(j, i) = c_wall_equilibrium[j]; 
-       }
-   }
-   
-   return guess;
-} */
-
-/* auto BoundaryLayerSolver::create_initial_guess(
-   int station,
-   double xi,
-   const conditions::BoundaryConditions& bc
-) const -> std::expected<equations::SolutionState, SolverError> {
-   
-   const auto n_eta = grid_->n_eta();
-   const auto n_species = mixture_.n_species();
-   const double eta_max = grid_->eta_max();
-   
-   equations::SolutionState guess(n_eta, n_species);
-   
-   // ===== STEP 1: RETRIEVE BOUNDARY COMPOSITIONS =====
-
-   // Compute equilibrium composition at the wall (Tw, P_e)
-   auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
-   if (!equilibrium_result) {
-       return std::unexpected(SolverError(
-           "Failed to compute equilibrium composition at wall conditions: {}",
-           std::source_location::current(), equilibrium_result.error().message()
-       ));
-   }
-   auto c_wall_equilibrium = equilibrium_result.value();
-   
-   // Extract edge composition from input
-   const auto& c_edge = bc.c_e();
-   if (c_edge.size() != n_species) {
-       return std::unexpected(SolverError(
-           "Edge composition size mismatch: expected {}, got {}",
-           std::source_location::current(), n_species, c_edge.size()
-       ));
-   }
-   
-   // ===== STEP 2: TRANSITION FUNCTION (TANH INTERPOLATION) =====
-
-   // Smooth transition function from wall (0) to edge (1)
-   // Centered at 35% of the boundary layer thickness, with steep slope
-   auto transition_function = [](double eta_norm, double eta_center = 0.35, double sharpness = 10.0) -> double {
-       return 0.5 * (1.0 + std::tanh(sharpness * (eta_norm - eta_center)));
-   };
-   
-   // ===== STEP 3: COMPUTE SPECIES PROFILES =====
-
-   for (std::size_t i = 0; i < n_eta; ++i) {
-       const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
-       const double eta_norm = static_cast<double>(i) / (n_eta - 1);  // Normalize to [0,1]
-       
-       // Analytical profiles for velocity F and enthalpy g (unchanged)
-       guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
-       guess.g[i] = 1.0;
-       
-       // ===== STEP 4: INTERPOLATE SPECIES CONCENTRATIONS =====
-       
-       // Compute transition factor from wall to edge
-       const double f = transition_function(eta_norm);
-       
-       // Linear interpolation between wall and edge compositions
-       double sum_interpolated = 0.0;
-       for (std::size_t j = 0; j < n_species; ++j) {
-           guess.c(j, i) = c_wall_equilibrium[j] * (1.0 - f) + c_edge[j] * f;
-           sum_interpolated += guess.c(j, i);
-       }
-       
-       // Enforce mass conservation: normalize so that sum_j c_j = 1
-       if (sum_interpolated > 1e-15) {
-           for (std::size_t j = 0; j < n_species; ++j) {
-               guess.c(j, i) /= sum_interpolated;
-           }
-       } else {
-        std::cout << "GROS BUG" << std::endl;
-        abort();
-       }
-   }
-   return guess;
-} */
 
 
 /* auto BoundaryLayerSolver::create_initial_guess(
@@ -1022,60 +621,6 @@ auto BoundaryLayerSolver::create_initial_guess(
    return guess;
 } */
 
-/* auto BoundaryLayerSolver::create_initial_guess(
-   int station,
-   double xi,
-   const conditions::BoundaryConditions& bc
-) const -> std::expected<equations::SolutionState, SolverError> {
-   
-   const auto n_eta = grid_->n_eta();
-   const auto n_species = mixture_.n_species();
-   const double eta_max = grid_->eta_max();
-   
-   equations::SolutionState guess(n_eta, n_species);
-
-   for (std::size_t i = 0; i < n_eta; ++i) {
-       const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
-       const double eta_norm = eta / eta_max;
-
-       // === F(η): velocity profile (unchanged)
-       guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta_norm);
-
-       // === g(η): enthalpy profile (analytic)
-       guess.g[i] = 1.0 - std::exp(-4.08 * std::pow(eta_norm, 0.53));
-
-       // === c_i(η): species profiles
-       // Species order: CO₂ (0), CO (1), O₂ (2), O (3), C (4)
-
-       // CO₂
-       guess.c(0, i) = 0.0266 - 0.0167 * std::exp(-4.79 * std::pow(eta_norm, 1.08));
-
-       // CO
-       guess.c(1, i) = 0.126 * std::exp(-6.51 * eta_norm) + 0.527;
-
-       // O₂
-       guess.c(2, i) = 0.0180 - 0.0130 * std::exp(-6.02 * std::pow(eta_norm, 1.31));
-
-       // O
-       guess.c(3, i) = 0.4204 - 0.1203 * std::exp(-32.31 * std::pow(eta_norm, 1.78));
-
-       // C
-       guess.c(4, i) = 0.0371 - 0.0071 * std::exp(-5.86 * std::pow(eta_norm, 1.25));
-
-       // === Normalisation (sécurité numérique)
-       double sum = 0.0;
-       for (std::size_t j = 0; j < n_species; ++j) sum += guess.c(j, i);
-       if (sum > 1e-15) {
-           for (std::size_t j = 0; j < n_species; ++j) guess.c(j, i) /= sum;
-       } else {
-           std::cerr << "ERROR: species concentrations sum to zero at eta = " << eta << std::endl;
-           abort();
-       }
-   }
-
-   return guess;
-} */
-
 
 auto BoundaryLayerSolver::extrapolate_from_previous(
     const equations::SolutionState& previous_solution,
@@ -1089,49 +634,13 @@ auto BoundaryLayerSolver::extrapolate_from_previous(
     auto extrapolated = previous_solution;
     
     // Extrapolate F and g fields
-/*     for (std::size_t i = 0; i < extrapolated.F.size(); ++i) {
+    for (std::size_t i = 0; i < extrapolated.F.size(); ++i) {
         extrapolated.F[i] *= factor;
         extrapolated.g[i] = std::max(0.1, extrapolated.g[i] * factor); // Keep positive
-    } */
+    }
     
     return extrapolated;
 }
-
-/* auto BoundaryLayerSolver::apply_relaxation(
-    const equations::SolutionState& old_solution,
-    const equations::SolutionState& new_solution,
-    double relaxation_factor
-) const -> equations::SolutionState {
-    
-    auto relaxed = new_solution; // Start with new solution
-    
-    // Apply relaxation: relaxed = (1-α)*old + α*new
-    const double alpha = relaxation_factor;
-    const double one_minus_alpha = 1.0 - alpha;
-    
-    for (std::size_t i = 0; i < relaxed.F.size(); ++i) {
-        relaxed.F[i] = one_minus_alpha * old_solution.F[i] + alpha * new_solution.F[i];
-        relaxed.g[i] = one_minus_alpha * old_solution.g[i] + alpha * new_solution.g[i];
-    }
-    
-    for (std::size_t i = 0; i < relaxed.c.rows(); ++i) {
-        for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
-            relaxed.c(i, j) = one_minus_alpha * old_solution.c(i, j) + alpha * new_solution.c(i, j);
-        }
-        
-    }
-
-    for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
-        double sum_at_eta = 0.0;
-        for (std::size_t i = 0; i < relaxed.c.rows(); ++i) {
-            sum_at_eta += relaxed.c(i, j);
-        }
-        std::cout << "Somme des espèces à eta[" << j << "] : " << sum_at_eta << '\n';
-    }
-
-    
-    return relaxed;
-} */
 
 auto BoundaryLayerSolver::apply_relaxation_differential(
     const equations::SolutionState& old_solution,
@@ -1158,13 +667,6 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
         std::cout << new_solution.c(i, 19) << " ";
     }
     std::cout << std::endl;
-
-    
-/*     std::cout << "Fractions dans relaxation c_19_0: " << new_solution.c(0,19) << std::endl;
-    std::cout << "Fractions dans relaxation c_19_1: " << new_solution.c(1,19) << std::endl;
-    std::cout << "Fractions dans relaxation c_19_2: " << new_solution.c(2,19) << std::endl;
-    std::cout << "Fractions dans relaxation c_19_3: " << new_solution.c(3,19) << std::endl;
-    std::cout << "Fractions dans relaxation c_19_4: " << new_solution.c(4,19) << std::endl; */
     
     for (std::size_t i = 0; i < relaxed.F.size() - 1; ++i) {
         relaxed.F[i] = (1.0 - alpha_F) * old_solution.F[i] + alpha_F * new_solution.F[i];
@@ -1177,13 +679,6 @@ auto BoundaryLayerSolver::apply_relaxation_differential(
             relaxed.c(i, j) = (1.0 - alpha_c) * old_solution.c(i, j) + alpha_c * new_solution.c(i, j);
         }
     }
-
-/*     std::cout << "---------------------------------------" << std::endl;
-    std::cout << "alpha_g dans la relaxation : " << alpha_g << std::endl;
-    std::cout << "g_old[0] dans la relaxation : " << old_solution.g[0] << std::endl;
-    std::cout << "g[0] dans la relaxation : " << relaxed.g[0] << std::endl;
-    std::cout << "---------------------------------------" << std::endl; */
-
 
     return relaxed;
 }
@@ -1240,21 +735,7 @@ auto BoundaryLayerSolver::compute_eta_derivatives(
     }
 
     const std::array<std::size_t, 3> indices_to_print{0, 10, 19};
-
-/*     std::cout << "\n=== Derivatives at selected eta points ===\n";
-    for (auto idx : indices_to_print) {
-        std::cout << "eta[" << idx << "]: ";
-        std::cout << "dF/deta = " << derivatives.F[idx] << ", ";
-        std::cout << "dg/deta = " << derivatives.g[idx] << ", ";
-        std::cout << "dV/deta = " << derivatives.V[idx] << "\n";
-        
-        for (std::size_t j = 0; j < n_species; ++j) {
-            std::cout << "  dc[" << j << "]/deta = " << derivatives.c(j, idx) << "\n";
-        }
-        std::cout << "------------------------------------------\n";
-    } */
-
-    
+  
     return derivatives;
 }
 
@@ -1371,198 +852,11 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
     
     // Normalize if total is significantly different from 1.0
     if (std::abs(total_mass_fraction - 1.0) > 1e-12 && total_mass_fraction > 1e-12) {
-        // std::cout << "[DEBUG] Normalizing species mass fractions..." << std::endl;
         for (std::size_t j = 0; j < n_species; ++j) {
             solution.c(j, edge_idx) /= total_mass_fraction;
         }
-        // std::cout << "[DEBUG] Normalization complete." << std::endl;
     }
-        // DEBUG : impression finale des concentrations à l’edge
-    std::cout << "enforce_edge_boundary_conditions ---------------------------------------------" << std::endl;
-    std::cout << "solution.c[:, " << edge_idx << "] = ";
-    for (std::size_t j = 0; j < n_species; ++j) {
-        std::cout << solution.c(j, edge_idx) << " ";
-    }
-    std::cout << std::endl;
-    std::cout << "------------------------------------------------------------------------------" << std::endl;
-
 }
-
-/* auto BoundaryLayerSolver::enforce_edge_boundary_conditions(
-    equations::SolutionState& solution,
-    const conditions::BoundaryConditions& bc
-) const -> void {
-    
-    const auto n_eta = grid_->n_eta();
-    const auto n_species = mixture_.n_species();
-
-    if (n_eta == 0) return;
-
-    const std::size_t edge_idx = n_eta - 1;  // Last eta point is the edge
-
-    // Composition imposée à l'edge (valeurs fixées manuellement)
-    const std::array<double, 5> imposed_edge_composition = {
-        2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02
-    };
-
-    for (std::size_t j = 0; j < n_species && j < imposed_edge_composition.size(); ++j) {
-        solution.c(j, edge_idx) = imposed_edge_composition[j];
-    }
-
-    // Vérification de la conservation de masse
-    double total_mass_fraction = 0.0;
-    for (std::size_t j = 0; j < n_species; ++j) {
-        total_mass_fraction += solution.c(j, edge_idx);
-    }
-
-    if (std::abs(total_mass_fraction - 1.0) > 1e-12 && total_mass_fraction > 1e-12) {
-        for (std::size_t j = 0; j < n_species; ++j) {
-            solution.c(j, edge_idx) /= total_mass_fraction;
-        }
-    }
-
-    // DEBUG final
-    std::cout << "enforce_edge_boundary_conditions ---------------------------------------------" << std::endl;
-    std::cout << "solution.c[:, " << edge_idx << "] = ";
-    for (std::size_t j = 0; j < n_species; ++j) {
-        std::cout << solution.c(j, edge_idx) << " ";
-    }
-    std::cout << std::endl;
-    std::cout << "------------------------------------------------------------------------------" << std::endl;
-} */
-
-
-/* auto BoundaryLayerSolver::update_edge_properties(
-    conditions::BoundaryConditions& bc,
-    const coefficients::CoefficientInputs& inputs,
-    const core::Matrix<double>& species_matrix
-) const -> void {
-    
-    const auto n_eta = grid_->n_eta();
-    const auto n_species = mixture_.n_species();
-    
-    if (n_eta == 0 || inputs.T.empty()) {
-        return; // No data to update
-    }
-    
-    // Get edge conditions (last point in eta grid)
-    const auto edge_idx = n_eta - 1;
-    const double T_edge = inputs.T[edge_idx];
-    const double P_edge = bc.P_e(); // Pressure remains constant
-    
-    // Get edge composition
-    std::vector<double> edge_composition(n_species);
-    for (std::size_t j = 0; j < n_species; ++j) {
-        edge_composition[j] = species_matrix(j, edge_idx);
-    }
-    
-    // Calculate new edge density using equation of state
-    auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
-    if (!MW_result) {
-        throw SolverError("Failed to compute edge molecular weight: {}", 
-                         std::source_location::current(), MW_result.error().message());
-    }
-    const double MW_edge = MW_result.value();
-    const double rho_e_new = P_edge * MW_edge / 
-                            (T_edge * thermophysics::constants::R_universal);
-
-    std::cout << "----------------------------------------" << std::endl;
-    std::cout << "Edge composition dans update_edge_properties : " << edge_composition[0] << " " << edge_composition[1] << " " << edge_composition[2] << " " << edge_composition[3] << " " << edge_composition[4] << " " << rho_e_new << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
-
-    auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);
-    
-    if (!mu_result) {
-        throw SolverError("Failed to compute edge viscosity: {}", 
-                         std::source_location::current(), mu_result.error().message());
-    }
-    const double mu_e_new = mu_result.value();
-    
-    bc.update_edge_viscosity(mu_e_new);
-    bc.update_edge_density(rho_e_new);
-    std::cout << "--------------------------------------------------------" << std::endl;
-    std::cout << "rho_e_new : " << rho_e_new << std::endl;
-    std::cout << "mu_e_new : " << mu_e_new << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
-} */
-
-/* auto BoundaryLayerSolver::update_edge_properties(
-    conditions::BoundaryConditions& bc,
-    const coefficients::CoefficientInputs& inputs,
-    const core::Matrix<double>& species_matrix
-) const -> void {
-    
-    const auto n_eta = grid_->n_eta();
-    const auto n_species = mixture_.n_species();
-    
-    if (n_eta == 0 || inputs.T.empty()) {
-        return; // No data to update
-    }
-    
-    // Get edge conditions (last point in eta grid)
-    const auto edge_idx = n_eta - 1;
-    const double T_edge = inputs.T[edge_idx];
-    const double P_edge = bc.P_e(); // Pressure remains constant
-    
-    // Get edge composition
-    std::vector<double> edge_composition(n_species);
-    for (std::size_t j = 0; j < n_species; ++j) {
-        edge_composition[j] = species_matrix(j, edge_idx);
-    }
-
-    std::cout << "----------------------------------------" << std::endl;
-    std::cout << "Edge composition dans update_edge_properties : " << edge_composition[0] << " " << edge_composition[1] << " " << edge_composition[2] << " " << edge_composition[3] << " " << edge_composition[4] << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
-
-    
-    // Calculate new edge density using equation of state
-    auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
-    if (!MW_result) {
-        throw SolverError("Failed to compute edge molecular weight: {}", 
-                         std::source_location::current(), MW_result.error().message());
-    }
-    const double MW_edge = MW_result.value();
-    const double rho_e_new = P_edge * MW_edge / 
-                            (T_edge * thermophysics::constants::R_universal);
-    
-    // Calculate equilibrium composition at edge conditions
-    auto eq_result = mixture_.equilibrium_composition(T_edge, P_edge);
-    if (!eq_result) {
-        throw SolverError("Failed to compute edge equilibrium composition: {}", 
-                         std::source_location::current(), eq_result.error().message());
-    }
-    auto edge_composition_eq = eq_result.value();
-    
-    // Calculate new edge viscosity using equilibrium composition
-    auto mu_result = mixture_.viscosity(edge_composition_eq, T_edge, P_edge);
-    if (!mu_result) {
-        throw SolverError("Failed to compute edge viscosity: {}", 
-                         std::source_location::current(), mu_result.error().message());
-    }
-    const double mu_e_new = mu_result.value();
-    
-    // Recalculate edge density with equilibrium composition
-    auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition_eq);
-    if (!MW_eq_result) {
-        throw SolverError("Failed to compute equilibrium edge molecular weight: {}", 
-                         std::source_location::current(), MW_eq_result.error().message());
-    }
-    const double MW_edge_eq = MW_eq_result.value();
-    const double rho_e_new_eq = P_edge * MW_edge_eq / 
-                               (T_edge * thermophysics::constants::R_universal);
-
-    std::cout << "Pression temperature et MW à l'edge dans enforce : " << P_edge << " " << MW_edge_eq << " " << MW_edge_eq << " " << T_edge << std::endl;
-    
-    // Update boundary conditions with new equilibrium values
-    bc.update_edge_density(rho_e_new_eq);
-    bc.update_edge_viscosity(mu_e_new);
-    bc.edge.species_fractions = edge_composition_eq;
-    std::cout << "--------------------------------------------------------" << std::endl;
-    std::cout << std::scientific << std::setprecision(15)
-          << "rho_e_new_eq : " << rho_e_new_eq << " " << rho_e_new << std::endl;
-    std::cout << "mu_e_new : " << mu_e_new << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
-} */
 
 
 auto BoundaryLayerSolver::update_edge_properties(
@@ -1581,24 +875,13 @@ auto BoundaryLayerSolver::update_edge_properties(
     // Get edge conditions (last point in eta grid)
     const auto edge_idx = n_eta - 1;
     const double T_edge = inputs.T[edge_idx];
-    const double P_edge = bc.P_e(); // Pressure remains constant
+    const double P_edge = bc.P_e();
     
     // Get edge composition
     std::vector<double> edge_composition(n_species);
     for (std::size_t j = 0; j < n_species; ++j) {
         edge_composition[j] = species_matrix(j, edge_idx);
     }
-
-    std::cout << "----------------------------------------" << std::endl;
-    std::cout << std::scientific << std::setprecision(8)
-          << "Edge composition dans update_edge_properties : "
-          << edge_composition[0] << " "
-          << edge_composition[1] << " "
-          << edge_composition[2] << " "
-          << edge_composition[3] << " "
-          << edge_composition[4] << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
-
     
     // Calculate new edge density using equation of state
     auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
@@ -1626,28 +909,10 @@ auto BoundaryLayerSolver::update_edge_properties(
     }
     const double mu_e_new = mu_result.value();
     
-    // Recalculate edge density with equilibrium composition
-    // auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition_eq);
-    auto MW_eq_result = mixture_.mixture_molecular_weight(edge_composition);
-    if (!MW_eq_result) {
-        throw SolverError("Failed to compute equilibrium edge molecular weight: {}", 
-                         std::source_location::current(), MW_eq_result.error().message());
-    }
-    const double MW_edge_eq = MW_eq_result.value();
-    const double rho_e_new_eq = P_edge * MW_edge_eq / 
-                               (T_edge * thermophysics::constants::R_universal);
-
-    std::cout << "Pression temperature et MW à l'edge dans enforce : " << P_edge << " " << MW_edge_eq << " " << MW_edge_eq << " " << T_edge << std::endl;
-    
     // Update boundary conditions with new equilibrium values
     bc.update_edge_density(rho_e_new);
     bc.update_edge_viscosity(mu_e_new);
     bc.edge.species_fractions = edge_composition_eq;
-    std::cout << "--------------------------------------------------------" << std::endl;
-    std::cout << std::scientific << std::setprecision(15)
-          << "rho_e_new_eq : " << rho_e_new_eq << " " << rho_e_new << std::endl;
-    std::cout << "mu_e_new : " << mu_e_new << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
 }
 
 } // namespace blast::boundary_layer::solver

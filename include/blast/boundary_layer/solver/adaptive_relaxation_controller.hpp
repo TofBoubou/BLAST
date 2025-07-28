@@ -26,7 +26,7 @@ class AdaptiveRelaxationController {
 public:
     // Configuration parameters
     struct Config {
-        double initial_factor = 1;         // Conservative initial factor
+        double initial_factor = 0.01;         // Conservative initial factor
         double min_factor = 0.00001;          // Absolute minimum
         double max_factor = 1;             // Reasonable maximum
         
