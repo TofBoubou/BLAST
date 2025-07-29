@@ -752,7 +752,7 @@ auto CoefficientCalculator::calculate_wall_properties(
 // Derivative computation implementations
 namespace derivatives {
 
-template<std::ranges::sized_range Range>
+/* template<std::ranges::sized_range Range>
 auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
     const auto n = std::ranges::size(values);
     std::vector<double> derivatives(n);
@@ -797,6 +797,33 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::
     derivatives[n - 1] = derivatives[n - 2]; // Same as n-2 for stability
     
     return derivatives;
+} */
+
+template<std::ranges::sized_range Range>
+auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
+   const auto n = std::ranges::size(values);
+   std::vector<double> derivatives(n);
+   
+   const double dx12 = 12.0 * d_eta;
+   
+   derivatives[0] = (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] + 
+                     16.0 * values[3] - 3.0 * values[4]) / dx12;
+   derivatives[1] = (-3.0 * values[0] - 10.0 * values[1] + 18.0 * values[2] - 
+                     6.0 * values[3] + 1.0 * values[4]) / dx12;
+   
+   for (std::size_t i = 2; i < n - 2; ++i) {
+       derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] + 
+                        8.0 * values[i + 1] - values[i + 2]) / dx12;
+   }
+   
+   derivatives[n - 2] = (3.0 * values[n - 6] - 16.0 * values[n - 5] + 
+                        36.0 * values[n - 4] - 48.0 * values[n - 3] + 
+                        25.0 * values[n - 2]) / dx12;
+   derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 
+                        36.0 * values[n - 3] - 48.0 * values[n - 2] + 
+                        25.0 * values[n - 1]) / dx12;
+   
+   return derivatives;
 }
 
 

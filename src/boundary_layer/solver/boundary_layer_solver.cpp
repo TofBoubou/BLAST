@@ -483,10 +483,12 @@ auto BoundaryLayerSolver::check_convergence(
     
     info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
+    std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
+
     return info;
 }
 
-auto BoundaryLayerSolver::create_initial_guess(
+/* auto BoundaryLayerSolver::create_initial_guess(
     int station,
     double xi,
     const conditions::BoundaryConditions& bc
@@ -523,10 +525,10 @@ auto BoundaryLayerSolver::create_initial_guess(
     }
 
     return guess;
-}
+} */
 
 
-/* auto BoundaryLayerSolver::create_initial_guess(
+auto BoundaryLayerSolver::create_initial_guess(
    int station,
    double xi,
    const conditions::BoundaryConditions& bc
@@ -619,7 +621,7 @@ auto BoundaryLayerSolver::create_initial_guess(
        }
    }
    return guess;
-} */
+}
 
 
 auto BoundaryLayerSolver::extrapolate_from_previous(
