@@ -13,7 +13,8 @@
       "Bash(./blast config/default.yaml test_output)",
       "Bash(killall:*)",
       "Bash(true)",
-      "Bash(./blast config/default.yaml)"
+      "Bash(./blast config/default.yaml)",
+      "Bash(cd:*)"
     ],
     "deny": []
   }

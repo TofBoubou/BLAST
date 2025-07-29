@@ -4,7 +4,7 @@
 # Compiler and flags
 CXX = g++
 CXXFLAGS = -std=c++23 -O3 -DNDEBUG -march=native -w
-DEBUG_FLAGS = -std=c++23 -Wall -Wextra -g -O0 -DDEBUG
+SHELL := /bin/bash
 INCLUDE_FLAGS = -Iinclude -I/usr/include/hdf5/serial
 
 
@@ -35,104 +35,62 @@ SRC_DIR = src
 BUILD_DIR = build
 BIN_DIR = .
 
-# Source files organized by module
-BOUNDARY_LAYER_SOURCES = \
-    $(SRC_DIR)/boundary_layer/coefficients/coefficient_calculator.cpp \
-    $(SRC_DIR)/boundary_layer/coefficients/diffusion.cpp \
-    $(SRC_DIR)/boundary_layer/coefficients/xi_derivatives.cpp \
-    $(SRC_DIR)/boundary_layer/conditions/boundary_interpolator.cpp \
-    $(SRC_DIR)/boundary_layer/equations/continuity.cpp \
-    $(SRC_DIR)/boundary_layer/equations/energy.cpp \
-    $(SRC_DIR)/boundary_layer/equations/momentum.cpp \
-    $(SRC_DIR)/boundary_layer/equations/species.cpp \
-    $(SRC_DIR)/boundary_layer/grid/coordinate_transform.cpp \
-    $(SRC_DIR)/boundary_layer/grid/grid.cpp \
-    $(SRC_DIR)/boundary_layer/solver/boundary_layer_solver.cpp \
-    $(SRC_DIR)/boundary_layer/solver/adaptive_relaxation_controller.cpp \
-    $(SRC_DIR)/boundary_layer/solvers/tridiagonal_solvers.cpp \
-    $(SRC_DIR)/boundary_layer/thermodynamics/enthalpy_temperature_solver.cpp
-
-IO_SOURCES = \
-    $(SRC_DIR)/io/config_manager.cpp \
-    $(SRC_DIR)/io/yaml_parser.cpp
-
-# Output system sources
-OUTPUT_SOURCES = \
-    $(SRC_DIR)/io/output/output_writer.cpp \
-    $(SRC_DIR)/io/output/hdf5_writer.cpp
-
-THERMOPHYSICS_SOURCES = \
-    $(SRC_DIR)/thermophysics/mutation_mixture.cpp
-
-MAIN_SOURCE = $(SRC_DIR)/main.cpp
-
-# All sources
-ALL_SOURCES = $(BOUNDARY_LAYER_SOURCES) $(IO_SOURCES) $(OUTPUT_SOURCES) $(THERMOPHYSICS_SOURCES) $(MAIN_SOURCE)
+# Automatic source detection
+ALL_SOURCES := $(shell find $(SRC_DIR) -name '*.cpp' -type f)
+TOTAL_FILES := $(words $(ALL_SOURCES))
 
 # Object files
-BOUNDARY_LAYER_OBJECTS = $(BOUNDARY_LAYER_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
-IO_OBJECTS = $(IO_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
-OUTPUT_OBJECTS = $(OUTPUT_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
-THERMOPHYSICS_OBJECTS = $(THERMOPHYSICS_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
-MAIN_OBJECT = $(MAIN_SOURCE:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+ALL_OBJECTS = $(ALL_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 
-ALL_OBJECTS = $(BOUNDARY_LAYER_OBJECTS) $(IO_OBJECTS) $(OUTPUT_OBJECTS) $(THERMOPHYSICS_OBJECTS) $(MAIN_OBJECT)
-
-# Targets
+# Target
 TARGET = $(BIN_DIR)/blast
-DEBUG_TARGET = $(BIN_DIR)/blast_debug
 
 # Default target
 .PHONY: all
-all: $(TARGET)
+all:
+	@echo "Building BLAST..."
+	@rm -f $(BUILD_DIR)/.progress 2>/dev/null || true
+	@$(MAKE) -s $(TARGET)
 
-# Debug target
-.PHONY: debug
-debug: CXXFLAGS = $(DEBUG_FLAGS)
-debug: $(DEBUG_TARGET)
-
-# Production target
+# Build target
 $(TARGET): $(ALL_OBJECTS) | check_dependencies
-	@echo "Linking production executable..."
-	$(CXX) $(ALL_OBJECTS) -o $@ $(LIBS)
-	@echo "✓ Production build complete: $@"
+	@printf "▸ Linking         "
+	@$(CXX) $(ALL_OBJECTS) -o $@ $(LIBS) 2>/dev/null && printf "✓\n" || (printf "✗\n" && exit 1)
+	@printf "\n✓ Complete → %s\n" "$@"
 
-# Debug target
-$(DEBUG_TARGET): $(ALL_OBJECTS) | check_dependencies
-	@echo "Linking debug executable..."
-	$(CXX) $(ALL_OBJECTS) -o $@ $(LIBS)
-	@echo "✓ Debug build complete: $@"
-
-# Object file compilation rules
+# Object file compilation rules with progress
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	@echo "Compiling $<..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+	@to_build=0; \
+	for src in $(ALL_SOURCES); do \
+		obj=$$(echo "$$src" | sed 's|$(SRC_DIR)/|$(BUILD_DIR)/|; s|\.cpp$$|.o|'); \
+		if [ "$$src" -nt "$$obj" ] 2>/dev/null || [ ! -f "$$obj" ]; then \
+			to_build=$$((to_build + 1)); \
+		fi; \
+	done; \
+	echo "$$$$" >> $(BUILD_DIR)/.progress 2>/dev/null || echo "$$$$" > $(BUILD_DIR)/.progress; \
+	current=$$(wc -l < $(BUILD_DIR)/.progress 2>/dev/null); \
+	percent=$$((current * 100 / to_build)); \
+	filled=$$((percent / 4)); \
+	bar=$$(printf "%*s" $$filled | tr ' ' '='); \
+	printf "\r[%-25s] %3d%% (%d/%d) %s\n" \
+		"$$bar" $$percent $$current $$to_build "$(notdir $<)"; \
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@ 2>/dev/null
 
-# Create build directories
+# Create build directories automatically
 $(BUILD_DIR):
-	@echo "Creating build directories..."
-	@mkdir -p $(BUILD_DIR)/boundary_layer/coefficients
-	@mkdir -p $(BUILD_DIR)/boundary_layer/conditions
-	@mkdir -p $(BUILD_DIR)/boundary_layer/equations
-	@mkdir -p $(BUILD_DIR)/boundary_layer/grid
-	@mkdir -p $(BUILD_DIR)/boundary_layer/solver
-	@mkdir -p $(BUILD_DIR)/boundary_layer/solvers
-	@mkdir -p $(BUILD_DIR)/boundary_layer/thermodynamics
-	@mkdir -p $(BUILD_DIR)/io
-	@mkdir -p $(BUILD_DIR)/io/output
-	@mkdir -p $(BUILD_DIR)/thermophysics
+	@mkdir -p $(BUILD_DIR)
 
 # Dependency checking
 .PHONY: check_dependencies
 check_dependencies:
-	@echo "Checking dependencies..."
-	@command -v pkg-config >/dev/null 2>&1 || { echo "Error: pkg-config not found"; exit 1; }
-	@pkg-config --exists hdf5 || { echo "Error: HDF5 development libraries not found. Install libhdf5-dev"; exit 1; }
-	@test -d $(MUTATIONPP_PATH) || { echo "Error: Mutation++ not found at $(MUTATIONPP_PATH)"; exit 1; }
-	@test -d $(YAML_CPP_PATH) || { echo "Error: yaml-cpp not found at $(YAML_CPP_PATH)"; exit 1; }
-	@test -d $(EIGEN_PATH) || { echo "Error: Eigen not found at $(EIGEN_PATH)"; exit 1; }
-	@echo "✓ All dependencies found"
+	@printf "▸ Dependencies    "
+	@command -v pkg-config >/dev/null 2>&1 || { printf "✗\nError: pkg-config not found\n"; exit 1; }
+	@pkg-config --exists hdf5 || { printf "✗\nError: HDF5 development libraries not found. Install libhdf5-dev\n"; exit 1; }
+	@test -d $(MUTATIONPP_PATH) || { printf "✗\nError: Mutation++ not found at $(MUTATIONPP_PATH)\n"; exit 1; }
+	@test -d $(YAML_CPP_PATH) || { printf "✗\nError: yaml-cpp not found at $(YAML_CPP_PATH)\n"; exit 1; }
+	@test -d $(EIGEN_PATH) || { printf "✗\nError: Eigen not found at $(EIGEN_PATH)\n"; exit 1; }
+	@printf "✓\n"
 
 # Library building
 .PHONY: build_libs
@@ -141,16 +99,20 @@ build_libs:
 	@if [ ! -f $(MUTATIONPP_PATH)/install/lib/libmutation++.a ]; then \
 		echo "Building Mutation++..."; \
 		cd $(MUTATIONPP_PATH) && mkdir -p build && cd build && \
-		cmake .. -DCMAKE_INSTALL_PREFIX=../install && \
+		cmake .. -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=Release && \
 		make -j$(shell nproc) && make install; \
+	else \
+		echo "✓ Mutation++ already built"; \
 	fi
 	@if [ ! -f $(YAML_CPP_PATH)/build/libyaml-cpp.a ]; then \
 		echo "Building yaml-cpp..."; \
 		cd $(YAML_CPP_PATH) && mkdir -p build && cd build && \
-		cmake .. -DYAML_CPP_BUILD_TESTS=OFF && \
+		cmake .. -DYAML_CPP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release && \
 		make -j$(shell nproc); \
+	else \
+		echo "✓ yaml-cpp already built"; \
 	fi
-	@echo "✓ External libraries built"
+	@echo "✓ External libraries ready"
 
 # System dependency installation (Ubuntu/Debian)
 .PHONY: install_deps_ubuntu
@@ -179,64 +141,12 @@ install_deps_macos:
 		zlib
 	@echo "✓ System dependencies installed"
 
-# Testing targets
-.PHONY: test
-test: $(TARGET)
-	@echo "Running tests..."
-	@if [ -f config/default.yaml ]; then \
-		./$(TARGET) config/default.yaml test_output; \
-	else \
-		echo "No test configuration found. Create config/default.yaml"; \
-	fi
 
-# Post-processing setup
-.PHONY: setup_postprocess
-setup_postprocess:
-	@echo "Setting up HDF5 post-processing environment..."
-	@command -v python3 >/dev/null 2>&1 || { echo "Error: Python 3 not found"; exit 1; }
-	python3 -m pip install numpy matplotlib pandas h5py seaborn pathlib
-	@echo "✓ HDF5 post-processing setup complete"
 
-# Example run
-.PHONY: example
-example: $(TARGET)
-	@echo "Running example simulation..."
-	@mkdir -p example_output
-	./$(TARGET) config/default.yaml example_simulation
-	@echo "✓ Example complete. HDF5 output available for analysis"
 
-# Performance profiling
-.PHONY: profile
-profile: debug
-	@echo "Running performance profile..."
-	@command -v valgrind >/dev/null 2>&1 || { echo "Install valgrind for profiling"; exit 1; }
-	valgrind --tool=callgrind --callgrind-out-file=profile.out ./$(DEBUG_TARGET) config/default.yaml profile_test
-	@echo "Profile saved to profile.out"
 
-# Memory check
-.PHONY: memcheck
-memcheck: debug
-	@echo "Running memory check..."
-	@command -v valgrind >/dev/null 2>&1 || { echo "Install valgrind for memory checking"; exit 1; }
-	valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all ./$(DEBUG_TARGET) config/default.yaml memcheck_test
 
-# Documentation generation
-.PHONY: docs
-docs:
-	@echo "Generating documentation..."
-	@command -v doxygen >/dev/null 2>&1 || { echo "Install doxygen for documentation"; exit 1; }
-	doxygen Doxyfile
-	@echo "✓ Documentation generated in docs/"
 
-# Static analysis
-.PHONY: analyze
-analyze:
-	@echo "Running static analysis..."
-	@command -v cppcheck >/dev/null 2>&1 || { echo "Install cppcheck for static analysis"; exit 1; }
-	cppcheck --enable=all --std=c++23 --inconclusive --xml --xml-version=2 \
-		--suppress=missingIncludeSystem \
-		$(SRC_DIR) 2> analysis.xml
-	@echo "Static analysis complete. Results in analysis.xml"
 
 # Format code
 .PHONY: format
@@ -251,16 +161,9 @@ format:
 clean:
 	@echo "Cleaning build files..."
 	rm -rf $(BUILD_DIR)
-	rm -f $(TARGET) $(DEBUG_TARGET)
+	rm -f $(TARGET)
 	@echo "✓ Clean complete"
 
-.PHONY: clean_all
-clean_all: clean
-	@echo "Cleaning all generated files..."
-	rm -rf example_output/
-	rm -f *.out *.xml
-	rm -rf docs/
-	@echo "✓ Deep clean complete"
 
 # Install target
 .PHONY: install
@@ -278,31 +181,20 @@ help:
 	@echo ""
 	@echo "Main targets:"
 	@echo "  all              Build production executable"
-	@echo "  debug            Build debug executable"
-	@echo "  test             Run test simulation"
-	@echo "  example          Run example simulation"
 	@echo "  clean            Remove build files"
-	@echo "  clean_all        Remove all generated files"
 	@echo ""
 	@echo "Setup targets:"
 	@echo "  install_deps_ubuntu   Install Ubuntu/Debian dependencies"
 	@echo "  install_deps_macos    Install macOS dependencies"
 	@echo "  build_libs            Build external libraries"
-	@echo "  setup_postprocess     Setup HDF5 post-processing"
 	@echo ""
 	@echo "Development targets:"
 	@echo "  format           Format source code"
-	@echo "  analyze          Run static analysis"
-	@echo "  profile          Profile performance"
-	@echo "  memcheck         Check for memory leaks"
-	@echo "  docs             Generate documentation"
 	@echo ""
 	@echo "Example workflow:"
 	@echo "  make install_deps_ubuntu  # Install system dependencies"
 	@echo "  make build_libs           # Build external libraries"
-	@echo "  make setup_postprocess    # Setup HDF5 post-processing"
 	@echo "  make all                  # Build BLAST"
-	@echo "  make example              # Run example"
 
 # Print configuration
 .PHONY: config
@@ -323,15 +215,11 @@ config:
 	@echo "Source files: $(words $(ALL_SOURCES)) files"
 	@echo "Object files: $(words $(ALL_OBJECTS)) objects"
 
-# Automatic dependency generation
--include $(ALL_OBJECTS:.o=.d)
-
-$(BUILD_DIR)/%.d: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MM -MT $(@:.d=.o) $< > $@
-
-.PHONY: deps
-deps: $(ALL_OBJECTS:.o=.d)
+# Dependency generation (disabled for cleaner build)
+# $(BUILD_DIR)/%.d: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+#	@mkdir -p $(dir $@)
+#	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MM -MT $(@:.d=.o) $< > $@
+# -include $(ALL_OBJECTS:.o=.d)
 
 # Default target
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := all

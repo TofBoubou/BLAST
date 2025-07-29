@@ -16,7 +16,6 @@ auto ConfigurationManager::resolve_config_path(std::string_view config_file) con
     return std::filesystem::absolute(path_candidate);
 }
 
-
 auto ConfigurationManager::load(std::string_view config_file) 
     -> std::expected<Configuration, core::ConfigurationError> {
     
