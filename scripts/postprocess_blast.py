@@ -13,6 +13,7 @@ Usage:
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import h5py
 import seaborn as sns
 from pathlib import Path
@@ -23,14 +24,23 @@ from scipy.interpolate import griddata
 warnings.filterwarnings('ignore')
 
 # Set publication-quality plot style
-plt.style.use('seaborn-v0_8-paper')
-sns.set_palette("husl")
+plt.style.use('classic')
 
-
-class BLASTFileError(Exception):
-    """Custom exception for BLAST file format issues"""
-    pass
-
+plt.rcParams.update({
+    'font.size': 10,
+    'axes.titlesize': 12,
+    'axes.labelsize': 10,
+    'xtick.labelsize': 9,
+    'ytick.labelsize': 9,
+    'legend.fontsize': 9,
+    'lines.linewidth': 1.5,
+    'lines.markersize': 5,
+    'axes.linewidth': 0.8,
+    'grid.linewidth': 0.5,
+    'grid.alpha': 0.3,
+    'figure.dpi': 300,
+    'savefig.dpi': 600,
+})
 
 class BLASTReader:
     """Unified reader for BLAST output formats with robust error handling"""
@@ -261,34 +271,46 @@ class BLASTPlotter:
         eta = np.array(station_data['eta'])
         
         # Plot 1: Velocity profile (F)
-        axes[0, 0].plot(station_data['F'], eta, 'b-', linewidth=2, label='F')
+        axes[0, 0].plot(station_data['F'], eta, 'black', linewidth=2, label='F')
         axes[0, 0].set_xlabel('F (Dimensionless Stream Function)')
         axes[0, 0].set_ylabel('η (Similarity Coordinate)')
         axes[0, 0].grid(True, alpha=0.3)
         axes[0, 0].set_title(f'Station {station_index:03d} - Velocity Profile (F)')
         
         # Plot 2: Temperature profile (g)
-        axes[0, 1].plot(station_data['g'], eta, 'r-', linewidth=2, label='g')
+        axes[0, 1].plot(station_data['g'], eta, 'black', linewidth=2, label='g')
         axes[0, 1].set_xlabel('g (Dimensionless Enthalpy)')
         axes[0, 1].set_ylabel('η')
         axes[0, 1].grid(True, alpha=0.3)
         axes[0, 1].set_title(f'Station {station_index:03d} - Enthalpy Profile (g)')
         
         # Plot 3: Physical temperature
-        axes[0, 2].plot(station_data['temperature'], eta, 'orange', linewidth=2)
+        axes[0, 2].plot(station_data['temperature'], eta, 'black', linewidth=2)
         axes[0, 2].set_xlabel('Temperature (K)')
         axes[0, 2].set_ylabel('η')
         axes[0, 2].grid(True, alpha=0.3)
         axes[0, 2].set_title(f'Station {station_index:03d} - Temperature Profile')
         
-        # Plot 4: Major species concentrations
-        colors = plt.cm.tab10(np.linspace(0, 1, len(species_names)))
+        # Plot 4: Major species concentrations with different line styles
+        line_styles = ['-', '--', '-.', ':']  # 4 styles de base
+        markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']  # 12 marqueurs
         legend_added = False
-        for i, (species, color) in enumerate(zip(species_names[:6], colors)):
+        
+        for i, species in enumerate(species_names):
             col_name = f'c_{species}'
             if col_name in station_data:
-                axes[1, 0].plot(station_data[col_name], eta, color=color, 
-                               linewidth=2, label=species)
+                # Combinaison cyclique : 4 styles × 12 marqueurs = 48 combinaisons uniques
+                style_idx = i % len(line_styles)
+                marker_idx = i % len(markers)
+                
+                axes[1, 0].plot(station_data[col_name], eta, 
+                            color='black',
+                            linestyle=line_styles[style_idx],
+                            marker=markers[marker_idx] if markers[marker_idx] else None,
+                            markevery=max(1, len(eta)//8),  # Espacer les marqueurs
+                            markersize=3.5,
+                            linewidth=1.5, 
+                            label=species)
                 legend_added = True
         
         axes[1, 0].set_xlabel('Mass Fraction')
@@ -301,21 +323,19 @@ class BLASTPlotter:
         axes[1, 0].set_title(f'Station {station_index:03d} - Species Concentrations')
         
         # Plot 5: V profile
-        axes[1, 1].plot(station_data['V'], eta, 'purple', linewidth=2)
+        axes[1, 1].plot(station_data['V'], eta, 'black', linewidth=2)
         axes[1, 1].set_xlabel('V (Velocity Component)')
         axes[1, 1].set_ylabel('η')
         axes[1, 1].grid(True, alpha=0.3)
         axes[1, 1].set_title(f'Station {station_index:03d} - V Profile')
         
         # Plot 6: Leave empty or add additional data if available
-        axes[1, 2].text(0.5, 0.5, f'Station {station_index:03d}\nAdditional plots\ncan be added here', 
-                       ha='center', va='center', transform=axes[1, 2].transAxes)
-        axes[1, 2].set_title('Reserved for Future Use')
+        axes[1, 2].axis('off')
         
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
             print(f"Profiles for station {station_index:03d} saved to: {save_path}")
         else:
             plt.show()
@@ -424,7 +444,7 @@ class BLASTPlotter:
             plt.tight_layout()
             
             if save_path:
-                plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+                plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
                 print(f"F and g map using {len(stations_used)} stations saved to: {save_path}")
             else:
                 plt.show()
@@ -457,7 +477,7 @@ class BLASTPlotter:
         stations_to_plot = valid_stations[:5]  # Limit to first 5 valid stations
         
         for station_idx in stations_to_plot:
-            profile_path = output_dir / f'profiles_station_{station_idx:03d}.png'
+            profile_path = output_dir / f'profiles_station_{station_idx:03d}'
             if self.plot_profiles(station_idx, save_path=profile_path):
                 plotted_stations.append(station_idx)
         
