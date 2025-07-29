@@ -103,7 +103,7 @@ private:
                                        const equations::SolutionState& new_solution) const noexcept -> ConvergenceInfo;
 
   // Solution initialization and extrapolation
-  [[nodiscard]] auto create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc) const
+  [[nodiscard]] auto create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc, double T_edge) const
       -> std::expected<equations::SolutionState, SolverError>;
 
   [[nodiscard]] auto extrapolate_from_previous(const equations::SolutionState& previous_solution, double xi_prev,

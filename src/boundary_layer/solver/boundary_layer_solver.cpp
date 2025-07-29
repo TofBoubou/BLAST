@@ -85,7 +85,11 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
                                           std::source_location::current(), station, bc_result.error().message()));
       }
 
-      auto guess_result = create_initial_guess(station, xi, bc_result.value());
+      // Get T_edge from configuration
+      const auto& edge_point = config_.outer_edge.edge_points[0];
+      const double T_edge = edge_point.temperature;
+      
+      auto guess_result = create_initial_guess(station, xi, bc_result.value(), T_edge);
       if (!guess_result) {
         return std::unexpected(guess_result.error());
       }
@@ -303,6 +307,11 @@ auto BoundaryLayerSolver::iterate_station_adaptive(
         // ================================================================
         
         // 1. Temperature field update for T-g-c consistency
+
+        std::cout << "T before update at station " << station << ", iteration " << iter << ":\n";
+        std::cout << "  T[0]     = " << std::scientific << std::setprecision(6) << solution.T.front() << "\n";
+        std::cout << "  T[n-1]   = " << std::scientific << std::setprecision(6) << solution.T.back()  << "\n";
+
         auto T_result = update_temperature_field(solution.g, solution.c, bc_dynamic, solution.T);
         if (!T_result) {
             return std::unexpected(SolverError(
@@ -634,7 +643,7 @@ equilibrium_result.error().message()
     return guess;
 } */
 
-auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc) const
+auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc, double T_edge) const
     -> std::expected<equations::SolutionState, SolverError> {
 
   const auto n_eta = grid_->n_eta();
@@ -718,6 +727,14 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
       abort();
     }
   }
+
+  // ===== STEP 5: INITIALIZE TEMPERATURE FIELD =====
+  for (std::size_t i = 0; i < n_eta; ++i) {
+    const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);  
+    double F_normalized = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
+    guess.T[i] = bc.Tw() + F_normalized * (T_edge - bc.Tw());
+  }
+
   return guess;
 }
 

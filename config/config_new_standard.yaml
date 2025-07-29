@@ -1,0 +1,343 @@
+simulation:
+  body_type: axisymmetric
+  only_stagnation_point: false
+  diffusion_type: stefan_maxwell
+  consider_thermal_diffusion: false
+  chemical_non_equilibrium: false
+numerical:
+  n_eta: 50
+  eta_max: 6.0
+  convergence_tolerance: 1.0e-06
+  max_iterations: 100000
+  under_relaxation: 1
+  step_control:
+    lower_bound: 5
+    upper_bound: 20
+  solvers:
+    h2t_tolerance: 1.0e-12
+    h2t_max_iterations: 50000
+    stefan_tolerance: 1.0e-12
+    stefan_max_iterations: 50000
+mixture:
+  name: CO2_5
+  thermodynamic_database: RRHO
+  viscosity_algorithm: chapman_enskog_ldlt
+  reference_temperature: 0.0
+output:
+  x_stations:
+  - 0.0
+  - 0.02
+  - 0.04
+  - 0.06
+  - 0.08
+  - 0.1
+  - 0.12
+  - 0.14
+  - 0.16
+  - 0.18
+  - 0.2
+  - 0.22
+  - 0.24
+  - 0.26
+  - 0.28
+  - 0.3
+  - 0.32
+  - 0.34
+  - 0.36
+  - 0.38
+  - 0.4
+  - 0.42
+  - 0.44
+  - 0.46
+  - 0.48
+  - 0.5
+  - 0.52
+  - 0.54
+  - 0.56
+  - 0.58
+  - 0.6
+  - 0.62
+  - 0.64
+  - 0.66
+  - 0.68
+  - 0.7
+  - 0.72
+  - 0.74
+  - 0.76
+  - 0.78
+  - 0.8
+  - 0.82
+  - 0.84
+  - 0.86
+  - 0.88
+  - 0.9
+  - 0.92
+  - 0.94
+  - 0.96
+  - 0.98
+  - 1.0
+  output_directory: test_outputs
+  generate_lookup_table: false
+outer_edge:
+  edge_points:
+  - x: 0.0
+    radius: 1
+    velocity: 0.0
+    temperature: 3000.0
+    pressure: 7000.0
+  - x: 0.02
+    radius: 1
+    velocity: 2.0
+    temperature: 3040.0
+    pressure: 7000.0
+  - x: 0.04
+    radius: 1
+    velocity: 4.0
+    temperature: 3080.0
+    pressure: 7000.0
+  - x: 0.06
+    radius: 1
+    velocity: 6.0
+    temperature: 3120.0
+    pressure: 7000.0
+  - x: 0.08
+    radius: 1
+    velocity: 8.0
+    temperature: 3160.0
+    pressure: 7000.0
+  - x: 0.1
+    radius: 1
+    velocity: 10.0
+    temperature: 3200.0
+    pressure: 7000.0
+  - x: 0.12
+    radius: 1
+    velocity: 12.0
+    temperature: 3240.0
+    pressure: 7000.0
+  - x: 0.14
+    radius: 1
+    velocity: 14.0
+    temperature: 3280.0
+    pressure: 7000.0
+  - x: 0.16
+    radius: 1
+    velocity: 16.0
+    temperature: 3320.0
+    pressure: 7000.0
+  - x: 0.18
+    radius: 1
+    velocity: 18.0
+    temperature: 3360.0
+    pressure: 7000.0
+  - x: 0.2
+    radius: 1
+    velocity: 20.0
+    temperature: 3400.0
+    pressure: 7000.0
+  - x: 0.22
+    radius: 1
+    velocity: 22.0
+    temperature: 3440.0
+    pressure: 7000.0
+  - x: 0.24
+    radius: 1
+    velocity: 24.0
+    temperature: 3480.0
+    pressure: 7000.0
+  - x: 0.26
+    radius: 1
+    velocity: 26.0
+    temperature: 3520.0
+    pressure: 7000.0
+  - x: 0.28
+    radius: 1
+    velocity: 28.0
+    temperature: 3560.0
+    pressure: 7000.0
+  - x: 0.3
+    radius: 1
+    velocity: 30.0
+    temperature: 3600.0
+    pressure: 7000.0
+  - x: 0.32
+    radius: 1
+    velocity: 32.0
+    temperature: 3640.0
+    pressure: 7000.0
+  - x: 0.34
+    radius: 1
+    velocity: 34.0
+    temperature: 3680.0
+    pressure: 7000.0
+  - x: 0.36
+    radius: 1
+    velocity: 36.0
+    temperature: 3720.0
+    pressure: 7000.0
+  - x: 0.38
+    radius: 1
+    velocity: 38.0
+    temperature: 3760.0
+    pressure: 7000.0
+  - x: 0.4
+    radius: 1
+    velocity: 40.0
+    temperature: 3800.0
+    pressure: 7000.0
+  - x: 0.42
+    radius: 1
+    velocity: 42.0
+    temperature: 3840.0
+    pressure: 7000.0
+  - x: 0.44
+    radius: 1
+    velocity: 44.0
+    temperature: 3880.0
+    pressure: 7000.0
+  - x: 0.46
+    radius: 1
+    velocity: 46.0
+    temperature: 3920.0
+    pressure: 7000.0
+  - x: 0.48
+    radius: 1
+    velocity: 48.0
+    temperature: 3960.0
+    pressure: 7000.0
+  - x: 0.5
+    radius: 1
+    velocity: 50.0
+    temperature: 4000.0
+    pressure: 7000.0
+  - x: 0.52
+    radius: 1
+    velocity: 52.0
+    temperature: 4040.0
+    pressure: 7000.0
+  - x: 0.54
+    radius: 1
+    velocity: 54.0
+    temperature: 4080.0
+    pressure: 7000.0
+  - x: 0.56
+    radius: 1
+    velocity: 56.0
+    temperature: 4120.0
+    pressure: 7000.0
+  - x: 0.58
+    radius: 1
+    velocity: 58.0
+    temperature: 4160.0
+    pressure: 7000.0
+  - x: 0.6
+    radius: 1
+    velocity: 60.0
+    temperature: 4200.0
+    pressure: 7000.0
+  - x: 0.62
+    radius: 1
+    velocity: 62.0
+    temperature: 4240.0
+    pressure: 7000.0
+  - x: 0.64
+    radius: 1
+    velocity: 64.0
+    temperature: 4280.0
+    pressure: 7000.0
+  - x: 0.66
+    radius: 1
+    velocity: 66.0
+    temperature: 4320.0
+    pressure: 7000.0
+  - x: 0.68
+    radius: 1
+    velocity: 68.0
+    temperature: 4360.0
+    pressure: 7000.0
+  - x: 0.7
+    radius: 1
+    velocity: 70.0
+    temperature: 4400.0
+    pressure: 7000.0
+  - x: 0.72
+    radius: 1
+    velocity: 72.0
+    temperature: 4440.0
+    pressure: 7000.0
+  - x: 0.74
+    radius: 1
+    velocity: 74.0
+    temperature: 4480.0
+    pressure: 7000.0
+  - x: 0.76
+    radius: 1
+    velocity: 76.0
+    temperature: 4520.0
+    pressure: 7000.0
+  - x: 0.78
+    radius: 1
+    velocity: 78.0
+    temperature: 4560.0
+    pressure: 7000.0
+  - x: 0.8
+    radius: 1
+    velocity: 80.0
+    temperature: 4600.0
+    pressure: 7000.0
+  - x: 0.82
+    radius: 1
+    velocity: 82.0
+    temperature: 4640.0
+    pressure: 7000.0
+  - x: 0.84
+    radius: 1
+    velocity: 84.0
+    temperature: 4680.0
+    pressure: 7000.0
+  - x: 0.86
+    radius: 1
+    velocity: 86.0
+    temperature: 4720.0
+    pressure: 7000.0
+  - x: 0.88
+    radius: 1
+    velocity: 88.0
+    temperature: 4760.0
+    pressure: 7000.0
+  - x: 0.9
+    radius: 1
+    velocity: 90.0
+    temperature: 4800.0
+    pressure: 7000.0
+  - x: 0.92
+    radius: 1
+    velocity: 92.0
+    temperature: 4840.0
+    pressure: 7000.0
+  - x: 0.94
+    radius: 1
+    velocity: 94.0
+    temperature: 4880.0
+    pressure: 7000.0
+  - x: 0.96
+    radius: 1
+    velocity: 96.0
+    temperature: 4920.0
+    pressure: 7000.0
+  - x: 0.98
+    radius: 1
+    velocity: 98.0
+    temperature: 4960.0
+    pressure: 7000.0
+  - x: 1.0
+    radius: 1
+    velocity: 100.0
+    temperature: 5000.0
+    pressure: 7000.0
+  velocity_gradient_stagnation: 4027.1213622326
+  freestream_density: 0.0019382429
+  freestream_velocity: 500000
+wall_parameters:
+  temperatures:
+  - 3100
