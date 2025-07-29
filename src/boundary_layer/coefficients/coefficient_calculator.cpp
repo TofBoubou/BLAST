@@ -682,54 +682,6 @@ auto CoefficientCalculator::calculate_wall_properties(
 // Derivative computation implementations
 namespace derivatives {
 
-/* template<std::ranges::sized_range Range>
-auto compute_eta_derivative(Range&& values, double d_eta) ->
-std::expected<std::vector<double>, CoefficientError> {
-    const auto n = std::ranges::size(values);
-    std::vector<double> derivatives(n);
-    
-    if (d_eta <= 0.0) {
-        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
-    }
-    
-    if (n < 2) {
-        return std::unexpected(CoefficientError("Insufficient points for derivative calculation: need at least 2 points"));
-    }
-    
-    if (n < 5) {
-        // Simple finite differences for small arrays
-        derivatives[0] = (values[1] - values[0]) / d_eta;
-        for (std::size_t i = 1; i < n - 1; ++i) {
-            derivatives[i] = (values[i + 1] - values[i - 1]) / (2.0 * d_eta);
-        }
-        derivatives[n - 1] = (values[n - 1] - values[n - 2]) / d_eta;
-        return derivatives;
-    }
-    
-    // 5-point stencil for higher accuracy
-    const double dx12 = 12.0 * d_eta;
-    
-    // Forward difference at start
-    derivatives[0] = (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] +
-                      16.0 * values[3] - 3.0 * values[4]) / dx12;
-    derivatives[1] = (-3.0 * values[0] - 10.0 * values[1] + 18.0 * values[2] -
-                      6.0 * values[3] + 1.0 * values[4]) / dx12;
-    
-    // Central differences
-    for (std::size_t i = 2; i < n - 2; ++i) {
-        derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] +
-                         8.0 * values[i + 1] - values[i + 2]) / dx12;
-    }
-    
-    // Backward difference at end
-    derivatives[n - 2] = (3.0 * values[n - 5] - 16.0 * values[n - 4] +
-                         36.0 * values[n - 3] - 48.0 * values[n - 2] +
-                         25.0 * values[n - 1]) / dx12;
-    derivatives[n - 1] = derivatives[n - 2]; // Same as n-2 for stability
-    
-    return derivatives;
-} */
-
 template<std::ranges::sized_range Range>
 auto compute_eta_derivative(Range&& values, double d_eta) ->
 std::expected<std::vector<double>, CoefficientError> {
@@ -830,81 +782,7 @@ std::expected<std::vector<double>, CoefficientError> {
     return derivatives;
 }
 
-/* template <std::ranges::sized_range Range>
-auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
-  const auto n = std::ranges::size(values);
-  std::vector<double> derivatives(n);
-
-  const double dx12 = 12.0 * d_eta;
-
-  derivatives[0] =
-      (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] + 16.0 * values[3] - 3.0 * values[4]) / dx12;
-  derivatives[1] = (-3.0 * values[0] - 10.0 * values[1] + 18.0 * values[2] - 6.0 * values[3] + 1.0 * values[4]) / dx12;
-
-  for (std::size_t i = 2; i < n - 2; ++i) {
-    derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] + 8.0 * values[i + 1] - values[i + 2]) / dx12;
-  }
-
-  derivatives[n - 2] = (3.0 * values[n - 6] - 16.0 * values[n - 5] + 36.0 * values[n - 4] - 48.0 * values[n - 3] +
-                        25.0 * values[n - 2]) /
-                       dx12;
-  derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 36.0 * values[n - 3] - 48.0 * values[n - 2] +
-                        25.0 * values[n - 1]) /
-                       dx12;
-
-  return derivatives;
-} */
-
-/* template<std::ranges::sized_range Range>
-auto compute_eta_second_derivative(Range&& values, double d_eta) ->
-std::vector<double> { const auto n = std::ranges::size(values);
-    std::vector<double> second_derivatives(n);
-
-    if (d_eta <= 0.0) {
-        throw std::invalid_argument("Invalid grid spacing: d_eta must be
-positive");
-    }
-
-    if (n < 3) {
-        throw std::invalid_argument("Insufficient points for second derivative
-calculation: need at least 3 points");
-    }
-
-    if (n < 5) {
-        // Simple finite differences for small arrays
-        const double d_eta_sq = d_eta * d_eta;
-        second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) /
-d_eta_sq; for (std::size_t i = 1; i < n - 1; ++i) { second_derivatives[i] =
-(values[i-1] - 2.0 * values[i] + values[i+1]) / d_eta_sq;
-        }
-        second_derivatives[n-1] = (values[n-3] - 2.0 * values[n-2] +
-values[n-1]) / d_eta_sq; return second_derivatives;
-    }
-
-    // 5-point stencil for higher accuracy: f''(x) = [-f(x-2h) + 16f(x-h) -
-30f(x) + 16f(x+h) - f(x+2h)]/(12h²) const double dx2_12 = 12.0 * d_eta * d_eta;
-
-    // Forward difference at boundaries
-    const double d_eta_sq = d_eta * d_eta;
-    second_derivatives[0] = (2.0 * values[0] - 5.0 * values[1] + 4.0 * values[2]
-- values[3]) / d_eta_sq; second_derivatives[1] = (values[0] - 2.0 * values[1] +
-values[2]) / d_eta_sq;
-
-    // Central differences with 5-point stencil
-    for (std::size_t i = 2; i < n - 2; ++i) {
-        second_derivatives[i] = (-values[i-2] + 16.0 * values[i-1] - 30.0 *
-values[i] + 16.0 * values[i+1] - values[i+2]) / dx2_12;
-    }
-
-    // Backward difference at boundaries
-    second_derivatives[n-2] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) /
-d_eta_sq; second_derivatives[n-1] = (2.0 * values[n-1] - 5.0 * values[n-2] + 4.0
-* values[n-3] - values[n-4]) / d_eta_sq;
-
-    return second_derivatives;
-} */
-
-/* template<std::ranges::sized_range Range>
+template<std::ranges::sized_range Range>
 auto compute_eta_second_derivative(Range&& values, double d_eta) ->
 std::vector<double> {
     const auto n = std::ranges::size(values);
@@ -1004,17 +882,16 @@ std::vector<double> {
     }
 
     return second_derivatives;
-} */
+}
 
-/* template<typename Matrix>
+template<typename Matrix>
 auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) ->
 std::expected<Matrix, CoefficientError> { const auto n_rows = values.rows();
     const auto n_cols = values.cols();
     Matrix result(n_rows, n_cols);
 
     if (d_eta <= 0.0) {
-        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta
-must be positive"));
+        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
     }
 
     for (std::size_t i = 0; i < n_rows; ++i) {
@@ -1029,7 +906,7 @@ must be positive"));
     }
 
     return result;
-} */
+}
 
 // Explicit instantiations
 template auto compute_eta_derivative(std::span<const double>&&,
