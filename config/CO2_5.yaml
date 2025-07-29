@@ -3,12 +3,12 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_non_equilibrium: false  
+  chemical_non_equilibrium: true  
 
 numerical:
-  n_eta: 100                       
+  n_eta: 1000                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-6    
+  convergence_tolerance: 1.0e-10    
   max_iterations: 2000000
   under_relaxation: 1
   step_control:

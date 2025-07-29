@@ -162,7 +162,7 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   return solution;
 }
 
-auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const conditions::BoundaryConditions& bc,
+/* auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const conditions::BoundaryConditions& bc,
                                                    equations::SolutionState& solution)
     -> std::expected<ConvergenceInfo, SolverError> {
 
@@ -280,6 +280,180 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
   }
 
   return conv_info;
+} */
+
+auto BoundaryLayerSolver::iterate_station_adaptive(
+    int station, 
+    double xi, 
+    const conditions::BoundaryConditions& bc,
+    equations::SolutionState& solution
+) -> std::expected<ConvergenceInfo, SolverError> {
+
+    const auto n_eta = grid_->n_eta();
+    const auto n_species = mixture_.n_species();
+
+    auto bc_dynamic = bc;
+    ConvergenceInfo conv_info;
+
+    for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
+        std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
+        const auto solution_old = solution;
+
+        // ================================================================
+        // PHASE 1: ESTABLISH BASIC THERMODYNAMIC CONSISTENCY
+        // ================================================================
+        
+        // 1. Temperature field update for T-g-c consistency
+        auto T_result = update_temperature_field(solution.g, solution.c, bc_dynamic, solution.T);
+        if (!T_result) {
+            return std::unexpected(SolverError(
+                "Temperature update failed at station {} iteration {}: {}",
+                std::source_location::current(), station, iter, T_result.error().message()
+            ));
+        }
+        solution.T = T_result.value();
+
+        // 2. Dynamic update of boundary properties for thermodynamic consistency
+        update_edge_properties(bc_dynamic, 
+            coefficients::CoefficientInputs{.xi = xi, .F = solution.F, .c = solution.c, 
+                                          .dc_deta = core::Matrix<double>(), .dc_deta2 = core::Matrix<double>(), 
+                                          .T = solution.T}, 
+            solution.c);
+
+        // ================================================================
+        // PHASE 2: MECHANICAL SYSTEM RESOLUTION (KINEMATICS + DYNAMICS)
+        // ================================================================
+        
+        // 3. Continuity resolution BEFORE derivative calculation (V depends on F and ∂F/∂ξ)
+        auto V_result = solve_continuity_equation(solution, xi);
+        if (!V_result) {
+            return std::unexpected(SolverError(
+                "Continuity solver failed at station {} iteration {}: {}",
+                std::source_location::current(), station, iter, V_result.error().message()
+            ));
+        }
+        solution.V = std::move(V_result.value());
+
+        // 4. Spatial derivatives calculation AFTER V update
+        auto derivatives_result = compute_eta_derivatives(solution);
+        if (!derivatives_result) {
+            return std::unexpected(derivatives_result.error());
+        }
+
+        auto conc_derivatives_result = compute_concentration_derivatives(solution);
+        if (!conc_derivatives_result) {
+            return std::unexpected(conc_derivatives_result.error());
+        }
+        auto concentration_derivatives = conc_derivatives_result.value();
+
+        // 5. Input construction with consistent state
+        coefficients::CoefficientInputs inputs{
+            .xi = xi,
+            .F = solution.F,
+            .c = solution.c,
+            .dc_deta = concentration_derivatives.dc_deta,
+            .dc_deta2 = concentration_derivatives.dc_deta2,
+            .T = solution.T
+        };
+
+        // 6. Coefficient calculation with consistent derivatives and state
+        auto coeffs_result = coeff_calculator_->calculate(inputs, bc_dynamic, *xi_derivatives_);
+        if (!coeffs_result) {
+            return std::unexpected(SolverError(
+                "Coefficient calculation failed at station {} iteration {}: {}",
+                std::source_location::current(), station, iter, coeffs_result.error().message()
+            ));
+        }
+        auto coeffs = coeffs_result.value();
+
+        // 7. Momentum resolution with accurate coefficients
+        auto F_result = solve_momentum_equation(solution, coeffs, bc_dynamic, xi);
+        if (!F_result) {
+            return std::unexpected(F_result.error());
+        }
+        auto F_new = F_result.value();
+        
+        // Immediate application of momentum boundary conditions
+        if (!F_new.empty()) {
+            F_new.back() = 1.0;  // Dimensionless velocity = 1 at edge
+        }
+
+        // ================================================================
+        // PHASE 3: THERMAL SYSTEM RESOLUTION
+        // ================================================================
+        
+        // 8. Solution update for energy equation
+        solution.F = std::move(F_new);
+
+        // 9. Energy resolution with updated mechanical state
+        auto g_result = solve_energy_equation(solution, inputs, coeffs, bc_dynamic, station);
+        if (!g_result) {
+            return std::unexpected(g_result.error());
+        }
+        auto g_new = g_result.value();
+        
+        // Immediate application of energy boundary conditions
+        if (!g_new.empty()) {
+            g_new.back() = 1.0;  // Dimensionless enthalpy = 1 at edge
+        }
+
+        // ================================================================
+        // PHASE 4: CHEMICAL SYSTEM RESOLUTION
+        // ================================================================
+        
+        // 10. Solution update for species equations
+        solution.g = std::move(g_new);
+
+        // 11. Species resolution with updated thermomechanical state
+        auto c_result = solve_species_equations(solution, inputs, coeffs, bc_dynamic, station);
+        if (!c_result) {
+            return std::unexpected(c_result.error());
+        }
+        auto c_new = c_result.value();
+
+        // ================================================================
+        // PHASE 5: ASSEMBLY AND CONVERGENCE CONTROL
+        // ================================================================
+        
+        // 12. Complete new solution construction
+        equations::SolutionState solution_new(n_eta, n_species);
+        solution_new.V = solution.V;        // Already updated
+        solution_new.F = solution.F;        // Already updated
+        solution_new.g = solution.g;        // Already updated
+        solution_new.c = std::move(c_new);  // New species solution
+        solution_new.T = solution.T;        // Consistent temperature
+
+        // 13. Final application of all boundary conditions
+        enforce_edge_boundary_conditions(solution_new, bc_dynamic);
+
+        // 14. Convergence check with fully consistent solution
+        conv_info = check_convergence(solution_old, solution_new);
+        conv_info.iterations = iter + 1;
+
+        // 15. Relaxation factor adaptation based on convergence history
+        double adaptive_factor = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
+        std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) 
+                  << adaptive_factor << " (max residual: " << conv_info.max_residual() << ")" << std::endl;
+
+        // 16. Differential relaxation application
+        solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
+
+        // 17. Convergence test and exit
+        if (conv_info.converged) {
+            std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
+            break;
+        }
+
+        // 18. Divergence detection for early termination
+        if (conv_info.max_residual() > 1e6) {
+            return std::unexpected(SolverError(
+                "Solution diverged at station {} iteration {} (residual={})",
+                std::source_location::current(), station, iter, conv_info.max_residual()
+            ));
+        }
+    }
+
+    return conv_info;
 }
 
 auto BoundaryLayerSolver::solve_continuity_equation(const equations::SolutionState& solution,
@@ -575,19 +749,6 @@ auto BoundaryLayerSolver::apply_relaxation_differential(const equations::Solutio
   const double alpha_g = base_factor * 1;
   const double alpha_c = base_factor * 1;
   const double alpha_T = base_factor * 1;
-
-  // DEBUG : impression de c_old[:,19] et c_new[:,19]
-  std::cout << "old_solution.c[:,19] = ";
-  for (std::size_t i = 0; i < old_solution.c.rows(); ++i) {
-    std::cout << old_solution.c(i, 19) << " ";
-  }
-  std::cout << std::endl;
-
-  std::cout << "new_solution.c[:,19] = ";
-  for (std::size_t i = 0; i < new_solution.c.rows(); ++i) {
-    std::cout << new_solution.c(i, 19) << " ";
-  }
-  std::cout << std::endl;
 
   for (std::size_t i = 0; i < relaxed.F.size() - 1; ++i) {
     relaxed.F[i] = (1.0 - alpha_F) * old_solution.F[i] + alpha_F * new_solution.F[i];

@@ -114,8 +114,6 @@ auto build_energy_boundary_conditions(const coefficients::CoefficientInputs& inp
                                       const conditions::BoundaryConditions& bc, const io::SimulationConfig& sim_config,
                                       int station, PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions {
 
-  std::cout << "coeffs.thermodynamic.h_wall " << coeffs.thermodynamic.h_wall << std::endl;
-
   return EnergyBoundaryConditions{.f_bc = 0.0, .g_bc = 1.0, .h_bc = coeffs.thermodynamic.h_wall / bc.he()};
 }
 

@@ -205,9 +205,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(
   transport.l0.reserve(n_eta);
   transport.l3.reserve(n_eta);
 
-  std::cout << "Concentration à l'edge : " << inputs.c(0, 19) << " " << inputs.c(1, 19) << " " << inputs.c(2, 19) << " "
-            << inputs.c(3, 19) << " " << inputs.c(4, 19) << std::endl;
-
   for (std::size_t i = 0; i < n_eta; ++i) {
     // Extract local composition
     std::vector<double> c_local(n_species);
