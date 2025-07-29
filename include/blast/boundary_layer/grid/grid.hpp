@@ -2,6 +2,7 @@
 #include "../../core/containers.hpp"
 #include "../../core/exceptions.hpp"
 #include "../../io/config_types.hpp"
+#include "../../thermophysics/mixture_interface.hpp"
 #include "coordinate_transform.hpp"
 #include <concepts>
 #include <expected>
@@ -46,12 +47,12 @@ public:
   template <GridConfigType NumericalConfig>
   [[nodiscard]] static constexpr auto
   create_stagnation_grid(NumericalConfig&& numerical_config,
-                         const io::OuterEdgeConfig& edge_config) -> std::expected<BoundaryLayerGrid, GridError>;
+                         const io::OuterEdgeConfig& edge_config, const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError>;
 
   template <GridConfigType NumericalConfig>
   [[nodiscard]] static constexpr auto
   create_downstream_grid(NumericalConfig&& numerical_config, const io::OuterEdgeConfig& edge_config,
-                         const io::OutputConfig& output_config) -> std::expected<BoundaryLayerGrid, GridError>;
+                         const io::OutputConfig& output_config, const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError>;
 
   // Modern accessors with noexcept
   [[nodiscard]] constexpr auto xi_coordinates() const noexcept -> std::span<const double> { return xi_; }
@@ -78,7 +79,7 @@ private:
   }
 
   inline constexpr auto generate_eta_distribution() noexcept -> void;
-  auto generate_xi_distribution(const io::OuterEdgeConfig& edge_config) -> std::expected<void, GridError>;
+  auto generate_xi_distribution(const io::OuterEdgeConfig& edge_config, const thermophysics::MixtureInterface& mixture) -> std::expected<void, GridError>;
   auto generate_xi_output_distribution(const io::OutputConfig& output_config,
                                        std::span<const double> x_edge) -> std::expected<void, GridError>;
 };
@@ -92,7 +93,7 @@ compute_xi_step_size(double current_xi, double d_xi, int iterations,
 
 template <GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_stagnation_grid(NumericalConfig&& numerical_config,
-                                                         const io::OuterEdgeConfig& edge_config)
+                                                         const io::OuterEdgeConfig& edge_config, const thermophysics::MixtureInterface& mixture)
     -> std::expected<BoundaryLayerGrid, GridError> {
 
   auto grid = BoundaryLayerGrid(numerical_config.n_eta, numerical_config.eta_max);

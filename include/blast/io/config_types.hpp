@@ -84,10 +84,8 @@ struct OuterEdgeConfig {
     double radius;
     double velocity;
     double enthalpy;
+        double temperature;
     double pressure;
-    double density;
-    double viscosity;
-    std::vector<double> species_fractions;
   };
 
   std::vector<EdgePoint> edge_points;

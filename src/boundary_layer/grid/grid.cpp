@@ -67,14 +67,14 @@ template <typename CoordGrid>
 template <GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_downstream_grid(
     NumericalConfig&& numerical_config, const io::OuterEdgeConfig& edge_config,
-    const io::OutputConfig& output_config) -> std::expected<BoundaryLayerGrid, GridError> {
+    const io::OutputConfig& output_config, const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError> {
 
   auto grid = BoundaryLayerGrid(numerical_config.n_eta, numerical_config.eta_max);
 
   grid.generate_eta_distribution();
 
-  if (auto xi_result = grid.generate_xi_distribution(edge_config); !xi_result) {
-    return std::unexpected(xi_result.error());
+  if (auto xi_result = grid.generate_xi_distribution(edge_config, mixture); !xi_result) {
+      return std::unexpected(xi_result.error());
   }
 
   auto x_edge_range = edge_config.edge_points | std::views::transform([](const auto& point) { return point.x; });
@@ -89,7 +89,7 @@ constexpr auto BoundaryLayerGrid::create_downstream_grid(
   return grid;
 }
 
-auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge_config)
+auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge_config, const thermophysics::MixtureInterface& mixture)
     -> std::expected<void, GridError> {
 
   constexpr auto min_points = 2;
@@ -107,10 +107,33 @@ auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge
   };
 
   auto x_edge = extract_property(&io::OuterEdgeConfig::EdgePoint::x);
-  auto rho_edge = extract_property(&io::OuterEdgeConfig::EdgePoint::density);
-  auto mu_edge = extract_property(&io::OuterEdgeConfig::EdgePoint::viscosity);
   auto u_edge = extract_property(&io::OuterEdgeConfig::EdgePoint::velocity);
   auto r_body = extract_property(&io::OuterEdgeConfig::EdgePoint::radius);
+
+  std::vector<double> rho_edge, mu_edge;
+  rho_edge.reserve(edge_config.edge_points.size());
+  mu_edge.reserve(edge_config.edge_points.size());
+
+  for (const auto& point : edge_config.edge_points) {
+    auto eq_result = mixture.equilibrium_composition(point.temperature, point.pressure);
+    if (!eq_result) {
+      return std::unexpected(GridError("Failed to compute equilibrium composition for grid generation"));
+    }
+    auto species_fractions = eq_result.value();
+
+    auto mw_result = mixture.mixture_molecular_weight(species_fractions);
+    if (!mw_result) {
+      return std::unexpected(GridError("Failed to compute MW for grid generation"));
+    }
+    auto density = point.pressure * mw_result.value() / (point.temperature * thermophysics::constants::R_universal);
+    rho_edge.push_back(density);
+
+    auto visc_result = mixture.viscosity(species_fractions, point.temperature, point.pressure);
+    if (!visc_result) {
+      return std::unexpected(GridError("Failed to compute viscosity for grid generation"));
+    }
+    mu_edge.push_back(visc_result.value());
+  }
 
   auto xi_result = coordinate_transform::compute_xi_from_integration(x_edge, rho_edge, mu_edge, u_edge, r_body);
 
@@ -215,6 +238,6 @@ constexpr auto reduce_step_size(double current_xi, double& d_xi) noexcept -> dou
 // Explicit instantiations for common use cases
 template auto BoundaryLayerGrid::create_downstream_grid<const io::NumericalConfig&>(
     const io::NumericalConfig& numerical_config, const io::OuterEdgeConfig& edge_config,
-    const io::OutputConfig& output_config) -> std::expected<BoundaryLayerGrid, GridError>;
+    const io::OutputConfig& output_config, const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError>;
 
 } // namespace blast::boundary_layer::grid

@@ -18,21 +18,21 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
 
   // Create grid
   if (config.simulation.only_stagnation_point) {
-    auto grid_result = grid::BoundaryLayerGrid::create_stagnation_grid(config.numerical, config.outer_edge);
-    if (!grid_result) {
-      throw SolverError("Failed to create stagnation grid: {}", std::source_location::current(),
-                        grid_result.error().message());
+      auto grid_result = grid::BoundaryLayerGrid::create_stagnation_grid(config.numerical, config.outer_edge, mixture_);
+      if (!grid_result) {
+        throw SolverError("Failed to create stagnation grid: {}", std::source_location::current(),
+                          grid_result.error().message());
+      }
+      grid_ = std::make_unique<grid::BoundaryLayerGrid>(std::move(grid_result.value()));
+    } else {
+      auto grid_result =
+          grid::BoundaryLayerGrid::create_downstream_grid(config.numerical, config.outer_edge, config.output, mixture_);
+      if (!grid_result) {
+        throw SolverError("Failed to create downstream grid: {}", std::source_location::current(),
+                          grid_result.error().message());
+      }
+      grid_ = std::make_unique<grid::BoundaryLayerGrid>(std::move(grid_result.value()));
     }
-    grid_ = std::make_unique<grid::BoundaryLayerGrid>(std::move(grid_result.value()));
-  } else {
-    auto grid_result =
-        grid::BoundaryLayerGrid::create_downstream_grid(config.numerical, config.outer_edge, config.output);
-    if (!grid_result) {
-      throw SolverError("Failed to create downstream grid: {}", std::source_location::current(),
-                        grid_result.error().message());
-    }
-    grid_ = std::make_unique<grid::BoundaryLayerGrid>(std::move(grid_result.value()));
-  }
 
   // Create coefficient calculator
   coeff_calculator_ =
@@ -78,12 +78,11 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     // Create initial guess for this station
     equations::SolutionState initial_guess;
     if (station == 0 || result.stations.empty()) {
-      // Create boundary conditions
       auto bc_result =
-          conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation);
+          conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation, mixture_);
       if (!bc_result) {
         return std::unexpected(SolverError("Failed to create boundary conditions for station {}: {}",
-                                           std::source_location::current(), station, bc_result.error().message()));
+                                          std::source_location::current(), station, bc_result.error().message()));
       }
 
       auto guess_result = create_initial_guess(station, xi, bc_result.value());
@@ -127,9 +126,9 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   // Get boundary conditions for this station
   auto bc_result =
       (station == 0)
-          ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation)
+          ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation, mixture_)
           : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
-                                                        config_.wall_parameters, config_.simulation);
+                                                        config_.wall_parameters, config_.simulation, mixture_);
 
   if (!bc_result) {
     return std::unexpected(SolverError("Failed to get boundary conditions for station {}: {}",

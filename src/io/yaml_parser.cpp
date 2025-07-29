@@ -397,32 +397,15 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
         return std::unexpected(velocity_result.error());
       point.velocity = velocity_result.value();
 
-      auto enthalpy_result = extract_value<double>(point_node, "enthalpy");
-      if (!enthalpy_result)
-        return std::unexpected(enthalpy_result.error());
-      point.enthalpy = enthalpy_result.value();
+      auto temperature_result = extract_value<double>(point_node, "temperature");
+      if (!temperature_result)
+        return std::unexpected(temperature_result.error());
+      point.temperature = temperature_result.value();
 
       auto pressure_result = extract_value<double>(point_node, "pressure");
       if (!pressure_result)
         return std::unexpected(pressure_result.error());
       point.pressure = pressure_result.value();
-
-      auto density_result = extract_value<double>(point_node, "density");
-      if (!density_result)
-        return std::unexpected(density_result.error());
-      point.density = density_result.value();
-
-      auto viscosity_result = extract_value<double>(point_node, "viscosity");
-      if (!viscosity_result)
-        return std::unexpected(viscosity_result.error());
-      point.viscosity = viscosity_result.value();
-
-      if (point_node["species"]) {
-        auto species_result = extract_value<std::vector<double>>(point_node, "species");
-        if (!species_result)
-          return std::unexpected(species_result.error());
-        point.species_fractions = species_result.value();
-      }
 
       config.edge_points.push_back(point);
     }

@@ -14,11 +14,13 @@ namespace blast::boundary_layer::conditions {
 [[nodiscard]] auto interpolate_boundary_conditions(
     int station, double xi, std::span<const double> xi_grid, const io::OuterEdgeConfig& edge_config,
     const io::WallParametersConfig& wall_config,
-    const io::SimulationConfig& sim_config) -> std::expected<BoundaryConditions, BoundaryConditionError>;
+    const io::SimulationConfig& sim_config,
+    const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryConditions, BoundaryConditionError>;
 
 // Specialized for stagnation point
 [[nodiscard]] auto create_stagnation_conditions(
     const io::OuterEdgeConfig& edge_config, const io::WallParametersConfig& wall_config,
-    const io::SimulationConfig& sim_config) -> std::expected<BoundaryConditions, BoundaryConditionError>;
+    const io::SimulationConfig& sim_config,
+    const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryConditions, BoundaryConditionError>;
 
 } // namespace blast::boundary_layer::conditions

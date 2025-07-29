@@ -3,7 +3,7 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_non_equilibrium: true  
+  chemical_non_equilibrium: false  
 
 numerical:
   n_eta: 1000                       
@@ -37,11 +37,8 @@ outer_edge:
     - x: 0.0
       radius: 1
       velocity: 0
-      enthalpy: 1.429162e+07
+      temperature: 5905.5
       pressure: 7.000000e+03
-      density: 2.912708e-03
-      viscosity: 1.771427e-04
-      species: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429

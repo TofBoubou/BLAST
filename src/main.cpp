@@ -89,9 +89,8 @@ int main(int argc, char* argv[]) {
       const auto& edge = config.outer_edge.edge_points[0];
       std::cout << "\nEdge conditions:" << std::endl;
       std::cout << "  Pressure: " << edge.pressure << " Pa" << std::endl;
-      std::cout << "  Temperature: " << edge.enthalpy / 1000.0 << " kJ/kg (enthalpy)" << std::endl;
-      std::cout << "  Density: " << edge.density << " kg/m³" << std::endl;
-      std::cout << "  Viscosity: " << edge.viscosity << " Pa·s" << std::endl;
+      std::cout << "  Temperature: " << edge.temperature << " K" << std::endl;
+      std::cout << "  Enthalpy: " << edge.enthalpy / 1000.0 << " kJ/kg" << std::endl;
       std::cout << "  Wall temp: " << config.wall_parameters.wall_temperatures[0] << " K" << std::endl;
     }
 
