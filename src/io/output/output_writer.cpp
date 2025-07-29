@@ -63,18 +63,7 @@ auto OutputWriter::write_solution(
         return std::unexpected(dataset_result.error());
     }
     auto dataset = std::move(dataset_result.value());
-    
-    // Compute derived quantities
-    if (config_.save_metadata) {
-        if (auto wall_result = compute_wall_properties(dataset, mixture); !wall_result) {
-            return std::unexpected(wall_result.error());
-        }
-        
-        if (auto integrated_result = compute_integrated_quantities(dataset); !integrated_result) {
-            return std::unexpected(integrated_result.error());
-        }
-    }
-    
+
     // Generate file paths
     auto file_paths = generate_file_paths(case_name, dataset.metadata.creation_time);
     
@@ -170,89 +159,21 @@ auto OutputWriter::convert_solution(
         station_data.g = station_solution.g;
         station_data.V = station_solution.V;
         
-        // Temperature field
-        if (station_idx < solution.temperature_fields.size()) {
-            station_data.temperature = solution.temperature_fields[station_idx];
-        } else {
-            station_data.temperature.resize(station_solution.F.size(), 300.0); // Default
-            std::cout << "Temperature field size: " << solution.temperature_fields[0].size() << std::endl;
-            std::cout << "Erreur dans le traitement de la température" << std::endl;
+        // Temperature field - must be available
+        if (station_idx >= solution.temperature_fields.size()) {
+            return std::unexpected(OutputError(
+                std::format("Temperature field missing for station {}", station_idx)
+            ));
         }
-        
-        // Initialize pressure and density with placeholder values
-        station_data.pressure.resize(station_solution.F.size(), 1000.0); // TODO
-        station_data.density.resize(station_solution.F.size(), 0.01); // TODO
+        station_data.temperature = solution.temperature_fields[station_idx];
         
         // Species concentrations
         station_data.species_concentrations = station_solution.c;
-        
-        // Initialize optional fields based on config
-        if (config_.variables.transport_properties) {
-            station_data.viscosity.resize(station_solution.F.size(), 0.0);
-            station_data.thermal_conductivity.resize(station_solution.F.size(), 0.0);
-            station_data.diffusion_coefficients = core::Matrix<double>(mixture.n_species(), mixture.n_species());
-            station_data.diffusion_coefficients.setZero();
-        }
-        
-        if (config_.variables.chemical_rates) {
-            station_data.production_rates = core::Matrix<double>(mixture.n_species(), station_solution.F.size());
-            station_data.production_rates.setZero();
-        }
-        
-        if (config_.variables.diffusion_fluxes) {
-            station_data.diffusion_fluxes = core::Matrix<double>(mixture.n_species(), station_solution.F.size());
-            station_data.diffusion_fluxes.setZero();
-        }
         
         dataset.stations.push_back(std::move(station_data));
     }
     
     return dataset;
-}
-
-auto OutputWriter::compute_wall_properties(
-    OutputDataset& dataset,
-    const thermophysics::MixtureInterface& mixture
-) const -> std::expected<void, OutputError> {
-    
-    dataset.wall.x_positions.reserve(dataset.stations.size());
-    dataset.wall.temperatures.reserve(dataset.stations.size());
-    dataset.wall.heat_flux.reserve(dataset.stations.size());
-    dataset.wall.shear_stress.reserve(dataset.stations.size());
-    
-    for (const auto& station : dataset.stations) {
-        dataset.wall.x_positions.push_back(station.x_physical);
-        
-        if (!station.temperature.empty()) {
-            dataset.wall.temperatures.push_back(station.temperature[0]); // Wall temperature
-        }
-        
-        // TODO: Compute heat flux and shear stress from gradients
-        dataset.wall.heat_flux.push_back(0.0);
-        dataset.wall.shear_stress.push_back(0.0);
-    }
-    
-    return {};
-}
-
-auto OutputWriter::compute_integrated_quantities(
-    OutputDataset& dataset
-) const -> std::expected<void, OutputError> {
-    
-    dataset.integrated.displacement_thickness.reserve(dataset.stations.size());
-    dataset.integrated.momentum_thickness.reserve(dataset.stations.size());
-    dataset.integrated.shape_factor.reserve(dataset.stations.size());
-    dataset.integrated.total_enthalpy_thickness.reserve(dataset.stations.size());
-    
-    for (const auto& station : dataset.stations) {
-        // TODO: Implement boundary layer integral calculations
-        dataset.integrated.displacement_thickness.push_back(0.0);
-        dataset.integrated.momentum_thickness.push_back(0.0);
-        dataset.integrated.shape_factor.push_back(0.0);
-        dataset.integrated.total_enthalpy_thickness.push_back(0.0);
-    }
-    
-    return {};
 }
 
 auto OutputWriter::generate_file_paths(
@@ -337,27 +258,6 @@ auto write_hdf5(
     OutputConfig out_config;
     out_config.primary_format = OutputFormat::HDF5;
     out_config.save_derivatives = include_derivatives;
-    out_config.base_directory = output_path.parent_path();
-    
-    OutputWriter writer(out_config);
-    
-    auto result = writer.write_solution(solution, config, mixture, output_path.stem().string());
-    if (!result) {
-        return std::unexpected(result.error());
-    }
-    
-    return {};
-}
-
-auto write_vtk(
-    const blast::boundary_layer::solver::SolutionResult& solution,
-    const Configuration& config,
-    const thermophysics::MixtureInterface& mixture,
-    const std::filesystem::path& output_path
-) -> std::expected<void, OutputError> {
-    
-    OutputConfig out_config;
-    out_config.primary_format = OutputFormat::HDF5;
     out_config.base_directory = output_path.parent_path();
     
     OutputWriter writer(out_config);

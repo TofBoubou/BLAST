@@ -47,16 +47,6 @@ private:
         const thermophysics::MixtureInterface& mixture
     ) const -> std::expected<OutputDataset, OutputError>;
     
-    // Compute derived quantities
-    auto compute_wall_properties(
-        OutputDataset& dataset,
-        const thermophysics::MixtureInterface& mixture
-    ) const -> std::expected<void, OutputError>;
-    
-    auto compute_integrated_quantities(
-        OutputDataset& dataset
-    ) const -> std::expected<void, OutputError>;
-    
     // Generate output file paths
     [[nodiscard]] auto generate_file_paths(
         const std::string& case_name,

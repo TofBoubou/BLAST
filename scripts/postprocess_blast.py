@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-BLAST Boundary Layer Post-Processing Script
+BLAST Boundary Layer Post-Processing Script - Improved Version
 
 This script provides comprehensive post-processing capabilities for BLAST simulation results.
-It can read HDF5 output format and generate publication-quality plots.
+It can read HDF5 output format and generate publication-quality plots with robust error handling.
 
 Usage:
     python postprocess_blast.py --input simulation.h5 --plots all
@@ -17,7 +17,7 @@ import h5py
 import seaborn as sns
 from pathlib import Path
 import json
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Union, Tuple, Set
 import warnings
 from scipy.interpolate import griddata
 warnings.filterwarnings('ignore')
@@ -27,23 +27,60 @@ plt.style.use('seaborn-v0_8-paper')
 sns.set_palette("husl")
 
 
+class BLASTFileError(Exception):
+    """Custom exception for BLAST file format issues"""
+    pass
+
+
 class BLASTReader:
-    """Unified reader for BLAST output formats"""
+    """Unified reader for BLAST output formats with robust error handling"""
+    
+    # Required fields for profile plotting
+    REQUIRED_PROFILE_FIELDS = {'F', 'g', 'V', 'temperature', 'eta'}
     
     def __init__(self, input_path: Union[str, Path]):
         self.input_path = Path(input_path)
         self.format = self._detect_format()
         self.data = None
         self.metadata = None
+        self.valid_stations = set()
         
     def _detect_format(self) -> str:
         """Auto-detect input format"""
+        if not self.input_path.exists():
+            raise FileNotFoundError(f"Input file not found: {self.input_path}")
+            
         if self.input_path.suffix.lower() in ['.h5', '.hdf5']:
             return 'hdf5'
         raise ValueError(f"Only HDF5 format is supported. Got: {self.input_path}")
     
+    def _verify_file_integrity(self) -> None:
+        """Test file integrity and required structure"""
+        try:
+            with h5py.File(self.input_path, 'r') as f:
+                # Check for required top-level groups
+                if 'stations' not in f:
+                    raise BLASTFileError("Missing 'stations' group in HDF5 file")
+                
+                if len(f['stations'].keys()) == 0:
+                    raise BLASTFileError("No station data found in 'stations' group")
+                
+                # Optional metadata check
+                if 'metadata' not in f:
+                    print("Warning: No 'metadata' group found - some features may be limited")
+                
+                print(f"File integrity check passed: {len(f['stations'])} stations found")
+                
+        except Exception as e:
+            if isinstance(e, BLASTFileError):
+                raise
+            raise BLASTFileError(f"File integrity check failed: {e}")
+    
     def load_data(self) -> Dict:
-        """Load data based on detected format"""
+        """Load data with integrity verification"""
+        # First verify file integrity
+        self._verify_file_integrity()
+        
         if self.format == 'hdf5':
             return self._load_hdf5()
         else:
@@ -55,31 +92,58 @@ class BLASTReader:
             with h5py.File(self.input_path, 'r') as f:
                 data = {}
                 
-                # Load metadata
+                # Load metadata (optional)
                 if 'metadata' in f:
                     data['metadata'] = self._read_hdf5_group(f['metadata'])
+                else:
+                    data['metadata'] = {}
                 
                 # Load stations
-                if 'stations' in f:
-                    data['stations'] = {}
-                    for station_name in f['stations'].keys():
+                data['stations'] = {}
+                for station_name in f['stations'].keys():
+                    try:
                         station_data = self._read_hdf5_group(f['stations'][station_name])
                         data['stations'][station_name] = station_data
+                        
+                        # Check if this station has required fields for plotting
+                        if self._validate_station_data(station_data):
+                            station_idx = int(station_name.split('_')[-1])
+                            self.valid_stations.add(station_idx)
+                        
+                    except Exception as e:
+                        print(f"Warning: Failed to load station {station_name}: {e}")
                 
-                # Load wall data
-                if 'wall' in f:
-                    data['wall'] = self._read_hdf5_group(f['wall'])
+                if len(data['stations']) == 0:
+                    raise BLASTFileError("No valid station data could be loaded")
                 
-                # Load integrated quantities
-                if 'integrated' in f:
-                    data['integrated'] = self._read_hdf5_group(f['integrated'])
+                print(f"Loaded {len(data['stations'])} stations, {len(self.valid_stations)} valid for plotting")
                 
                 self.data = data
                 self.metadata = data.get('metadata', {})
                 return data
                 
         except Exception as e:
+            if isinstance(e, BLASTFileError):
+                raise
             raise RuntimeError(f"Failed to load HDF5 file: {e}")
+    
+    def _validate_station_data(self, station_data: Dict) -> bool:
+        """Check if station has all required fields for profile plotting"""
+        available_fields = set(station_data.keys())
+        missing_fields = self.REQUIRED_PROFILE_FIELDS - available_fields
+        
+        if missing_fields:
+            return False
+        
+        # Check if arrays have data and compatible shapes
+        try:
+            eta_len = len(station_data['eta'])
+            for field in self.REQUIRED_PROFILE_FIELDS:
+                if field != 'eta' and len(station_data[field]) != eta_len:
+                    return False
+            return eta_len > 0
+        except:
+            return False
     
     def _read_hdf5_group(self, group) -> Dict:
         """Recursively read HDF5 group"""
@@ -90,13 +154,10 @@ class BLASTReader:
             elif isinstance(item, h5py.Dataset):
                 # Handle string datasets specially
                 if h5py.check_string_dtype(item.dtype):
-                    # Read string data and decode if necessary
                     data = item[()]
                     if isinstance(data, np.ndarray):
-                        # Array of strings
                         result[key] = [s.decode('utf-8') if isinstance(s, bytes) else s for s in data]
                     else:
-                        # Single string
                         result[key] = data.decode('utf-8') if isinstance(data, bytes) else data
                 else:
                     result[key] = np.array(item)
@@ -106,39 +167,45 @@ class BLASTReader:
                     result[f'{key}_attrs'] = dict(item.attrs)
         return result
     
-    
-
-    
     def get_station_data(self, station_index: int) -> Dict:
-        """Get data for specific station with species concentration processing"""
+        """Get data for specific station with validation"""
         if self.data is None:
             self.load_data()
         
         station_key = f'station_{station_index:03d}'
-        if station_key in self.data['stations']:
-            station_data = self.data['stations'][station_key].copy()
+        if station_key not in self.data['stations']:
+            available = sorted([int(k.split('_')[-1]) for k in self.data['stations'].keys()])
+            raise KeyError(f"Station {station_index} not found. Available stations: {available}")
+        
+        station_data = self.data['stations'][station_key].copy()
+        
+        # Validate required fields
+        if not self._validate_station_data(station_data):
+            missing = self.REQUIRED_PROFILE_FIELDS - set(station_data.keys())
+            raise ValueError(f"Station {station_index} missing required fields: {missing}")
+        
+        # Process species concentrations if available
+        if 'species_concentrations' in station_data:
+            species_names = self.get_species_names()
+            conc_matrix = station_data['species_concentrations']
             
-            # Process species concentrations if available
-            if 'species_concentrations' in station_data:
-                species_names = self.get_species_names()
-                conc_matrix = station_data['species_concentrations']
-                
-                # Add individual species as separate arrays
-                for i, species in enumerate(species_names):
-                    if i < conc_matrix.shape[0]:
-                        station_data[f'c_{species}'] = conc_matrix[i, :]
-            
-            return station_data
-        else:
-            available = list(self.data['stations'].keys())
-            raise KeyError(f"Station {station_index} not found. Available: {available}")
+            for i, species in enumerate(species_names):
+                if i < conc_matrix.shape[0]:
+                    station_data[f'c_{species}'] = conc_matrix[i, :]
+        
+        return station_data
+    
+    def get_valid_stations(self) -> Set[int]:
+        """Get set of station indices that have valid data for plotting"""
+        if self.data is None:
+            self.load_data()
+        return self.valid_stations.copy()
     
     def get_species_names(self) -> List[str]:
         """Extract species names from metadata or data"""
         if self.metadata and 'mixture' in self.metadata:
             if 'species_names' in self.metadata['mixture']:
                 names = self.metadata['mixture']['species_names']
-                # Handle both list and array formats
                 if isinstance(names, (list, np.ndarray)):
                     return [str(name) for name in names]
                 else:
@@ -148,28 +215,47 @@ class BLASTReader:
         if self.data and 'stations' in self.data:
             station_data = next(iter(self.data['stations'].values()))
             species_cols = [col for col in station_data.keys() if col.startswith('c_')]
-            return [col[2:] for col in species_cols]  # Remove 'c_' prefix
+            return [col[2:] for col in species_cols]
         
         return []
 
 
 class BLASTPlotter:
-    """Publication-quality plotting for BLAST results"""
+    """Publication-quality plotting for BLAST results with robust error handling"""
     
     def __init__(self, reader: BLASTReader):
         self.reader = reader
         self.fig_size = (12, 8)
         self.dpi = 300
         
-    def plot_profiles(self, station_index: int = 0, save_path: Optional[Path] = None) -> None:
-        """Plot boundary layer profiles for a given station"""
+    def plot_profiles(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot boundary layer profiles for a given station
         
-        station_data = self.reader.get_station_data(station_index)
-        species_names = self.reader.get_species_names()
+        Returns:
+            bool: True if plot was created successfully, False otherwise
+        """
         
-        # Create subplots
+        try:
+            # Check if station is valid for plotting
+            valid_stations = self.reader.get_valid_stations()
+            if station_index not in valid_stations:
+                available = sorted(valid_stations)
+                print(f"Error: Station {station_index} does not have required fields for plotting.")
+                print(f"Required fields: {', '.join(self.reader.REQUIRED_PROFILE_FIELDS)}")
+                print(f"Available stations with valid data: {available}")
+                return False
+            
+            station_data = self.reader.get_station_data(station_index)
+            species_names = self.reader.get_species_names()
+            
+        except Exception as e:
+            print(f"Error loading station {station_index}: {e}")
+            return False
+        
+        # Create subplots with clear titles
         fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-        fig.suptitle(f'Boundary Layer Profiles - Station {station_index}', fontsize=16, fontweight='bold')
+        fig.suptitle(f'Boundary Layer Profiles - Station {station_index:03d}', 
+                    fontsize=16, fontweight='bold')
         
         # Get eta coordinates
         eta = np.array(station_data['eta'])
@@ -179,22 +265,21 @@ class BLASTPlotter:
         axes[0, 0].set_xlabel('F (Dimensionless Stream Function)')
         axes[0, 0].set_ylabel('η (Similarity Coordinate)')
         axes[0, 0].grid(True, alpha=0.3)
-        axes[0, 0].set_title('Velocity Profile')
+        axes[0, 0].set_title(f'Station {station_index:03d} - Velocity Profile (F)')
         
         # Plot 2: Temperature profile (g)
         axes[0, 1].plot(station_data['g'], eta, 'r-', linewidth=2, label='g')
         axes[0, 1].set_xlabel('g (Dimensionless Enthalpy)')
         axes[0, 1].set_ylabel('η')
         axes[0, 1].grid(True, alpha=0.3)
-        axes[0, 1].set_title('Enthalpy Profile')
+        axes[0, 1].set_title(f'Station {station_index:03d} - Enthalpy Profile (g)')
         
         # Plot 3: Physical temperature
-        if 'temperature' in station_data:
-            axes[0, 2].plot(station_data['temperature'], eta, 'orange', linewidth=2)
-            axes[0, 2].set_xlabel('Temperature (K)')
-            axes[0, 2].set_ylabel('η')
-            axes[0, 2].grid(True, alpha=0.3)
-            axes[0, 2].set_title('Temperature Profile')
+        axes[0, 2].plot(station_data['temperature'], eta, 'orange', linewidth=2)
+        axes[0, 2].set_xlabel('Temperature (K)')
+        axes[0, 2].set_ylabel('η')
+        axes[0, 2].grid(True, alpha=0.3)
+        axes[0, 2].set_title(f'Station {station_index:03d} - Temperature Profile')
         
         # Plot 4: Major species concentrations
         colors = plt.cm.tab10(np.linspace(0, 1, len(species_names)))
@@ -210,300 +295,215 @@ class BLASTPlotter:
         axes[1, 0].set_ylabel('η')
         axes[1, 0].grid(True, alpha=0.3)
         
-        # Only add legend if there are labeled artists
         if legend_added:
             axes[1, 0].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         
-        axes[1, 0].set_title('Species Concentrations')
+        axes[1, 0].set_title(f'Station {station_index:03d} - Species Concentrations')
         
-        # Plot 5: Density and pressure
-        if 'density' in station_data:
-            ax_rho = axes[1, 1]
-            ax_rho.plot(station_data['density'], eta, 'g-', linewidth=2, label='Density')
-            ax_rho.set_xlabel('Density (kg/m³)')
-            ax_rho.set_ylabel('η')
-            ax_rho.grid(True, alpha=0.3)
-            ax_rho.set_title('Density Profile')
-            
-            if 'pressure' in station_data:
-                ax_p = ax_rho.twinx()
-                ax_p.plot(station_data['pressure'], eta, 'm--', linewidth=2, label='Pressure')
-                ax_p.set_xlabel('Pressure (Pa)')
-                ax_p.legend(loc='upper right')
+        # Plot 5: V profile
+        axes[1, 1].plot(station_data['V'], eta, 'purple', linewidth=2)
+        axes[1, 1].set_xlabel('V (Velocity Component)')
+        axes[1, 1].set_ylabel('η')
+        axes[1, 1].grid(True, alpha=0.3)
+        axes[1, 1].set_title(f'Station {station_index:03d} - V Profile')
         
-        # Plot 6: V profile
-        if 'V' in station_data:
-            axes[1, 2].plot(station_data['V'], eta, 'purple', linewidth=2)
-            axes[1, 2].set_xlabel('V (Velocity Component)')
-            axes[1, 2].set_ylabel('η')
-            axes[1, 2].grid(True, alpha=0.3)
-            axes[1, 2].set_title('V Profile')
+        # Plot 6: Leave empty or add additional data if available
+        axes[1, 2].text(0.5, 0.5, f'Station {station_index:03d}\nAdditional plots\ncan be added here', 
+                       ha='center', va='center', transform=axes[1, 2].transAxes)
+        axes[1, 2].set_title('Reserved for Future Use')
         
         plt.tight_layout()
         
         if save_path:
             plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
-            print(f"Profiles saved to: {save_path}")
+            print(f"Profiles for station {station_index:03d} saved to: {save_path}")
         else:
             plt.show()
+        
+        plt.close()  # Free memory
+        return True
     
-    def plot_wall_properties(self, save_path: Optional[Path] = None) -> None:
-        """Plot wall properties along the body"""
+    def plot_F_and_g_map(self, save_path: Optional[Path] = None) -> bool:
+        """Plot 2D interpolated maps of F(η, ξ) and g(η, ξ)
         
-        if 'wall' not in self.reader.data:
-            print("No wall data available")
-            return
-        
-        wall_data = self.reader.data['wall']
-        
-        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-        fig.suptitle('Wall Properties', fontsize=16, fontweight='bold')
-        
-        x_pos = np.array(wall_data['x_positions'])
-        
-        # Wall temperature
-        if 'temperatures' in wall_data:
-            axes[0, 0].plot(x_pos, wall_data['temperatures'], 'r-', linewidth=2)
-            axes[0, 0].set_xlabel('x (m)')
-            axes[0, 0].set_ylabel('Temperature (K)')
-            axes[0, 0].set_title('Wall Temperature')
-            axes[0, 0].grid(True, alpha=0.3)
-        
-        # Heat flux
-        if 'heat_flux' in wall_data:
-            axes[0, 1].plot(x_pos, wall_data['heat_flux'], 'b-', linewidth=2)
-            axes[0, 1].set_xlabel('x (m)')
-            axes[0, 1].set_ylabel('Heat Flux (W/m²)')
-            axes[0, 1].set_title('Wall Heat Flux')
-            axes[0, 1].grid(True, alpha=0.3)
-        
-        # Shear stress
-        if 'shear_stress' in wall_data:
-            axes[1, 0].plot(x_pos, wall_data['shear_stress'], 'g-', linewidth=2)
-            axes[1, 0].set_xlabel('x (m)')
-            axes[1, 0].set_ylabel('Shear Stress (Pa)')
-            axes[1, 0].set_title('Wall Shear Stress')
-            axes[1, 0].grid(True, alpha=0.3)
-        
-        # Combined plot
-        if all(key in wall_data for key in ['temperatures', 'heat_flux']):
-            ax1 = axes[1, 1]
-            color = 'tab:red'
-            ax1.set_xlabel('x (m)')
-            ax1.set_ylabel('Temperature (K)', color=color)
-            ax1.plot(x_pos, wall_data['temperatures'], color=color, linewidth=2)
-            ax1.tick_params(axis='y', labelcolor=color)
-            
-            ax2 = ax1.twinx()
-            color = 'tab:blue'
-            ax2.set_ylabel('Heat Flux (W/m²)', color=color)
-            ax2.plot(x_pos, wall_data['heat_flux'], color=color, linewidth=2)
-            ax2.tick_params(axis='y', labelcolor=color)
-            
-            axes[1, 1].set_title('Temperature & Heat Flux')
-            axes[1, 1].grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
-            print(f"Wall properties saved to: {save_path}")
-        else:
-            plt.show()
-    
-    def plot_integrated_quantities(self, save_path: Optional[Path] = None) -> None:
-        """Plot boundary layer integral parameters"""
-        
-        if 'integrated' not in self.reader.data:
-            print("No integrated quantities data available")
-            return
-        
-        integrated_data = self.reader.data['integrated']
-        
-        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-        fig.suptitle('Boundary Layer Integral Parameters', fontsize=16, fontweight='bold')
-        
-        # Get xi coordinates
-        if 'metadata' in self.reader.data and 'grid' in self.reader.data['metadata']:
-            xi = np.array(self.reader.data['metadata']['grid']['xi_coordinates'])
-        else:
-            # Create dummy xi coordinates
-            n_points = len(integrated_data['displacement_thickness'])
-            xi = np.linspace(0, 1, n_points)
-        
-        # Displacement thickness
-        if 'displacement_thickness' in integrated_data:
-            axes[0, 0].plot(xi, integrated_data['displacement_thickness'], 'b-', linewidth=2)
-            axes[0, 0].set_xlabel('ξ')
-            axes[0, 0].set_ylabel('δ* (m)')
-            axes[0, 0].set_title('Displacement Thickness')
-            axes[0, 0].grid(True, alpha=0.3)
-        
-        # Momentum thickness
-        if 'momentum_thickness' in integrated_data:
-            axes[0, 1].plot(xi, integrated_data['momentum_thickness'], 'r-', linewidth=2)
-            axes[0, 1].set_xlabel('ξ')
-            axes[0, 1].set_ylabel('θ (m)')
-            axes[0, 1].set_title('Momentum Thickness')
-            axes[0, 1].grid(True, alpha=0.3)
-        
-        # Shape factor
-        if 'shape_factor' in integrated_data:
-            axes[1, 0].plot(xi, integrated_data['shape_factor'], 'g-', linewidth=2)
-            axes[1, 0].set_xlabel('ξ')
-            axes[1, 0].set_ylabel('H = δ*/θ')
-            axes[1, 0].set_title('Shape Factor')
-            axes[1, 0].grid(True, alpha=0.3)
-        
-        # Enthalpy thickness
-        if 'total_enthalpy_thickness' in integrated_data:
-            axes[1, 1].plot(xi, integrated_data['total_enthalpy_thickness'], 'purple', linewidth=2)
-            axes[1, 1].set_xlabel('ξ')
-            axes[1, 1].set_ylabel('δ_h (m)')
-            axes[1, 1].set_title('Enthalpy Thickness')
-            axes[1, 1].grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
-            print(f"Integrated quantities saved to: {save_path}")
-        else:
-            plt.show()
-    
-    def plot_convergence_history(self, save_path: Optional[Path] = None) -> None:
-        """Plot convergence history if available"""
-        
-        # This would require convergence data to be saved during simulation
-        print("Convergence history plotting not implemented (requires convergence data)")
-    
-    def plot_F_and_g_map(self, save_path: Optional[Path] = None) -> None:
-        """Plot 2D interpolated maps of F(η, ξ) and g(η, ξ)"""
+        Returns:
+            bool: True if plot was created successfully, False otherwise
+        """
         
         if 'stations' not in self.reader.data:
-            print("No station data available for F and g mapping")
-            return
+            print("Error: No station data available for F and g mapping")
+            return False
         
-        # Collect all F, g, eta, and xi data
-        xi_vals = []
-        eta_vals = []
-        F_vals = []
-        g_vals = []
+        valid_stations = self.reader.get_valid_stations()
+        if len(valid_stations) < 2:
+            print(f"Error: Need at least 2 valid stations for mapping, found {len(valid_stations)}")
+            return False
         
-        # Get xi coordinates from metadata if available
-        if 'metadata' in self.reader.data and 'grid' in self.reader.data['metadata']:
-            xi_coordinates = np.array(self.reader.data['metadata']['grid']['xi_coordinates'])
-        else:
-            # Create dummy xi coordinates based on number of stations
-            n_stations = len(self.reader.data['stations'])
-            xi_coordinates = np.linspace(0, 1, n_stations)
-        
-        # Collect data from all stations
-        for i, (station_key, station_data) in enumerate(self.reader.data['stations'].items()):
-            if i < len(xi_coordinates):
-                xi_station = xi_coordinates[i]
-                eta_station = np.array(station_data['eta'])
-                F_station = np.array(station_data['F'])
-                g_station = np.array(station_data['g'])
+        try:
+            # Collect all F, g, eta, and xi data
+            xi_vals = []
+            eta_vals = []
+            F_vals = []
+            g_vals = []
+            
+            # Get xi coordinates from metadata if available
+            if 'metadata' in self.reader.data and 'grid' in self.reader.data['metadata']:
+                xi_coordinates = np.array(self.reader.data['metadata']['grid']['xi_coordinates'])
+            else:
+                # Create dummy xi coordinates based on number of stations
+                n_stations = len(self.reader.data['stations'])
+                xi_coordinates = np.linspace(0, 1, n_stations)
+            
+            # Collect data from valid stations only
+            stations_used = []
+            for i, (station_key, station_data) in enumerate(self.reader.data['stations'].items()):
+                station_idx = int(station_key.split('_')[-1])
                 
-                # Add data points
-                for j in range(len(eta_station)):
-                    xi_vals.append(xi_station)
-                    eta_vals.append(eta_station[j])
-                    F_vals.append(F_station[j])
-                    g_vals.append(g_station[j])
-        
-        # Convert to numpy arrays
-        xi_vals = np.array(xi_vals)
-        eta_vals = np.array(eta_vals)
-        F_vals = np.array(F_vals)
-        g_vals = np.array(g_vals)
-        
-        # Create interpolation grid
-        xi_min, xi_max = xi_vals.min(), xi_vals.max()
-        eta_min, eta_max = eta_vals.min(), eta_vals.max()
-        
-        xi_grid = np.linspace(xi_min, xi_max, 100)
-        eta_grid = np.linspace(eta_min, eta_max, 100)
-        Xi, Eta = np.meshgrid(xi_grid, eta_grid)
-        
-        # Interpolate F and g
-        points = np.column_stack((xi_vals, eta_vals))
-        F_interp = griddata(points, F_vals, (Xi, Eta), method='linear')
-        g_interp = griddata(points, g_vals, (Xi, Eta), method='linear')
-        
-        # Create the plot
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-        
-        # Plot F(η, ξ)
-        im1 = ax1.contourf(Xi, Eta, F_interp, levels=50, cmap='inferno')
-        ax1.set_xlabel('ξ')
-        ax1.set_ylabel('η')
-        ax1.set_title('F(η, ξ)')
-        cbar1 = plt.colorbar(im1, ax=ax1)
-        cbar1.set_label('F')
-        
-        # Plot g(η, ξ)
-        im2 = ax2.contourf(Xi, Eta, g_interp, levels=50, cmap='inferno')
-        ax2.set_xlabel('ξ')
-        ax2.set_ylabel('η')
-        ax2.set_title('g(η, ξ)')
-        cbar2 = plt.colorbar(im2, ax=ax2)
-        cbar2.set_label('g')
-        
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
-            print(f"F and g map saved to: {save_path}")
-        else:
-            plt.show()
+                if station_idx not in valid_stations:
+                    continue
+                    
+                if i < len(xi_coordinates):
+                    xi_station = xi_coordinates[i]
+                    eta_station = np.array(station_data['eta'])
+                    F_station = np.array(station_data['F'])
+                    g_station = np.array(station_data['g'])
+                    
+                    stations_used.append(station_idx)
+                    
+                    # Add data points
+                    for j in range(len(eta_station)):
+                        xi_vals.append(xi_station)
+                        eta_vals.append(eta_station[j])
+                        F_vals.append(F_station[j])
+                        g_vals.append(g_station[j])
+            
+            if len(stations_used) < 2:
+                print("Error: Insufficient valid station data for interpolation")
+                return False
+            
+            # Convert to numpy arrays
+            xi_vals = np.array(xi_vals)
+            eta_vals = np.array(eta_vals)
+            F_vals = np.array(F_vals)
+            g_vals = np.array(g_vals)
+            
+            # Create interpolation grid
+            xi_min, xi_max = xi_vals.min(), xi_vals.max()
+            eta_min, eta_max = eta_vals.min(), eta_vals.max()
+            
+            xi_grid = np.linspace(xi_min, xi_max, 100)
+            eta_grid = np.linspace(eta_min, eta_max, 100)
+            Xi, Eta = np.meshgrid(xi_grid, eta_grid)
+            
+            # Interpolate F and g
+            points = np.column_stack((xi_vals, eta_vals))
+            F_interp = griddata(points, F_vals, (Xi, Eta), method='linear')
+            g_interp = griddata(points, g_vals, (Xi, Eta), method='linear')
+            
+            # Create the plot
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+            fig.suptitle(f'F and g Mapping (Stations: {min(stations_used):03d}-{max(stations_used):03d})', 
+                        fontsize=14, fontweight='bold')
+            
+            # Plot F(η, ξ)
+            im1 = ax1.contourf(Xi, Eta, F_interp, levels=50, cmap='inferno')
+            ax1.set_xlabel('ξ')
+            ax1.set_ylabel('η')
+            ax1.set_title('F(η, ξ) - Velocity Function')
+            cbar1 = plt.colorbar(im1, ax=ax1)
+            cbar1.set_label('F')
+            
+            # Plot g(η, ξ)
+            im2 = ax2.contourf(Xi, Eta, g_interp, levels=50, cmap='inferno')
+            ax2.set_xlabel('ξ')
+            ax2.set_ylabel('η')
+            ax2.set_title('g(η, ξ) - Enthalpy Function')
+            cbar2 = plt.colorbar(im2, ax=ax2)
+            cbar2.set_label('g')
+            
+            plt.tight_layout()
+            
+            if save_path:
+                plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+                print(f"F and g map using {len(stations_used)} stations saved to: {save_path}")
+            else:
+                plt.show()
+            
+            plt.close()
+            return True
+            
+        except Exception as e:
+            print(f"Error creating F and g map: {e}")
+            return False
     
     def create_summary_report(self, output_dir: Path) -> None:
-        """Create a comprehensive summary report"""
+        """Create a comprehensive summary report with consistent naming"""
         
         output_dir = Path(output_dir)
         output_dir.mkdir(exist_ok=True)
         
         print(f"Creating summary report in: {output_dir}")
         
-        # Plot profiles for first few stations
-        n_stations = len(self.reader.data['stations'])
-        stations_to_plot = min(3, n_stations)
+        valid_stations = sorted(self.reader.get_valid_stations())
         
-        for i in range(stations_to_plot):
-            self.plot_profiles(i, save_path=output_dir / f'profiles_station_{i:03d}.png')
+        if not valid_stations:
+            print("Error: No valid stations found for plotting")
+            return
         
-        # Plot wall properties
-        self.plot_wall_properties(save_path=output_dir / 'wall_properties.png')
+        # Track successfully plotted stations
+        plotted_stations = []
         
-        # Plot integrated quantities
-        self.plot_integrated_quantities(save_path=output_dir / 'integrated_quantities.png')
+        # Plot profiles for valid stations (limit to first few to avoid too many plots)
+        stations_to_plot = valid_stations[:5]  # Limit to first 5 valid stations
         
-        # Create summary data file
+        for station_idx in stations_to_plot:
+            profile_path = output_dir / f'profiles_station_{station_idx:03d}.png'
+            if self.plot_profiles(station_idx, save_path=profile_path):
+                plotted_stations.append(station_idx)
+        
+        # Create F and g map if possible
+        f_g_map_path = output_dir / 'F_g_eta_xi_map.png'
+        f_g_map_created = self.plot_F_and_g_map(save_path=f_g_map_path)
+        
+        # Create summary data file with consistent information
         try:
-            self._create_summary_json(output_dir / 'summary.json')
+            summary_data = {
+                'plotted_stations': plotted_stations,
+                'f_g_map_created': f_g_map_created,
+                'valid_stations_total': len(valid_stations),
+                'all_valid_stations': valid_stations
+            }
+            self._create_summary_json(output_dir / 'summary.json', summary_data)
         except Exception as e:
             print(f"Warning: Could not create summary JSON file: {e}")
         
-        print("Summary report completed!")
+        print(f"Summary report completed!")
+        print(f"Successfully plotted {len(plotted_stations)} stations: {plotted_stations}")
+        if f_g_map_created:
+            print("F and g mapping plot created successfully")
     
-    def _create_summary_json(self, file_path: Path) -> None:
-        """Create JSON summary of key results"""
+    def _create_summary_json(self, file_path: Path, plot_summary: Dict) -> None:
+        """Create JSON summary with consistent plot information"""
         
         summary = {
             'metadata': self.reader.metadata,
-            'n_stations': len(self.reader.data['stations']),
-            'species_names': self.reader.get_species_names()
+            'file_info': {
+                'input_file': str(self.reader.input_path),
+                'format': self.reader.format,
+                'total_stations_in_file': len(self.reader.data['stations']) if self.reader.data else 0
+            },
+            'data_validation': {
+                'valid_stations_for_plotting': len(self.reader.get_valid_stations()),
+                'required_fields': list(self.reader.REQUIRED_PROFILE_FIELDS),
+                'valid_station_indices': sorted(self.reader.get_valid_stations())
+            },
+            'species_info': {
+                'species_names': self.reader.get_species_names(),
+                'species_count': len(self.reader.get_species_names())
+            },
+            'plots_generated': plot_summary
         }
-        
-        # Add key results
-        if 'wall' in self.reader.data:
-            wall_data = self.reader.data['wall']
-            if 'temperatures' in wall_data:
-                summary['max_wall_temperature'] = float(np.max(wall_data['temperatures']))
-                summary['min_wall_temperature'] = float(np.min(wall_data['temperatures']))
-        
+
         # Convert numpy arrays to lists for JSON serialization
         def convert_numpy(obj):
             if isinstance(obj, np.ndarray):
@@ -513,7 +513,6 @@ class BLASTPlotter:
             elif isinstance(obj, np.floating):
                 return float(obj)
             elif isinstance(obj, (bytes, np.bytes_)):
-                # Handle bytes objects (common in HDF5 string data)
                 try:
                     return obj.decode('utf-8')
                 except UnicodeDecodeError:
@@ -522,22 +521,26 @@ class BLASTPlotter:
                 return {key: convert_numpy(value) for key, value in obj.items()}
             elif isinstance(obj, list):
                 return [convert_numpy(item) for item in obj]
+            elif isinstance(obj, set):
+                return sorted(list(obj))
             return obj
         
         summary = convert_numpy(summary)
         
         with open(file_path, 'w') as f:
             json.dump(summary, f, indent=2)
+        
+        print(f"Summary JSON saved to: {file_path}")
 
 
 def main():
-    """Main function with command-line interface"""
+    """Main function with command-line interface and robust error handling"""
     
-    parser = argparse.ArgumentParser(description='BLAST Post-Processing Tool')
+    parser = argparse.ArgumentParser(description='BLAST Post-Processing Tool - Improved Version')
     parser.add_argument('--input', '-i', type=str, required=True,
                        help='Input HDF5 file')
     parser.add_argument('--plots', '-p', type=str, default='all',
-                       choices=['all', 'profiles', 'wall', 'integrated', 'summary', 'f_g_map'],
+                       choices=['all', 'profiles', 'summary', 'f_g_map'],
                        help='Type of plots to generate')
     parser.add_argument('--station', '-s', type=int, default=0,
                        help='Station index for profile plots')
@@ -550,16 +553,26 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize reader
+    # Initialize reader with error handling
     try:
         reader = BLASTReader(args.input)
         
-        print(f"Loading {reader.format.upper()} data from: {reader.input_path}")
+        print(f"Initializing {reader.format.upper()} reader for: {reader.input_path}")
         reader.load_data()
-        print(f"Loaded data with {len(reader.data['stations'])} stations")
+        
+        valid_stations = reader.get_valid_stations()
+        print(f"Data loaded successfully:")
+        print(f"  - Total stations: {len(reader.data['stations'])}")
+        print(f"  - Valid stations for plotting: {len(valid_stations)}")
+        print(f"  - Valid station indices: {sorted(valid_stations)}")
+        
+        if not valid_stations:
+            print("Error: No stations have the required fields for plotting")
+            print(f"Required fields: {', '.join(reader.REQUIRED_PROFILE_FIELDS)}")
+            return 1
         
     except Exception as e:
-        print(f"Error loading data: {e}")
+        print(f"Error initializing data reader: {e}")
         return 1
     
     # Initialize plotter
@@ -570,29 +583,24 @@ def main():
     output_path = Path(args.output) if not args.show else None
     if output_path:
         output_path.mkdir(exist_ok=True)
+        print(f"Output directory: {output_path}")
     
-    # Generate plots
+    # Generate plots with error handling
     try:
         if args.plots == 'all':
             if args.show:
-                plotter.plot_profiles(args.station)
-                plotter.plot_wall_properties()
-                plotter.plot_integrated_quantities()
+                success = plotter.plot_profiles(args.station)
+                if not success:
+                    return 1
             else:
                 plotter.create_summary_report(output_path)
                 
         elif args.plots == 'profiles':
             save_path = output_path / f'profiles_station_{args.station:03d}.png' if output_path else None
-            plotter.plot_profiles(args.station, save_path)
-            
-        elif args.plots == 'wall':
-            save_path = output_path / 'wall_properties.png' if output_path else None
-            plotter.plot_wall_properties(save_path)
-            
-        elif args.plots == 'integrated':
-            save_path = output_path / 'integrated_quantities.png' if output_path else None
-            plotter.plot_integrated_quantities(save_path)
-            
+            success = plotter.plot_profiles(args.station, save_path)
+            if not success:
+                return 1
+                
         elif args.plots == 'summary':
             if not output_path:
                 output_path = Path('blast_summary')
@@ -600,7 +608,9 @@ def main():
             
         elif args.plots == 'f_g_map':
             save_path = output_path / 'F_g_eta_xi_map.png' if output_path else None
-            plotter.plot_F_and_g_map(save_path)
+            success = plotter.plot_F_and_g_map(save_path)
+            if not success:
+                return 1
         
         print("Post-processing completed successfully!")
         

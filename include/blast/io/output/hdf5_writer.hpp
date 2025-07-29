@@ -98,16 +98,6 @@ private:
         const OutputConfig& config
     ) const -> std::expected<void, OutputError>;
     
-    [[nodiscard]] auto write_wall_data(
-        FileHandle& file,
-        const OutputDataset::WallData& wall_data
-    ) const -> std::expected<void, OutputError>;
-    
-    [[nodiscard]] auto write_integrated_quantities(
-        FileHandle& file,
-        const OutputDataset::IntegratedQuantities& quantities
-    ) const -> std::expected<void, OutputError>;
-    
     // Utility functions for HDF5 operations
     [[nodiscard]] auto create_group(
         hid_t parent,

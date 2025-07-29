@@ -116,9 +116,6 @@ int main(int argc, char* argv[]) {
         // Select variables to save based on simulation type
         output_config.variables.flow_variables = true;
         output_config.variables.species_concentrations = true;
-        output_config.variables.transport_properties = config.simulation.consider_thermal_diffusion;
-        output_config.variables.chemical_rates = config.simulation.chemical_non_equilibrium;
-        output_config.variables.diffusion_fluxes = true;
         
         blast::io::output::OutputWriter output_writer(output_config);
         

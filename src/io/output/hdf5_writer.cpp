@@ -42,16 +42,6 @@ auto HDF5Writer::write(
         
         if (progress) progress(0.8, "Writing wall and integrated data");
         
-        // Write wall data
-        if (auto wall_result = write_wall_data(file, dataset.wall); !wall_result) {
-            return std::unexpected(wall_result.error());
-        }
-        
-        // Write integrated quantities
-        if (auto integrated_result = write_integrated_quantities(file, dataset.integrated); !integrated_result) {
-            return std::unexpected(integrated_result.error());
-        }
-        
         if (progress) progress(1.0, "HDF5 write complete");
         
         return {};
@@ -251,12 +241,6 @@ auto HDF5Writer::write_station_data(
         if (auto result = write_vector(station_group, "temperature", station.temperature, "K", "Temperature"); !result) {
             return std::unexpected(result.error());
         }
-        if (auto result = write_vector(station_group, "pressure", station.pressure, "Pa", "Pressure"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_vector(station_group, "density", station.density, "kg/m³", "Density"); !result) {
-            return std::unexpected(result.error());
-        }
     }
     
     // Species concentrations
@@ -264,119 +248,6 @@ auto HDF5Writer::write_station_data(
         if (auto result = write_matrix(station_group, "species_concentrations", station.species_concentrations, "", "Species mass fractions"); !result) {
             return std::unexpected(result.error());
         }
-    }
-    
-    // Transport properties
-    if (config.variables.transport_properties && !station.viscosity.empty()) {
-        if (auto result = write_vector(station_group, "viscosity", station.viscosity, "Pa·s", "Dynamic viscosity"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_vector(station_group, "thermal_conductivity", station.thermal_conductivity, "W/(m·K)", "Thermal conductivity"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_matrix(station_group, "diffusion_coefficients", station.diffusion_coefficients, "m²/s", "Binary diffusion coefficients"); !result) {
-            return std::unexpected(result.error());
-        }
-    }
-    
-    // Chemical rates
-    if (config.variables.chemical_rates && station.production_rates.rows() > 0) {
-        if (auto result = write_matrix(station_group, "production_rates", station.production_rates, "kg/(m³·s)", "Chemical production rates"); !result) {
-            return std::unexpected(result.error());
-        }
-    }
-    
-    // Diffusion fluxes
-    if (config.variables.diffusion_fluxes && station.diffusion_fluxes.rows() > 0) {
-        if (auto result = write_matrix(station_group, "diffusion_fluxes", station.diffusion_fluxes, "kg/(m²·s)", "Species diffusion fluxes"); !result) {
-            return std::unexpected(result.error());
-        }
-    }
-    
-    // Derivatives
-    if (config.save_derivatives) {
-        auto deriv_group_result = create_group(station_group, "derivatives");
-        if (!deriv_group_result) {
-            return std::unexpected(deriv_group_result.error());
-        }
-        auto deriv_group = std::move(deriv_group_result.value());
-        
-        if (auto result = write_vector(deriv_group, "dF_deta", station.derivatives.dF_deta, "1/m", "dF/deta"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_vector(deriv_group, "dg_deta", station.derivatives.dg_deta, "1/m", "dg/deta"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_vector(deriv_group, "dT_deta", station.derivatives.dT_deta, "K/m", "dT/deta"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_matrix(deriv_group, "dc_deta", station.derivatives.dc_deta, "1/m", "dc/deta"); !result) {
-            return std::unexpected(result.error());
-        }
-        
-        if (auto result = write_vector(deriv_group, "dF_dxi", station.derivatives.dF_dxi, "", "dF/dxi"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_vector(deriv_group, "dg_dxi", station.derivatives.dg_dxi, "", "dg/dxi"); !result) {
-            return std::unexpected(result.error());
-        }
-        if (auto result = write_matrix(deriv_group, "dc_dxi", station.derivatives.dc_dxi, "", "dc/dxi"); !result) {
-            return std::unexpected(result.error());
-        }
-    }
-    
-    return {};
-}
-
-auto HDF5Writer::write_wall_data(
-    FileHandle& file,
-    const OutputDataset::WallData& wall_data
-) const -> std::expected<void, OutputError> {
-    
-    auto wall_group_result = create_group(file, "wall");
-    if (!wall_group_result) {
-        return std::unexpected(wall_group_result.error());
-    }
-    auto wall_group = std::move(wall_group_result.value());
-    
-    if (auto result = write_vector(wall_group, "x_positions", wall_data.x_positions, "m", "Wall x positions"); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = write_vector(wall_group, "temperatures", wall_data.temperatures, "K", "Wall temperatures"); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = write_vector(wall_group, "heat_flux", wall_data.heat_flux, "W/m²", "Wall heat flux"); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = write_vector(wall_group, "shear_stress", wall_data.shear_stress, "Pa", "Wall shear stress"); !result) {
-        return std::unexpected(result.error());
-    }
-    
-    return {};
-}
-
-auto HDF5Writer::write_integrated_quantities(
-    FileHandle& file,
-    const OutputDataset::IntegratedQuantities& quantities
-) const -> std::expected<void, OutputError> {
-    
-    auto integrated_group_result = create_group(file, "integrated");
-    if (!integrated_group_result) {
-        return std::unexpected(integrated_group_result.error());
-    }
-    auto integrated_group = std::move(integrated_group_result.value());
-    
-    if (auto result = write_vector(integrated_group, "displacement_thickness", quantities.displacement_thickness, "m", "Displacement thickness"); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = write_vector(integrated_group, "momentum_thickness", quantities.momentum_thickness, "m", "Momentum thickness"); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = write_vector(integrated_group, "shape_factor", quantities.shape_factor, "", "Shape factor H"); !result) {
-        return std::unexpected(result.error());
-    }
-    if (auto result = write_vector(integrated_group, "total_enthalpy_thickness", quantities.total_enthalpy_thickness, "m", "Total enthalpy thickness"); !result) {
-        return std::unexpected(result.error());
     }
     
     return {};

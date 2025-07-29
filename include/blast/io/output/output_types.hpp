@@ -32,11 +32,8 @@ struct OutputConfig {
     
     // Variable selection
     struct VariableSelection {
-        bool flow_variables = true;      // F, g, V, T, P, rho
+        bool flow_variables = true;      // F, g, V, T, P
         bool species_concentrations = true;
-        bool transport_properties = false;
-        bool chemical_rates = false;
-        bool diffusion_fluxes = false;
     } variables;
 };
 
@@ -81,55 +78,17 @@ struct StationData {
     std::vector<double> g;           // Dimensionless enthalpy
     std::vector<double> V;           // Velocity field
     std::vector<double> temperature;
-    std::vector<double> pressure;
-    std::vector<double> density;
     
     // Species data
     core::Matrix<double> species_concentrations;  // [n_species x n_eta]
-    
-    // Transport properties (optional)
-    std::vector<double> viscosity;
-    std::vector<double> thermal_conductivity;
-    core::Matrix<double> diffusion_coefficients;
-    
-    // Chemical data (optional)
-    core::Matrix<double> production_rates;
-    core::Matrix<double> diffusion_fluxes;
-    
-    // Derivatives (optional)
-    struct Derivatives {
-        std::vector<double> dF_deta;
-        std::vector<double> dg_deta;
-        std::vector<double> dT_deta;
-        core::Matrix<double> dc_deta;
-        
-        // Xi derivatives
-        std::vector<double> dF_dxi;
-        std::vector<double> dg_dxi;
-        core::Matrix<double> dc_dxi;
-    } derivatives;
+
 };
 
 // Complete output dataset
 struct OutputDataset {
     SimulationMetadata metadata;
     std::vector<StationData> stations;
-    
-    // Wall properties
-    struct WallData {
-        std::vector<double> x_positions;
-        std::vector<double> temperatures;
-        std::vector<double> heat_flux;
-        std::vector<double> shear_stress;
-    } wall;
-    
-    // Integrated quantities
-    struct IntegratedQuantities {
-        std::vector<double> displacement_thickness;
-        std::vector<double> momentum_thickness;
-        std::vector<double> shape_factor;
-        std::vector<double> total_enthalpy_thickness;
-    } integrated;
+
 };
 
 // Progress callback for large outputs
