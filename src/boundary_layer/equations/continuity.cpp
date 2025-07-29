@@ -5,17 +5,13 @@
 
 namespace blast::boundary_layer::equations {
 
-template<NumericRange VField>
-constexpr auto solve_continuity(
-    VField&& d_velocity_field,
-    PhysicalQuantity auto d_eta,
-    PhysicalQuantity auto initial_value
-) noexcept -> std::vector<double>
-requires std::ranges::sized_range<VField> {
-    
-    return grid::coordinate_transform::simpson_integrate(
-        std::forward<VField>(d_velocity_field), d_eta, initial_value
-    );
+template <NumericRange VField>
+constexpr auto solve_continuity(VField&& d_velocity_field, PhysicalQuantity auto d_eta,
+                                PhysicalQuantity auto initial_value) noexcept -> std::vector<double>
+  requires std::ranges::sized_range<VField>
+{
+
+  return grid::coordinate_transform::simpson_integrate(std::forward<VField>(d_velocity_field), d_eta, initial_value);
 }
 
 // Explicit instantiations for common use cases

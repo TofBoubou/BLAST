@@ -39,6 +39,13 @@ BIN_DIR = .
 ALL_SOURCES := $(shell find $(SRC_DIR) -name '*.cpp' -type f)
 TOTAL_FILES := $(words $(ALL_SOURCES))
 
+TO_BUILD_TOTAL := $(shell for src in $(ALL_SOURCES); do \
+    obj=$$(echo "$$src" | sed 's|$(SRC_DIR)/|$(BUILD_DIR)/|; s|\.cpp$$|.o|'); \
+    if [ "$$src" -nt "$$obj" ] 2>/dev/null || [ ! -f "$$obj" ]; then \
+        echo "x"; \
+    fi; \
+done | wc -l)
+
 # Object files
 ALL_OBJECTS = $(ALL_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 
@@ -61,21 +68,14 @@ $(TARGET): $(ALL_OBJECTS) | check_dependencies
 # Object file compilation rules with progress
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	@to_build=0; \
-	for src in $(ALL_SOURCES); do \
-		obj=$$(echo "$$src" | sed 's|$(SRC_DIR)/|$(BUILD_DIR)/|; s|\.cpp$$|.o|'); \
-		if [ "$$src" -nt "$$obj" ] 2>/dev/null || [ ! -f "$$obj" ]; then \
-			to_build=$$((to_build + 1)); \
-		fi; \
-	done; \
-	echo "$$$$" >> $(BUILD_DIR)/.progress 2>/dev/null || echo "$$$$" > $(BUILD_DIR)/.progress; \
+	@echo "$$$$" >> $(BUILD_DIR)/.progress 2>/dev/null || echo "$$$$" > $(BUILD_DIR)/.progress; \
 	current=$$(wc -l < $(BUILD_DIR)/.progress 2>/dev/null); \
-	percent=$$((current * 100 / to_build)); \
+	percent=$$((current * 100 / $(TO_BUILD_TOTAL))); \
 	filled=$$((percent / 4)); \
-	bar=$$(printf "%*s" $$filled | tr ' ' '='); \
+	bar=$$(printf "%*s" $$filled | tr ' ' '#'); \
 	printf "\r[%-25s] %3d%% (%d/%d) %s\n" \
-		"$$bar" $$percent $$current $$to_build "$(notdir $<)"; \
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@ 2>/dev/null
+		"$$bar" $$percent $$current $(TO_BUILD_TOTAL) "$(notdir $<)"; \
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
 # Create build directories automatically
 $(BUILD_DIR):
@@ -153,7 +153,16 @@ install_deps_macos:
 format:
 	@echo "Formatting code..."
 	@command -v clang-format >/dev/null 2>&1 || { echo "Install clang-format for code formatting"; exit 1; }
-	find $(SRC_DIR) include -name "*.cpp" -o -name "*.hpp" | xargs clang-format -i
+	find $(SRC_DIR) include -name "*.cpp" -o -name "*.hpp" | xargs clang-format -i \
+		-style="{BasedOnStyle: LLVM, ColumnLimit: 120, IndentWidth: 2, \
+		AllowShortFunctionsOnASingleLine: InlineOnly, \
+		AllowShortIfStatementsOnASingleLine: Never, \
+		AllowShortLoopsOnASingleLine: false, \
+		BreakBeforeBraces: Attach, \
+		PointerAlignment: Left, \
+		ReferenceAlignment: Left, \
+		SpaceBeforeParens: ControlStatements, \
+		Standard: c++20}"
 	@echo "✓ Code formatted"
 
 # Clean targets
