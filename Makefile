@@ -4,6 +4,7 @@
 # Compiler and flags
 CXX = g++
 CXXFLAGS = -std=c++23 -O3 -DNDEBUG -march=native -w
+PROFILE_FLAGS = -std=c++23 -pg -g -O2 -march=native -w
 SHELL := /bin/bash
 INCLUDE_FLAGS = -Iinclude -I/usr/include/hdf5/serial
 
@@ -51,6 +52,7 @@ ALL_OBJECTS = $(ALL_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 
 # Target
 TARGET = $(BIN_DIR)/blast
+PROFILE_TARGET = $(BIN_DIR)/blast_profile
 
 # Default target
 .PHONY: all
@@ -76,6 +78,18 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	printf "\r[%-25s] %3d%% (%d/%d) %s\n" \
 		"$$bar" $$percent $$current $(TO_BUILD_TOTAL) "$(notdir $<)"; \
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+# Profile object files
+PROFILE_OBJECTS = $(ALL_SOURCES:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/profile_%.o)
+
+$(BUILD_DIR)/profile_%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) $(PROFILE_FLAGS) $(INCLUDES) -c $< -o $@
+
+# Profile target
+$(PROFILE_TARGET): $(PROFILE_OBJECTS) | check_dependencies
+	@echo "Linking profile executable..."
+	$(CXX) $(PROFILE_OBJECTS) -o $@ $(LIBS) -pg
 
 # Create build directories automatically
 $(BUILD_DIR):
@@ -165,13 +179,37 @@ format:
 		Standard: c++20}"
 	@echo "✓ Code formatted"
 
+# Profile target
+.PHONY: profile
+profile: $(PROFILE_TARGET)
+	@if [ -z "$(CONFIG)" ]; then \
+		echo "Error: CONFIG parameter required. Usage: make profile CONFIG=config/file.yaml"; \
+		exit 1; \
+	fi
+	@echo "Running profile with config: $(CONFIG)"
+	@rm -f gmon.out profile_report.txt
+	./$(PROFILE_TARGET) $(CONFIG)
+	@echo "Generating profile report..."
+	gprof $(PROFILE_TARGET) gmon.out > profile_report.txt
+	@echo "✓ Profile complete. Results in profile_report.txt"
+	@echo ""
+	@echo "Top time-consuming functions:"
+	@head -30 profile_report.txt | grep -A 20 "cumulative"
+
 # Clean targets
 .PHONY: clean
 clean:
 	@echo "Cleaning build files..."
 	rm -rf $(BUILD_DIR)
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(PROFILE_TARGET)
 	@echo "✓ Clean complete"
+
+.PHONY: clean-profile
+clean-profile:
+	@echo "Cleaning profile files..."
+	rm -f $(PROFILE_TARGET) gmon.out profile_report.txt
+	rm -f $(BUILD_DIR)/profile_*.o
+	@echo "✓ Profile clean complete"
 
 
 # Install target

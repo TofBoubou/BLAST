@@ -706,181 +706,80 @@ std::expected<std::vector<double>, CoefficientError> {
         return derivatives;
     }
     
-    if (n < 7) {
-        // 5-point stencil for medium arrays
-        const double dx12 = 12.0 * d_eta;
-        
-        derivatives[0] = (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] +
-                          16.0 * values[3] - 3.0 * values[4]) / dx12;
-        derivatives[1] = (-3.0 * values[0] - 10.0 * values[1] + 18.0 * values[2] -
-                          6.0 * values[3] + 1.0 * values[4]) / dx12;
-        
-        for (std::size_t i = 2; i < n - 2; ++i) {
-            derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] +
-                             8.0 * values[i + 1] - values[i + 2]) / dx12;
-        }
-        
-        derivatives[n - 2] = (3.0 * values[n - 5] - 16.0 * values[n - 4] +
-                             36.0 * values[n - 3] - 48.0 * values[n - 2] +
-                             25.0 * values[n - 1]) / dx12;
-        derivatives[n - 1] = derivatives[n - 2];
-        
-        return derivatives;
+    const double dx12 = 12.0 * d_eta;
+    
+    // Forward 5-point stencil O(h^4) for first 2 points
+    derivatives[0] = (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] +
+                      16.0 * values[3] - 3.0 * values[4]) / dx12;
+    
+    derivatives[1] = (-25.0 * values[1] + 48.0 * values[2] - 36.0 * values[3] +
+                      16.0 * values[4] - 3.0 * values[5]) / dx12;
+    
+    // Central 5-point stencil O(h^4) for interior points
+    for (std::size_t i = 2; i < n - 2; ++i) {
+        derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] +
+                         8.0 * values[i + 1] - values[i + 2]) / dx12;
     }
     
-    // === STENCILS 7 POINTS O(h^6) - COEFFICIENTS 100% VÉRIFIÉS ===
+    // Backward 5-point stencil O(h^4) for last 2 points
+    derivatives[n - 2] = (-1.0 * values[n - 5] + 6.0 * values[n - 4] - 18.0 * values[n - 3] +
+                         10.0 * values[n - 2] + 3.0 * values[n - 1]) / dx12;
     
-    const double dx60 = 60.0 * d_eta;
-    
-    // FORWARD STENCIL O(h^6) pour points 0,1,2
-    // Coefficients exacts : [-147, 360, -450, 400, -225, 72, -10] / (60h)
-    derivatives[0] = (-147.0 * values[0] + 360.0 * values[1] - 450.0 * values[2] +
-                      400.0 * values[3] - 225.0 * values[4] + 72.0 * values[5] - 
-                      10.0 * values[6]) / dx60;
-    
-    derivatives[1] = (-147.0 * values[1] + 360.0 * values[2] - 450.0 * values[3] +
-                      400.0 * values[4] - 225.0 * values[5] + 72.0 * values[6] - 
-                      10.0 * values[7]) / dx60;
-    
-    derivatives[2] = (-147.0 * values[2] + 360.0 * values[3] - 450.0 * values[4] +
-                      400.0 * values[5] - 225.0 * values[6] + 72.0 * values[7] - 
-                      10.0 * values[8]) / dx60;
-    
-    // CENTRAL STENCIL O(h^6) pour points intérieurs
-    // Coefficients exacts : [-1, 9, -45, 0, 45, -9, 1] / (60h)
-    for (std::size_t i = 3; i < n - 3; ++i) {
-        derivatives[i] = (-values[i - 3] + 9.0 * values[i - 2] - 45.0 * values[i - 1] +
-                         45.0 * values[i + 1] - 9.0 * values[i + 2] + values[i + 3]) / dx60;
-    }
-    
-    // STENCILS AUX BORDS DROITS avec gestion des débordements
-    if (n >= 9) {
-        // BACKWARD STENCIL O(h^6) pour les 3 derniers points
-        // Coefficients exacts : [10, -72, 225, -400, 450, -360, 147] / (60h)
-        derivatives[n - 3] = (10.0 * values[n - 9] - 72.0 * values[n - 8] + 225.0 * values[n - 7] -
-                             400.0 * values[n - 6] + 450.0 * values[n - 5] - 360.0 * values[n - 4] + 
-                             147.0 * values[n - 3]) / dx60;
-        
-        derivatives[n - 2] = (10.0 * values[n - 8] - 72.0 * values[n - 7] + 225.0 * values[n - 6] -
-                             400.0 * values[n - 5] + 450.0 * values[n - 4] - 360.0 * values[n - 3] + 
-                             147.0 * values[n - 2]) / dx60;
-        
-        derivatives[n - 1] = (10.0 * values[n - 7] - 72.0 * values[n - 6] + 225.0 * values[n - 5] -
-                             400.0 * values[n - 4] + 450.0 * values[n - 3] - 360.0 * values[n - 2] + 
-                             147.0 * values[n - 1]) / dx60;
-    } else {
-        // Si pas assez de points pour les stencils 7 points aux bords, utiliser 5 points
-        const double dx12 = 12.0 * d_eta;
-        
-        derivatives[n - 3] = (values[n - 5] - 8.0 * values[n - 4] + 8.0 * values[n - 2] - values[n - 1]) / dx12;
-        derivatives[n - 2] = (-1.0 * values[n - 5] + 6.0 * values[n - 4] - 18.0 * values[n - 3] +
-                             10.0 * values[n - 2] + 3.0 * values[n - 1]) / dx12;
-        derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 36.0 * values[n - 3] -
-                             48.0 * values[n - 2] + 25.0 * values[n - 1]) / dx12;
-    }
+    derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 36.0 * values[n - 3] -
+                         48.0 * values[n - 2] + 25.0 * values[n - 1]) / dx12;
     
     return derivatives;
 }
 
 template<std::ranges::sized_range Range>
 auto compute_eta_second_derivative(Range&& values, double d_eta) ->
-std::vector<double> {
+std::expected<std::vector<double>, CoefficientError> {
     const auto n = std::ranges::size(values);
     std::vector<double> second_derivatives(n);
 
     if (d_eta <= 0.0) {
-        throw std::invalid_argument("Invalid grid spacing: d_eta must be positive");
+        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
     }
 
     if (n < 3) {
-        throw std::invalid_argument("Insufficient points for second derivative calculation: need at least 3 points");
+        return std::unexpected(CoefficientError("Insufficient points for second derivative calculation: need at least 3 points"));
     }
 
-    if (n < 7) {
-        // 5-point stencil pour les petits tableaux
-        const double dx2_12 = 12.0 * d_eta * d_eta;
+    if (n < 5) {
+        // Simple 3-point stencil for small arrays
         const double d_eta_sq = d_eta * d_eta;
         
-        if (n < 5) {
-            // 3-point simple
-            second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
-            for (std::size_t i = 1; i < n - 1; ++i) {
-                second_derivatives[i] = (values[i-1] - 2.0 * values[i] + values[i+1]) / d_eta_sq;
-            }
-            second_derivatives[n-1] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / d_eta_sq;
-        } else {
-            // 5-point stencil
-            second_derivatives[0] = (2.0 * values[0] - 5.0 * values[1] + 4.0 * values[2] - values[3]) / d_eta_sq;
-            second_derivatives[1] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
-
-            for (std::size_t i = 2; i < n - 2; ++i) {
-                second_derivatives[i] = (-values[i-2] + 16.0 * values[i-1] - 30.0 * values[i] + 
-                                       16.0 * values[i+1] - values[i+2]) / dx2_12;
-            }
-
-            second_derivatives[n-2] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / d_eta_sq;
-            second_derivatives[n-1] = (2.0 * values[n-1] - 5.0 * values[n-2] + 4.0 * values[n-3] - values[n-4]) / d_eta_sq;
+        second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
+        for (std::size_t i = 1; i < n - 1; ++i) {
+            second_derivatives[i] = (values[i-1] - 2.0 * values[i] + values[i+1]) / d_eta_sq;
         }
+        second_derivatives[n-1] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / d_eta_sq;
+        
         return second_derivatives;
     }
 
-    // === STENCILS 7 POINTS O(h^6) - COEFFICIENTS 100% VÉRIFIÉS ===
+    const double dx2_12 = 12.0 * d_eta * d_eta;
     
-    const double dx2_180 = 180.0 * d_eta * d_eta;
+    // Forward 5-point stencil O(h^4) for first 2 points
+    second_derivatives[0] = (35.0 * values[0] - 104.0 * values[1] + 114.0 * values[2] -
+                            56.0 * values[3] + 11.0 * values[4]) / dx2_12;
     
-    // FORWARD STENCIL O(h^6) pour points 0,1,2 
-    // Coefficients exacts : [812, -3132, 5265, -5080, 2970, -972, 137] / (180h²)
-    second_derivatives[0] = (812.0 * values[0] - 3132.0 * values[1] + 5265.0 * values[2] -
-                           5080.0 * values[3] + 2970.0 * values[4] - 972.0 * values[5] + 
-                           137.0 * values[6]) / dx2_180;
+    second_derivatives[1] = (35.0 * values[1] - 104.0 * values[2] + 114.0 * values[3] -
+                            56.0 * values[4] + 11.0 * values[5]) / dx2_12;
     
-    second_derivatives[1] = (812.0 * values[1] - 3132.0 * values[2] + 5265.0 * values[3] -
-                           5080.0 * values[4] + 2970.0 * values[5] - 972.0 * values[6] + 
-                           137.0 * values[7]) / dx2_180;
-    
-    second_derivatives[2] = (812.0 * values[2] - 3132.0 * values[3] + 5265.0 * values[4] -
-                           5080.0 * values[5] + 2970.0 * values[6] - 972.0 * values[7] + 
-                           137.0 * values[8]) / dx2_180;
-    
-    // CENTRAL STENCIL O(h^6) pour points intérieurs
-    // Coefficients exacts : [2, -27, 270, -490, 270, -27, 2] / (180h²)
-    for (std::size_t i = 3; i < n - 3; ++i) {
-        second_derivatives[i] = (2.0 * values[i - 3] - 27.0 * values[i - 2] + 270.0 * values[i - 1] -
-                               490.0 * values[i] + 270.0 * values[i + 1] - 27.0 * values[i + 2] + 
-                               2.0 * values[i + 3]) / dx2_180;
+    // Central 5-point stencil O(h^4) for interior points
+    for (std::size_t i = 2; i < n - 2; ++i) {
+        second_derivatives[i] = (-values[i - 2] + 16.0 * values[i - 1] - 30.0 * values[i] +
+                                16.0 * values[i + 1] - values[i + 2]) / dx2_12;
     }
     
-    // STENCILS AUX BORDS DROITS - approche simplifiée et correcte
-    // Pour éviter les débordements d'indices, on utilise des formules adaptées
+    // Backward 5-point stencils O(h^4) for last 2 points
+    second_derivatives[n - 2] = (-1.0 * values[n - 5] + 4.0 * values[n - 4] + 6.0 * values[n - 3] -
+                                20.0 * values[n - 2] + 11.0 * values[n - 1]) / dx2_12;
     
-    // Les 3 derniers points utilisent des stencils basés sur les points disponibles
-    // Point n-3 : stencil utilisant [n-6, n-5, n-4, n-3, n-2, n-1, et un point virtuel]
-    // Approche : utiliser un stencil forward décalé
+    second_derivatives[n - 1] = (11.0 * values[n - 5] - 56.0 * values[n - 4] + 114.0 * values[n - 3] -
+                                104.0 * values[n - 2] + 35.0 * values[n - 1]) / dx2_12;
     
-    if (n >= 9) {
-        // Si on a assez de points, utiliser les vrais stencils backward O(h^6)
-        second_derivatives[n - 3] = (137.0 * values[n - 9] - 972.0 * values[n - 8] + 2970.0 * values[n - 7] -
-                                   5080.0 * values[n - 6] + 5265.0 * values[n - 5] - 3132.0 * values[n - 4] + 
-                                   812.0 * values[n - 3]) / dx2_180;
-        
-        second_derivatives[n - 2] = (137.0 * values[n - 8] - 972.0 * values[n - 7] + 2970.0 * values[n - 6] -
-                                   5080.0 * values[n - 5] + 5265.0 * values[n - 4] - 3132.0 * values[n - 3] + 
-                                   812.0 * values[n - 2]) / dx2_180;
-        
-        second_derivatives[n - 1] = (137.0 * values[n - 7] - 972.0 * values[n - 6] + 2970.0 * values[n - 5] -
-                                   5080.0 * values[n - 4] + 5265.0 * values[n - 3] - 3132.0 * values[n - 2] + 
-                                   812.0 * values[n - 1]) / dx2_180;
-    } else {
-        // Si pas assez de points pour les stencils 7 points aux bords, utiliser 5 points
-        const double dx2_12 = 12.0 * d_eta * d_eta;
-        const double d_eta_sq = d_eta * d_eta;
-        
-        second_derivatives[n - 3] = (-values[n - 5] + 16.0 * values[n - 4] - 30.0 * values[n - 3] + 
-                                   16.0 * values[n - 2] - values[n - 1]) / dx2_12;
-        second_derivatives[n - 2] = (values[n - 3] - 2.0 * values[n - 2] + values[n - 1]) / d_eta_sq;
-        second_derivatives[n - 1] = (2.0 * values[n - 1] - 5.0 * values[n - 2] + 4.0 * values[n - 3] - values[n - 4]) / d_eta_sq;
-    }
-
     return second_derivatives;
 }
 
@@ -899,7 +798,11 @@ std::expected<Matrix, CoefficientError> { const auto n_rows = values.rows();
         for (std::size_t j = 0; j < n_cols; ++j) {
             row_values[j] = values(i, j);
         }
-        auto row_derivatives = compute_eta_second_derivative(row_values, d_eta);
+        auto row_derivatives_result = compute_eta_second_derivative(row_values, d_eta);
+        if (!row_derivatives_result) {
+            return std::unexpected(row_derivatives_result.error());
+        }
+        const auto& row_derivatives = row_derivatives_result.value();
         for (std::size_t j = 0; j < n_cols; ++j) {
             result(i, j) = row_derivatives[j];
         }

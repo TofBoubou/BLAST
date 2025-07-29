@@ -17,7 +17,7 @@ template <std::ranges::sized_range Range>
                                           double d_eta) -> std::expected<std::vector<double>, CoefficientError>;
 
 template <std::ranges::sized_range Range>
-[[nodiscard]] auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::vector<double>;
+[[nodiscard]] auto compute_eta_second_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError>;
 
 template <typename Matrix>
 [[nodiscard]] auto compute_matrix_eta_derivative(const Matrix& values, double d_eta) -> Matrix;
