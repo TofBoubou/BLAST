@@ -109,10 +109,12 @@ public:
 class SolverPipeline {
 private:
     std::vector<std::unique_ptr<SolverStep>> steps_;
+    mutable std::string last_failed_step_;
     
 public:
     static auto create_for_solver(BoundaryLayerSolver& solver) -> SolverPipeline;
     auto execute_all(SolverContext& ctx) -> StepResult;
+    [[nodiscard]] auto last_failed_step() const -> const std::string& { return last_failed_step_; }
 };
 
 } // namespace blast::boundary_layer::solver

@@ -130,6 +130,48 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 auto BoundaryLayerSolver::solve_station(int station, double xi, const equations::SolutionState& initial_guess)
     -> std::expected<equations::SolutionState, SolverError> {
 
+  // Validate input parameters
+  if (station < 0) {
+    return std::unexpected(SolverError("Invalid station number: {} (must be non-negative)", 
+                                       std::source_location::current(), station));
+  }
+  
+  if (!std::isfinite(xi) || xi < 0.0) {
+    return std::unexpected(SolverError("Invalid xi coordinate: {} (must be finite and non-negative)", 
+                                       std::source_location::current(), xi));
+  }
+
+  // Validate initial guess dimensions
+  const auto expected_n_eta = grid_->n_eta();
+  const auto expected_n_species = mixture_.n_species();
+  
+  if (initial_guess.F.size() != expected_n_eta || initial_guess.T.size() != expected_n_eta || 
+      initial_guess.g.size() != expected_n_eta) {
+    return std::unexpected(SolverError("Initial guess field dimensions mismatch: expected {} eta points", 
+                                       std::source_location::current(), expected_n_eta));
+  }
+  
+  if (initial_guess.c.rows() != expected_n_species || initial_guess.c.cols() != expected_n_eta) {
+    return std::unexpected(SolverError("Initial guess species matrix dimensions mismatch: expected {}x{}", 
+                                       std::source_location::current(), expected_n_species, expected_n_eta));
+  }
+
+  // Check consistency between station and xi coordinates
+  if (station > 0) {
+    const auto& xi_coords = grid_->xi_coordinates();
+    if (station >= static_cast<int>(xi_coords.size())) {
+      return std::unexpected(SolverError("Station {} exceeds available xi coordinates (max: {})", 
+                                         std::source_location::current(), station, xi_coords.size() - 1));
+    }
+    
+    // Allow some tolerance for floating point comparison
+    const double expected_xi = xi_coords[station];
+    if (std::abs(xi - expected_xi) > 1e-10) {
+      return std::unexpected(SolverError("Xi coordinate mismatch for station {}: provided {}, expected {}", 
+                                         std::source_location::current(), station, xi, expected_xi));
+    }
+  }
+
   // Get boundary conditions for this station
   auto bc_result =
       (station == 0)
@@ -215,8 +257,9 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi,
         // Execute pipeline
         auto pipeline_result = pipeline.execute_all(ctx);
         if (pipeline_result == StepResult::Failed) {
-            return std::unexpected(SolverError("Pipeline execution failed at station {} iteration {}",
-                                             std::source_location::current(), station, iter));
+            const auto& failed_step = pipeline.last_failed_step();
+            return std::unexpected(SolverError("Pipeline execution failed at station {} iteration {} in step '{}'",
+                                             std::source_location::current(), station, iter, failed_step));
         }
         
         // Complete new solution construction
@@ -456,8 +499,8 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
         guess.c(j, i) /= sum_interpolated;
       }
     } else {
-      std::cout << "GROS BUG" << std::endl;
-      abort();
+      return std::unexpected(SolverError("Mass conservation violation: sum of species concentrations is too small ({})", 
+                                         std::source_location::current(), sum_interpolated));
     }
   }
 

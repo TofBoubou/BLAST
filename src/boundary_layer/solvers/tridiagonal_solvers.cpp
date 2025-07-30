@@ -480,7 +480,7 @@ auto block_thomas_algorithm(std::vector<core::Matrix<double>>& lower_blocks,
     }
 
   } catch (const std::exception& e) {
-    return std::unexpected(SolverError("Matrix operation failed"));
+    return std::unexpected(SolverError(std::format("Matrix operation failed in block Thomas algorithm: {}", e.what())));
   }
 
   return {};

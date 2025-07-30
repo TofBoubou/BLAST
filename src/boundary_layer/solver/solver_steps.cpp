@@ -15,10 +15,6 @@ ThermodynamicConsistencyStep::ThermodynamicConsistencyStep(thermodynamics::Entha
 
 auto ThermodynamicConsistencyStep::execute(SolverContext& ctx) -> StepResult {
     // 1. Temperature update from enthalpy
-    std::cout << "T before update at station " << ctx.station << ", iteration " << ctx.iteration << ":\n";
-    std::cout << "  T[0]     = " << std::scientific << std::setprecision(6) << ctx.solution.T.front() << "\n";
-    std::cout << "  T[n-1]   = " << std::scientific << std::setprecision(6) << ctx.solution.T.back() << "\n";
-
     std::vector<double> enthalpy_field(ctx.solution.g.size());
     for (std::size_t i = 0; i < enthalpy_field.size(); ++i) {
         enthalpy_field[i] = ctx.solution.g[i] * ctx.bc.he();
@@ -255,11 +251,14 @@ auto SolverPipeline::create_for_solver(BoundaryLayerSolver& solver) -> SolverPip
 }
 
 auto SolverPipeline::execute_all(SolverContext& ctx) -> StepResult {
+    last_failed_step_.clear(); // Reset previous failure state
+    
     for (auto& step : steps_) {
-        std::cout << "Executing step: " << step->name() << std::endl;
+        // std::cout << "Executing step: " << step->name() << std::endl;
         
         auto result = step->execute(ctx);
         if (result == StepResult::Failed) {
+            last_failed_step_ = step->name();
             std::cerr << "Step failed: " << step->name() << std::endl;
             return StepResult::Failed;
         }
