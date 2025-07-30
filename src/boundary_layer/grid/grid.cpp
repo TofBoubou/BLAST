@@ -214,26 +214,6 @@ auto BoundaryLayerGrid::interpolate_x_from_xi(double xi_target,
                                                    x_derivatives[i1], x_derivatives[i2]);
 }
 
-constexpr auto compute_xi_step_size( // see if it can be better
-    double current_xi, double d_xi, int iterations,
-    const io::NumericalConfig::StepControl& step_control) noexcept -> double {
-
-  if (iterations <= step_control.lower_bound) {
-    return d_xi + d_xi / static_cast<double>(iterations);
-  }
-
-  if (iterations >= step_control.upper_bound) {
-    return d_xi * static_cast<double>(step_control.upper_bound) / static_cast<double>(iterations);
-  }
-
-  return d_xi;
-}
-
-constexpr auto reduce_step_size(double current_xi, double& d_xi) noexcept -> double {
-  const auto new_xi = current_xi - d_xi;
-  d_xi *= constants::step_reduction_factor;
-  return new_xi + d_xi;
-}
 
 // Explicit instantiations for common use cases
 template auto BoundaryLayerGrid::create_downstream_grid<const io::NumericalConfig&>(

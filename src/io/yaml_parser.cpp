@@ -176,25 +176,6 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
       return std::unexpected(max_iter_result.error());
     config.max_iterations = max_iter_result.value();
 
-    auto under_relax_result = extract_value<double>(node, "under_relaxation");
-    if (!under_relax_result)
-      return std::unexpected(under_relax_result.error());
-    config.under_relaxation = under_relax_result.value();
-
-    if (node["step_control"]) {
-      auto sc_node = node["step_control"];
-
-      auto lower_bound_result = extract_value<int>(sc_node, "lower_bound");
-      if (!lower_bound_result)
-        return std::unexpected(lower_bound_result.error());
-      config.step_control.lower_bound = lower_bound_result.value();
-
-      auto upper_bound_result = extract_value<int>(sc_node, "upper_bound");
-      if (!upper_bound_result)
-        return std::unexpected(upper_bound_result.error());
-      config.step_control.upper_bound = upper_bound_result.value();
-    }
-
     if (node["solvers"]) {
       auto solv_node = node["solvers"];
 
@@ -274,46 +255,6 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
     if (!output_dir_result)
       return std::unexpected(output_dir_result.error());
     config.output_directory = output_dir_result.value();
-
-    auto gen_lookup_result = extract_value<bool>(node, "generate_lookup_table");
-    if (!gen_lookup_result)
-      return std::unexpected(gen_lookup_result.error());
-    config.generate_lookup_table = gen_lookup_result.value();
-
-    // lookup_table
-    if (node["lookup_table"]) {
-      auto lt_node = node["lookup_table"];
-
-      auto temp_min_result = extract_value<double>(lt_node, "temperature_min");
-      if (!temp_min_result)
-        return std::unexpected(temp_min_result.error());
-      config.lookup_table.temperature_min = temp_min_result.value();
-
-      auto temp_max_result = extract_value<double>(lt_node, "temperature_max");
-      if (!temp_max_result)
-        return std::unexpected(temp_max_result.error());
-      config.lookup_table.temperature_max = temp_max_result.value();
-
-      auto temp_step_result = extract_value<double>(lt_node, "temperature_step");
-      if (!temp_step_result)
-        return std::unexpected(temp_step_result.error());
-      config.lookup_table.temperature_step = temp_step_result.value();
-
-      auto gamma_min_result = extract_value<double>(lt_node, "gamma_min");
-      if (!gamma_min_result)
-        return std::unexpected(gamma_min_result.error());
-      config.lookup_table.gamma_min = gamma_min_result.value();
-
-      auto gamma_max_result = extract_value<double>(lt_node, "gamma_max");
-      if (!gamma_max_result)
-        return std::unexpected(gamma_max_result.error());
-      config.lookup_table.gamma_max = gamma_max_result.value();
-
-      auto gamma_step_result = extract_value<double>(lt_node, "gamma_step");
-      if (!gamma_step_result)
-        return std::unexpected(gamma_step_result.error());
-      config.lookup_table.gamma_step = gamma_step_result.value();
-    }
 
     return config;
 

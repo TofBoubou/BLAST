@@ -30,12 +30,7 @@ struct NumericalConfig {
   double eta_max = 8.0;
   double convergence_tolerance = 1e-6;
   int max_iterations = 1000;
-  double under_relaxation = 0.5;
 
-  struct StepControl {
-    int lower_bound = 10;
-    int upper_bound = 50;
-  } step_control;
 
   struct Solvers {
     double h2t_tolerance = 1e-8;
@@ -59,16 +54,6 @@ struct MixtureConfig {
 struct OutputConfig {
   std::vector<double> x_stations;
   std::string output_directory = "BLAST_outputs";
-  bool generate_lookup_table = false;
-
-  struct LookupTable {
-    double temperature_min = 300.0;
-    double temperature_max = 3000.0;
-    double temperature_step = 100.0;
-    double gamma_min = 0.0;
-    double gamma_max = 1.0;
-    double gamma_step = 0.1;
-  } lookup_table;
 };
 
 struct InitialGuessConfig {

@@ -85,11 +85,6 @@ private:
 };
 
 // Utility functions with constexpr where possible
-[[nodiscard]] constexpr auto
-compute_xi_step_size(double current_xi, double d_xi, int iterations,
-                     const io::NumericalConfig::StepControl& step_control) noexcept -> double;
-
-[[nodiscard]] constexpr auto reduce_step_size(double current_xi, double& d_xi) noexcept -> double;
 
 template <GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_stagnation_grid(NumericalConfig&& numerical_config,

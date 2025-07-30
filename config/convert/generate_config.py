@@ -29,8 +29,6 @@ def generate_config():
             "eta_max": 6.0,
             "convergence_tolerance": 1.0e-6,
             "max_iterations": 100000,
-            "under_relaxation": 1,
-            "step_control": {"lower_bound": 5, "upper_bound": 20},
             "solvers": {
                 "h2t_tolerance": 1.0e-12,
                 "h2t_max_iterations": 50000,
@@ -47,7 +45,6 @@ def generate_config():
         "output": {
             "x_stations": x_vals,
             "output_directory": output_dir,
-            "generate_lookup_table": False,
         },
         "outer_edge": {
             "edge_points": [
