@@ -9,6 +9,7 @@
 #include "../grid/grid.hpp"
 #include "../thermodynamics/enthalpy_temperature_solver.hpp"
 #include "adaptive_relaxation_controller.hpp"
+#include "solver_steps.hpp"
 #include <expected>
 #include <memory>
 
@@ -58,75 +59,86 @@ private:
 public:
   explicit BoundaryLayerSolver(const thermophysics::MixtureInterface& mixture, const io::Configuration& config);
 
-  // Main solving interface
   [[nodiscard]] auto solve() -> std::expected<SolutionResult, SolverError>;
 
-private:
-  // Station-level solving
-  [[nodiscard]] auto solve_station(int station, double xi, const equations::SolutionState& initial_guess)
+  // =============================================================================
+  // PUBLIC ACCESSORS FOR PIPELINE STEPS
+  // =============================================================================
+  
+  [[nodiscard]] auto get_h2t_solver() -> thermodynamics::EnthalpyTemperatureSolver& { 
+      return *h2t_solver_; 
+  }
+  
+  [[nodiscard]] auto get_grid() -> const grid::BoundaryLayerGrid& { 
+      return *grid_; 
+  }
+  
+  [[nodiscard]] auto get_coeff_calculator() -> coefficients::CoefficientCalculator& { 
+      return *coeff_calculator_; 
+  }
+
+  // =============================================================================
+  // PUBLIC METHODS FOR STEP ACCESS
+  // =============================================================================
+  
+  auto update_edge_properties(conditions::BoundaryConditions& bc, 
+                             const coefficients::CoefficientInputs& inputs,
+                             const core::Matrix<double>& species_matrix) const -> void;
+  
+  auto enforce_edge_boundary_conditions(equations::SolutionState& solution,
+                                      const conditions::BoundaryConditions& bc) const -> void;
+  
+  [[nodiscard]] auto compute_eta_derivatives(const equations::SolutionState& solution) const
       -> std::expected<equations::SolutionState, SolverError>;
-
-  // Iterative solving at one station
-  [[nodiscard]] auto iterate_station(int station, double xi, const conditions::BoundaryConditions& bc,
-                                     equations::SolutionState& solution) -> std::expected<ConvergenceInfo, SolverError>;
-
-  // Individual equation solving with proper sequencing
-  auto solve_continuity_equation(const equations::SolutionState& solution,
-                                 double xi // <- Add this parameter
-                                 ) -> std::expected<std::vector<double>, SolverError>;
-
+  
+  [[nodiscard]] auto compute_concentration_derivatives(const equations::SolutionState& solution) const
+      -> std::expected<DerivativeState, SolverError>;
+  
   [[nodiscard]] auto solve_momentum_equation(const equations::SolutionState& solution,
-                                             const coefficients::CoefficientSet& coeffs,
-                                             const conditions::BoundaryConditions& bc,
-                                             double xi) -> std::expected<std::vector<double>, SolverError>;
-
+                                           const coefficients::CoefficientSet& coeffs,
+                                           const conditions::BoundaryConditions& bc,
+                                           double xi) -> std::expected<std::vector<double>, SolverError>;
+  
   [[nodiscard]] auto solve_energy_equation(const equations::SolutionState& solution,
+                                         const coefficients::CoefficientInputs& inputs,
+                                         const coefficients::CoefficientSet& coeffs,
+                                         const conditions::BoundaryConditions& bc,
+                                         int station) -> std::expected<std::vector<double>, SolverError>;
+  
+  [[nodiscard]] auto solve_species_equations(const equations::SolutionState& solution,
                                            const coefficients::CoefficientInputs& inputs,
                                            const coefficients::CoefficientSet& coeffs,
                                            const conditions::BoundaryConditions& bc,
-                                           int station) -> std::expected<std::vector<double>, SolverError>;
+                                           int station) -> std::expected<core::Matrix<double>, SolverError>;
 
-  [[nodiscard]] auto solve_species_equations(const equations::SolutionState& solution,
-                                             const coefficients::CoefficientInputs& inputs,
-                                             const coefficients::CoefficientSet& coeffs,
-                                             const conditions::BoundaryConditions& bc,
-                                             int station) -> std::expected<core::Matrix<double>, SolverError>;
-
-  // Temperature update from enthalpy
-  [[nodiscard]] auto update_temperature_field(std::span<const double> g_field, const core::Matrix<double>& composition,
-                                              const conditions::BoundaryConditions& bc,
-                                              std::span<const double> current_temperatures)
-      -> std::expected<std::vector<double>, SolverError>;
-
-  // Convergence checking
-  [[nodiscard]] auto check_convergence(const equations::SolutionState& old_solution,
-                                       const equations::SolutionState& new_solution) const noexcept -> ConvergenceInfo;
-
-  // Solution initialization
-  [[nodiscard]] auto create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc,
-                                          double T_edge) const -> std::expected<equations::SolutionState, SolverError>;
-
-  [[nodiscard]] auto
-  iterate_station_adaptive(int station, double xi, const conditions::BoundaryConditions& bc,
-                           equations::SolutionState& solution) -> std::expected<ConvergenceInfo, SolverError>;
-
-  [[nodiscard]] auto apply_relaxation_differential(const equations::SolutionState& old_solution,
-                                                   const equations::SolutionState& new_solution,
-                                                   double base_factor) const -> equations::SolutionState;
-
-  [[nodiscard]] auto compute_eta_derivatives(const equations::SolutionState& solution) const
+private:
+  // =============================================================================
+  // PRIVATE ORCHESTRATION METHODS
+  // =============================================================================
+  
+  [[nodiscard]] auto solve_station(int station, double xi, const equations::SolutionState& initial_guess)
       -> std::expected<equations::SolutionState, SolverError>;
 
-  [[nodiscard]] auto compute_concentration_derivatives(const equations::SolutionState& solution) const
-      -> std::expected<DerivativeState, SolverError>;
+  [[nodiscard]] auto iterate_station_adaptive(int station, double xi, 
+                                             const conditions::BoundaryConditions& bc,
+                                             equations::SolutionState& solution)
+      -> std::expected<ConvergenceInfo, SolverError>;
 
-  // Enforce edge boundary conditions (critical for convergence)
-  auto enforce_edge_boundary_conditions(equations::SolutionState& solution,
-                                        const conditions::BoundaryConditions& bc) const -> void;
+  [[nodiscard]] auto update_temperature_field(std::span<const double> g_field, 
+                                             const core::Matrix<double>& composition,
+                                             const conditions::BoundaryConditions& bc,
+                                             std::span<const double> current_temperatures)
+      -> std::expected<std::vector<double>, SolverError>;
 
-  // Dynamic edge properties update for thermodynamic consistency
-  auto update_edge_properties(conditions::BoundaryConditions& bc, const coefficients::CoefficientInputs& inputs,
-                              const core::Matrix<double>& species_matrix) const -> void;
+  [[nodiscard]] auto check_convergence(const equations::SolutionState& old_solution,
+                                     const equations::SolutionState& new_solution) const noexcept -> ConvergenceInfo;
+
+  [[nodiscard]] auto create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc,
+                                        double T_edge) const -> std::expected<equations::SolutionState, SolverError>;
+
+  [[nodiscard]] auto apply_relaxation_differential(const equations::SolutionState& old_solution,
+                                                 const equations::SolutionState& new_solution,
+                                                 double base_factor) const -> equations::SolutionState;
 };
 
 } // namespace blast::boundary_layer::solver

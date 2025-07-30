@@ -8,7 +8,7 @@ simulation:
 numerical:
   n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-3    
+  convergence_tolerance: 1.0e-12    
   max_iterations: 100000
 
 mixture:
