@@ -331,7 +331,6 @@ auto thomas_algorithm(std::span<double> lower_diag, std::span<double> main_diag,
                       std::span<double> rhs, std::span<double> solution) -> std::expected<void, SolverError> {
   const auto n = main_diag.size();
 
-  // Validation des tailles
   if (lower_diag.size() != n || upper_diag.size() != n || rhs.size() != n || solution.size() != n) {
     return std::unexpected(SolverError("Incompatible array sizes in Thomas algorithm"));
   }

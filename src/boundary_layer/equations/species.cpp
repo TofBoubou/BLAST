@@ -320,7 +320,6 @@ auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coeffi
 
   // Compute derivatives of fake fluxes
   for (std::size_t j = 0; j < n_species; ++j) {
-    // Copie élément par élément pour garantir la contiguïté
     std::vector<double> J_row_data(n_eta);
     for (std::size_t i = 0; i < n_eta; ++i) {
       J_row_data[i] = J_fake(j, i);

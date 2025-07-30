@@ -78,7 +78,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.outer_edge = std::move(edge_result.value());
 
-    // 6. Parser la section wall_parameters (obligatoire)
     if (!root_["wall_parameters"]) {
       return std::unexpected(core::ConfigurationError("Missing required 'wall_parameters' section"));
     }
@@ -88,7 +87,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.wall_parameters = std::move(wall_result.value());
 
-    // 7. Parser la section initial_guess (optionnelle)
     if (root_["initial_guess"]) {
       auto guess_result = parse_initial_guess_config(root_["initial_guess"]);
       if (!guess_result) {
@@ -96,7 +94,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       }
       config.initial_guess = std::move(guess_result.value());
     }
-    // Sinon, use_initial_guess reste à false par défaut
 
     return config;
 
@@ -329,7 +326,7 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
       config.edge_points.push_back(point);
     }
 
-    // Scalars (inchangés)
+    // Scalars (unchanged)
     auto vel_grad_result = extract_value<double>(node, "velocity_gradient_stagnation");
     if (!vel_grad_result)
       return std::unexpected(vel_grad_result.error());
@@ -358,7 +355,6 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
   WallParametersConfig config;
 
   try {
-    // Parser les températures de paroi (requis)
     auto temp_result = extract_value<std::vector<double>>(node, "temperatures");
     if (!temp_result)
       return std::unexpected(temp_result.error());

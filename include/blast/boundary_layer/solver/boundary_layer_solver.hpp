@@ -72,7 +72,7 @@ private:
 
   // Individual equation solving with proper sequencing
   auto solve_continuity_equation(const equations::SolutionState& solution,
-                                 double xi // <- Ajouter ce paramètre
+                                 double xi // <- Add this parameter
                                  ) -> std::expected<std::vector<double>, SolverError>;
 
   [[nodiscard]] auto solve_momentum_equation(const equations::SolutionState& solution,
