@@ -66,9 +66,10 @@ int main(int argc, char* argv[]) {
     // Print mixture information
     std::cout << "\nMixture species:" << std::endl;
     for (std::size_t i = 0; i < mixture.n_species(); ++i) {
-      std::cout << "  [" << std::setw(2) << i << "] " << std::setw(8) << mixture.species_name(i)
-                << " (MW: " << std::setw(8) << std::fixed << std::setprecision(3) << mixture.species_molecular_weight(i)
-                << " kg/kmol)" << std::endl;
+      std::cout << std::format("  [{:2}] {:>8} (MW: {:8.3f} kg/kmol)", 
+                                i, 
+                                mixture.species_name(i), 
+                                mixture.species_molecular_weight(i)) << std::endl;
     }
 
     // Print simulation configuration
@@ -84,14 +85,18 @@ int main(int argc, char* argv[]) {
     std::cout << "  η_max: " << config.numerical.eta_max << std::endl;
     std::cout << "  Convergence tol: " << config.numerical.convergence_tolerance << std::endl;
 
-    // Print edge conditions
+    // Print edge conditions  
     if (!config.outer_edge.edge_points.empty()) {
-      const auto& edge = config.outer_edge.edge_points[0];
+      auto edge = config.outer_edge.edge_points[0];
       std::cout << "\nEdge conditions:" << std::endl;
       std::cout << "  Pressure: " << edge.pressure << " Pa" << std::endl;
       std::cout << "  Temperature: " << edge.temperature << " K" << std::endl;
       std::cout << "  Enthalpy: " << edge.enthalpy / 1000.0 << " kJ/kg" << std::endl;
-      std::cout << "  Wall temp: " << config.wall_parameters.wall_temperatures[0] << " K" << std::endl;
+      if (!config.wall_parameters.wall_temperatures.empty()) {
+        std::cout << "  Wall temp: " << config.wall_parameters.wall_temperatures[0] << " K" << std::endl;
+      } else {
+        std::cout << "  Wall temp: NOT SET" << std::endl;
+      }
     }
 
     // Initialize HDF5 library
@@ -149,8 +154,11 @@ int main(int argc, char* argv[]) {
     std::cout << "\n=== STARTING BOUNDARY LAYER SOLUTION ===" << std::endl;
     auto start_time = std::chrono::high_resolution_clock::now();
 
+    std::cout << "Creating BoundaryLayerSolver..." << std::endl;
     blast::boundary_layer::solver::BoundaryLayerSolver solver(mixture, config);
+    std::cout << "BoundaryLayerSolver created successfully." << std::endl;
 
+    std::cout << "Starting solver.solve()..." << std::endl;
     auto solution_result = solver.solve();
     if (!solution_result) {
       std::cerr << "Solver failed: " << solution_result.error().message() << "\n";

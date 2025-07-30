@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 
 namespace blast::io {
 
@@ -176,29 +177,6 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
       return std::unexpected(max_iter_result.error());
     config.max_iterations = max_iter_result.value();
 
-    if (node["solvers"]) {
-      auto solv_node = node["solvers"];
-
-      auto h2t_tol_result = extract_value<double>(solv_node, "h2t_tolerance");
-      if (!h2t_tol_result)
-        return std::unexpected(h2t_tol_result.error());
-      config.solvers.h2t_tolerance = h2t_tol_result.value();
-
-      auto h2t_iter_result = extract_value<int>(solv_node, "h2t_max_iterations");
-      if (!h2t_iter_result)
-        return std::unexpected(h2t_iter_result.error());
-      config.solvers.h2t_max_iterations = h2t_iter_result.value();
-
-      auto stefan_tol_result = extract_value<double>(solv_node, "stefan_tolerance");
-      if (!stefan_tol_result)
-        return std::unexpected(stefan_tol_result.error());
-      config.solvers.stefan_tolerance = stefan_tol_result.value();
-
-      auto stefan_iter_result = extract_value<int>(solv_node, "stefan_max_iterations");
-      if (!stefan_iter_result)
-        return std::unexpected(stefan_iter_result.error());
-      config.solvers.stefan_max_iterations = stefan_iter_result.value();
-    }
 
     return config;
 

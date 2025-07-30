@@ -33,11 +33,11 @@ struct NumericalConfig {
 
 
   struct Solvers {
-    double h2t_tolerance = 1e-8;
-    int h2t_max_iterations = 100;
-    double stefan_tolerance = 1e-6;
-    int stefan_max_iterations = 50;
-  } solvers;
+    double h2t_tolerance = 1.0e-12;
+    int h2t_max_iterations = 50000;
+    double stefan_tolerance = 1.0e-12;
+    int stefan_max_iterations = 50000;
+  } solvers{};
 };
 
 struct MixtureConfig {

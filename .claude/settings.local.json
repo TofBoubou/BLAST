@@ -15,7 +15,14 @@
       "Bash(true)",
       "Bash(./blast config/default.yaml)",
       "Bash(cd:*)",
-      "Bash(./blast config/config_new_standard.yaml)"
+      "Bash(./blast config/config_new_standard.yaml)",
+      "Bash(cd:*)",
+      "Bash(./test_config)",
+      "Bash(cd:*)",
+      "Bash(./blast config/CO2_5.yaml)",
+      "Bash(./test_solvers)",
+      "Bash(cd:*)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

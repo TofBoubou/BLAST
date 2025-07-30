@@ -1,4 +1,5 @@
 #include "blast/io/config_manager.hpp"
+#include <iostream>
 
 namespace blast::io {
 

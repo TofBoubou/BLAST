@@ -29,12 +29,6 @@ def generate_config():
             "eta_max": 6.0,
             "convergence_tolerance": 1.0e-6,
             "max_iterations": 100000,
-            "solvers": {
-                "h2t_tolerance": 1.0e-12,
-                "h2t_max_iterations": 50000,
-                "stefan_tolerance": 1.0e-12,
-                "stefan_max_iterations": 50000,
-            },
         },
         "mixture": {
             "name": "CO2_5",
