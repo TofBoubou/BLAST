@@ -19,7 +19,12 @@ auto ThermodynamicConsistencyStep::execute(SolverContext& ctx) -> StepResult {
     std::cout << "  T[0]     = " << std::scientific << std::setprecision(6) << ctx.solution.T.front() << "\n";
     std::cout << "  T[n-1]   = " << std::scientific << std::setprecision(6) << ctx.solution.T.back() << "\n";
 
-    auto T_result = h2t_solver_.solve(ctx.solution.g, ctx.solution.c, ctx.bc, ctx.solution.T);
+    std::vector<double> enthalpy_field(ctx.solution.g.size());
+    for (std::size_t i = 0; i < enthalpy_field.size(); ++i) {
+        enthalpy_field[i] = ctx.solution.g[i] * ctx.bc.he();
+    }
+
+    auto T_result = h2t_solver_.solve(enthalpy_field, ctx.solution.c, ctx.bc, ctx.solution.T);
     if (!T_result) {
         std::cerr << "Temperature update failed: " << T_result.error().message() << std::endl;
         return StepResult::Failed;
