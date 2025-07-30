@@ -126,8 +126,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
       c_local[j] = inputs.c(j, i);
       if (!std::isfinite(c_local[j]) || c_local[j] < -1e-6) {
                       return std::unexpected(CoefficientError(
-                          std::format("Invalid concentration at eta={}
-         species={}: c={}", i, j, c_local[j])
+                          std::format("Invalid concentration at eta={} species={}: c={}", i, j, c_local[j])
                       ));
                   }
       sum_c += c_local[j];

@@ -13,7 +13,7 @@ namespace blast::boundary_layer::solver {
 ThermodynamicConsistencyStep::ThermodynamicConsistencyStep(thermodynamics::EnthalpyTemperatureSolver& solver) 
     : h2t_solver_(solver) {}
 
-auto ThermodynamicConsistencyStep::execute(SolverContext& ctx) -> StepResult {
+auto ThermodynamicConsistencyStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
     // 1. Temperature update from enthalpy
     std::vector<double> enthalpy_field(ctx.solution.g.size());
     for (std::size_t i = 0; i < enthalpy_field.size(); ++i) {
@@ -22,8 +22,8 @@ auto ThermodynamicConsistencyStep::execute(SolverContext& ctx) -> StepResult {
 
     auto T_result = h2t_solver_.solve(enthalpy_field, ctx.solution.c, ctx.bc, ctx.solution.T);
     if (!T_result) {
-        std::cerr << "Temperature update failed: " << T_result.error().message() << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("Temperature update failed: {}", T_result.error().message())));
     }
     
     ctx.solution.T = std::move(T_result.value().temperatures);
@@ -37,9 +37,14 @@ auto ThermodynamicConsistencyStep::execute(SolverContext& ctx) -> StepResult {
         .dc_deta2 = core::Matrix<double>(),
         .T = ctx.solution.T
     };
-    ctx.solver.update_edge_properties(ctx.bc, dummy_inputs, ctx.solution.c);
     
-    return StepResult::Success;
+    auto update_result = ctx.solver.update_edge_properties(ctx.bc, dummy_inputs, ctx.solution.c);
+    if (!update_result) {
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("Edge properties update failed: {}", update_result.error().what())));
+    }
+    
+    return {};
 }
 
 // =============================================================================
@@ -50,20 +55,20 @@ MechanicalResolutionStep::MechanicalResolutionStep(const grid::BoundaryLayerGrid
                                                  coefficients::CoefficientCalculator& calc)
     : grid_(grid), coeff_calculator_(calc) {}
 
-auto MechanicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
+auto MechanicalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
     // 1. Continuity equation
     auto V_result = solve_continuity(ctx);
     if (!V_result) {
-        std::cerr << "Continuity equation failed: " << V_result.error().message() << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("Continuity equation failed: {}", V_result.error().message())));
     }
     ctx.solution.V = std::move(V_result.value());
     
     // 2. Compute all derivatives after V update
     auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
     if (!all_derivatives_result) {
-        std::cerr << "All derivatives computation failed: " << all_derivatives_result.error().message() << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
     }
     auto all_derivatives = all_derivatives_result.value();
     
@@ -80,16 +85,16 @@ auto MechanicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
     // 4. Calculate coefficients
     auto coeffs_result = coeff_calculator_.calculate(updated_inputs, ctx.bc, ctx.xi_derivatives);
     if (!coeffs_result) {
-        std::cerr << "Coefficient calculation failed: " << coeffs_result.error().message() << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("Coefficient calculation failed: {}", coeffs_result.error().message())));
     }
     ctx.coeffs = std::move(coeffs_result.value());
     
     // 5. Solve momentum equation
     auto F_result = ctx.solver.solve_momentum_equation(ctx.solution, ctx.coeffs, ctx.bc, ctx.xi);
     if (!F_result) {
-        std::cerr << "Momentum equation failed: " << F_result.error().message() << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("Momentum equation failed: {}", F_result.error().message())));
     }
     auto F_new = F_result.value();
     
@@ -99,7 +104,7 @@ auto MechanicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
     }
     ctx.solution.F = std::move(F_new);
     
-    return StepResult::Success;
+    return {};
 }
 
 auto MechanicalResolutionStep::solve_continuity(SolverContext& ctx) -> std::expected<std::vector<double>, SolverError> {
@@ -120,11 +125,11 @@ auto MechanicalResolutionStep::solve_continuity(SolverContext& ctx) -> std::expe
 // THERMAL RESOLUTION STEP
 // =============================================================================
 
-auto ThermalResolutionStep::execute(SolverContext& ctx) -> StepResult {
+auto ThermalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
     auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
     if (!all_derivatives_result) {
-        std::cerr << "All derivatives computation failed in ThermalResolution" << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
     }
     auto derivatives = all_derivatives_result.value();
 
@@ -139,8 +144,8 @@ auto ThermalResolutionStep::execute(SolverContext& ctx) -> StepResult {
 
     auto g_result = ctx.solver.solve_energy_equation(ctx.solution, thermal_inputs, ctx.coeffs, ctx.bc, ctx.station);
     if (!g_result) {
-        std::cerr << "Energy equation failed: " << g_result.error().message() << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("Energy equation failed: {}", g_result.error().message())));
     }
     
     auto g_new = g_result.value();
@@ -151,18 +156,18 @@ auto ThermalResolutionStep::execute(SolverContext& ctx) -> StepResult {
     }
     ctx.solution.g = std::move(g_new);
     
-    return StepResult::Success;
+    return {};
 }
 
 // =============================================================================
 // CHEMICAL RESOLUTION STEP
 // =============================================================================
 
-auto ChemicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
+auto ChemicalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
     auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
     if (!all_derivatives_result) {
-        std::cerr << "All derivatives computation failed in ThermalResolution" << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
     }
     auto derivatives = all_derivatives_result.value();
 
@@ -177,24 +182,24 @@ auto ChemicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
 
     auto c_result = ctx.solver.solve_species_equations(ctx.solution, chemical_inputs, ctx.coeffs, ctx.bc, ctx.station);
     if (!c_result) {
-        std::cerr << "Species equations failed: " << c_result.error().message() << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("Species equations failed: {}", c_result.error().message())));
     }
     
     ctx.solution.c = std::move(c_result.value());
     
-    return StepResult::Success;
+    return {};
 }
 
 // =============================================================================
 // INPUT CALCULATION STEP  
 // =============================================================================
 
-auto InputCalculationStep::execute(SolverContext& ctx) -> StepResult {
+auto InputCalculationStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
     auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
     if (!all_derivatives_result) {
-        std::cerr << "All derivatives computation failed in ThermalResolution" << std::endl;
-        return StepResult::Failed;
+        return std::unexpected(StepExecutionError(name(), 
+            std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
     }
     auto derivatives = all_derivatives_result.value();
     
@@ -208,7 +213,7 @@ auto InputCalculationStep::execute(SolverContext& ctx) -> StepResult {
             .T = ctx.solution.T
         }
     );
-    return StepResult::Success;
+    return {};
 }
 
 auto InputCalculationStep::get_inputs() const -> const coefficients::CoefficientInputs& {
@@ -219,9 +224,9 @@ auto InputCalculationStep::get_inputs() const -> const coefficients::Coefficient
 // BOUNDARY ENFORCEMENT STEP
 // =============================================================================
 
-auto BoundaryEnforcementStep::execute(SolverContext& ctx) -> StepResult {
+auto BoundaryEnforcementStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
     ctx.solver.enforce_edge_boundary_conditions(ctx.solution, ctx.bc);
-    return StepResult::Success;
+    return {};
 }
 
 // =============================================================================
@@ -250,20 +255,17 @@ auto SolverPipeline::create_for_solver(BoundaryLayerSolver& solver) -> SolverPip
     return pipeline;
 }
 
-auto SolverPipeline::execute_all(SolverContext& ctx) -> StepResult {
-    last_failed_step_.clear(); // Reset previous failure state
-    
+auto SolverPipeline::execute_all(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
     for (auto& step : steps_) {
         // std::cout << "Executing step: " << step->name() << std::endl;
         
         auto result = step->execute(ctx);
-        if (result == StepResult::Failed) {
-            last_failed_step_ = step->name();
-            std::cerr << "Step failed: " << step->name() << std::endl;
-            return StepResult::Failed;
+        if (!result) {
+            // L'erreur est déjà formatée avec le nom du step, on la propage
+            return std::unexpected(result.error());
         }
     }
-    return StepResult::Success;
+    return {};
 }
 
 } // namespace blast::boundary_layer::solver

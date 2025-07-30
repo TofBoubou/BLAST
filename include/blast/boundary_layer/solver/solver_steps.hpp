@@ -15,13 +15,12 @@ namespace blast::boundary_layer::solver {
 
 // Forward declarations
 class BoundaryLayerSolver;
-class SolverError;  // ← AJOUTER CETTE LIGNE
+class SolverError;  // Forward declaration
+class StepExecutionError;  // Forward declaration
 
 // =============================================================================
 // CORE STEP INTERFACES
 // =============================================================================
-
-enum class StepResult { Success, Failed };
 
 struct SolverContext {
     equations::SolutionState& solution;
@@ -42,7 +41,7 @@ struct SolverContext {
 class SolverStep {
 public:
     virtual ~SolverStep() = default;
-    virtual auto execute(SolverContext& ctx) -> StepResult = 0;
+    virtual auto execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> = 0;
     virtual auto name() const -> std::string_view = 0;
 };
 
@@ -56,7 +55,7 @@ private:
     
 public:
     explicit ThermodynamicConsistencyStep(thermodynamics::EnthalpyTemperatureSolver& solver);
-    auto execute(SolverContext& ctx) -> StepResult override;
+    auto execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> override;
     auto name() const -> std::string_view override { return "ThermodynamicConsistency"; }
 };
 
@@ -70,25 +69,25 @@ private:
 public:
     MechanicalResolutionStep(const grid::BoundaryLayerGrid& grid, 
                            coefficients::CoefficientCalculator& calc);
-    auto execute(SolverContext& ctx) -> StepResult override;
+    auto execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> override;
     auto name() const -> std::string_view override { return "MechanicalResolution"; }
 };
 
 class ThermalResolutionStep : public SolverStep {
 public:
-    auto execute(SolverContext& ctx) -> StepResult override;
+    auto execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> override;
     auto name() const -> std::string_view override { return "ThermalResolution"; }
 };
 
 class ChemicalResolutionStep : public SolverStep {
 public:
-    auto execute(SolverContext& ctx) -> StepResult override;
+    auto execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> override;
     auto name() const -> std::string_view override { return "ChemicalResolution"; }
 };
 
 class BoundaryEnforcementStep : public SolverStep {
 public:
-    auto execute(SolverContext& ctx) -> StepResult override;
+    auto execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> override;
     auto name() const -> std::string_view override { return "BoundaryEnforcement"; }
 };
 
@@ -97,7 +96,7 @@ private:
     std::unique_ptr<coefficients::CoefficientInputs> current_inputs_;
     
 public:
-    auto execute(SolverContext& ctx) -> StepResult override;
+    auto execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> override;
     auto get_inputs() const -> const coefficients::CoefficientInputs&;
     auto name() const -> std::string_view override { return "InputCalculation"; }
 };
@@ -109,12 +108,10 @@ public:
 class SolverPipeline {
 private:
     std::vector<std::unique_ptr<SolverStep>> steps_;
-    mutable std::string last_failed_step_;
     
 public:
     static auto create_for_solver(BoundaryLayerSolver& solver) -> SolverPipeline;
-    auto execute_all(SolverContext& ctx) -> StepResult;
-    [[nodiscard]] auto last_failed_step() const -> const std::string& { return last_failed_step_; }
+    auto execute_all(SolverContext& ctx) -> std::expected<void, StepExecutionError>;
 };
 
 } // namespace blast::boundary_layer::solver

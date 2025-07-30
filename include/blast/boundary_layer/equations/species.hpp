@@ -63,8 +63,7 @@ build_species_coefficients(const core::Matrix<double>& c_previous, const coeffic
                                        const coefficients::CoefficientSet& coeffs, PhysicalQuantity auto d_eta,
                                        double Le = 1.2, // Lewis number
                                        double Pr = 0.72 // Prandtl number
-                                       ) -> std::pair<core::Matrix<double>,
-                                                      core::Matrix<double>>; // Returns {J_fake, dJ_fake_deta}
+                                       ) -> std::expected<std::pair<core::Matrix<double>, core::Matrix<double>>, EquationError>;
 
 // Fix concentration derivatives for mass conservation
 [[nodiscard]] auto fix_concentration_derivatives(const core::Matrix<double>& c_matrix,

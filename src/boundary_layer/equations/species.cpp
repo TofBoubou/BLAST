@@ -231,14 +231,13 @@ auto build_species_coefficients(const core::Matrix<double>& c_previous, const co
   auto dc_deta_fixed = fix_concentration_derivatives(c_previous, inputs.dc_deta);
 
   // Compute fake fluxes and their derivatives
-  core::Matrix<double> J_fake, dJ_fake_deta;
-  try {
-    auto result = compute_fake_fluxes(dc_deta_fixed, coeffs, d_eta, Le, Pr);
-    J_fake = std::move(result.first);
-    dJ_fake_deta = std::move(result.second);
-  } catch (const std::exception& e) {
-    return std::unexpected(EquationError("Failed to compute fake fluxes"));
+  auto fake_fluxes_result = compute_fake_fluxes(dc_deta_fixed, coeffs, d_eta, Le, Pr);
+  if (!fake_fluxes_result) {
+    return std::unexpected(fake_fluxes_result.error());
   }
+  
+  auto J_fake = std::move(fake_fluxes_result.value().first);
+  auto dJ_fake_deta = std::move(fake_fluxes_result.value().second);
 
   SpeciesCoefficients species_coeffs;
   species_coeffs.a = core::Matrix<double>(n_eta, n_species);
@@ -303,7 +302,7 @@ auto build_species_boundary_conditions(
 
 auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coefficients::CoefficientSet& coeffs,
                          PhysicalQuantity auto d_eta, double Le,
-                         double Pr) -> std::pair<core::Matrix<double>, core::Matrix<double>> {
+                         double Pr) -> std::expected<std::pair<core::Matrix<double>, core::Matrix<double>>, EquationError> {
 
   const auto n_species = dc_deta_fixed.rows();
   const auto n_eta = dc_deta_fixed.cols();
@@ -328,7 +327,7 @@ auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coeffi
     auto dJ_result = coefficients::derivatives::compute_eta_derivative(std::span(J_row_data.data(), n_eta), d_eta);
 
     if (!dJ_result) {
-      throw std::runtime_error("Failed to compute diffusion flux derivative");
+      return std::unexpected(EquationError("Failed to compute diffusion flux derivative"));
     }
     auto dJ = dJ_result.value();
 

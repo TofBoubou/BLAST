@@ -1,4 +1,5 @@
 #include "blast/boundary_layer/solver/adaptive_relaxation_controller.hpp"
+#include "blast/boundary_layer/solver/boundary_layer_solver.hpp"  // For SolverError definition
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -26,7 +27,15 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
   }
 
   // Detect oscillations
-  const bool oscillating = detect_oscillations();
+  auto oscillating_result = detect_oscillations();
+  bool oscillating = false;
+  if (!oscillating_result) {
+    // Log l'erreur mais continue avec une valeur par défaut
+    std::cout << "[RELAXATION] Warning: " << oscillating_result.error().what() << std::endl;
+    oscillating = false; // Valeur conservatrice
+  } else {
+    oscillating = oscillating_result.value();
+  }
 
   // Adaptation logic — BASED ON CONFIG THRESHOLDS AND FACTORS
   if (oscillating) {
@@ -79,9 +88,9 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
   return current_factor_;
 }
 
-auto AdaptiveRelaxationController::detect_oscillations() const -> bool {
+auto AdaptiveRelaxationController::detect_oscillations() const -> std::expected<bool, SolverError> {
   if (residual_history_.size() < 4)
-    return false;
+    return false;  // Pas d'erreur, juste pas assez de données
 
   // Check if residuals oscillate around a mean value
   const std::size_t n = residual_history_.size();
@@ -107,9 +116,9 @@ auto AdaptiveRelaxationController::detect_oscillations() const -> bool {
   return sign_changes >= 2;
 }
 
-auto AdaptiveRelaxationController::compute_residual_trend() const -> double {
+auto AdaptiveRelaxationController::compute_residual_trend() const -> std::expected<double, SolverError> {
   if (residual_history_.size() < 3)
-    return 0.0;
+    return 0.0;  // Cas normal, pas d'erreur
 
   // Simple linear regression over the last few points
   const std::size_t n = std::min(residual_history_.size(), std::size_t{5});
@@ -127,7 +136,12 @@ auto AdaptiveRelaxationController::compute_residual_trend() const -> double {
     sum_x2 += x * x;
   }
 
-  const double slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x);
+  const double denominator = n * sum_x2 - sum_x * sum_x;
+  if (std::abs(denominator) < 1e-15) {
+    return std::unexpected(SolverError("Division by zero in residual trend computation"));
+  }
+
+  const double slope = (n * sum_xy - sum_x * sum_y) / denominator;
   return slope; // Negative slope = improving, positive = worsening
 }
 

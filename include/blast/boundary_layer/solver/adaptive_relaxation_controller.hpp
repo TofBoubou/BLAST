@@ -3,10 +3,14 @@
 #include "../equations/equation_types.hpp"
 #include <algorithm>
 #include <cmath>
+#include <expected>
 #include <numeric>
 #include <vector>
 
 namespace blast::boundary_layer::solver {
+
+// Forward declarations
+class SolverError;
 
 // ConvergenceInfo definition
 struct ConvergenceInfo {
@@ -99,8 +103,8 @@ public:
   }
 
 private:
-  [[nodiscard]] auto detect_oscillations() const -> bool;
-  [[nodiscard]] auto compute_residual_trend() const -> double;
+  [[nodiscard]] auto detect_oscillations() const -> std::expected<bool, SolverError>;
+  [[nodiscard]] auto compute_residual_trend() const -> std::expected<double, SolverError>;
 };
 
 // Factory functions for different problem types

@@ -41,6 +41,14 @@ public:
                        location) {}
 };
 
+// Specialized error class for step execution failures
+class StepExecutionError : public SolverError {
+public:
+    explicit StepExecutionError(std::string_view step_name, std::string_view message,
+                               std::source_location location = std::source_location::current())
+        : SolverError(std::format("Step '{}' failed: {}", step_name, message), location) {}
+};
+
 class BoundaryLayerSolver {
 private:
   const thermophysics::MixtureInterface& mixture_;
@@ -79,7 +87,7 @@ public:
   
   auto update_edge_properties(conditions::BoundaryConditions& bc, 
                              const coefficients::CoefficientInputs& inputs,
-                             const core::Matrix<double>& species_matrix) const -> void;
+                             const core::Matrix<double>& species_matrix) const -> std::expected<void, SolverError>;
   
   auto enforce_edge_boundary_conditions(equations::SolutionState& solution,
                                       const conditions::BoundaryConditions& bc) const -> void;
