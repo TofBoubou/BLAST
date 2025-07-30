@@ -63,27 +63,21 @@ auto MechanicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
     }
     ctx.solution.V = std::move(V_result.value());
     
-    // 2. Compute derivatives after V update
-    auto derivatives_result = ctx.solver.compute_eta_derivatives(ctx.solution);
-    if (!derivatives_result) {
-        std::cerr << "Eta derivatives computation failed: " << derivatives_result.error().message() << std::endl;
+    // 2. Compute all derivatives after V update
+    auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+    if (!all_derivatives_result) {
+        std::cerr << "All derivatives computation failed: " << all_derivatives_result.error().message() << std::endl;
         return StepResult::Failed;
     }
-    
-    auto conc_derivatives_result = ctx.solver.compute_concentration_derivatives(ctx.solution);
-    if (!conc_derivatives_result) {
-        std::cerr << "Concentration derivatives computation failed: " << conc_derivatives_result.error().message() << std::endl;
-        return StepResult::Failed;
-    }
-    auto concentration_derivatives = conc_derivatives_result.value();
+    auto all_derivatives = all_derivatives_result.value();
     
     // 3. Create updated inputs with consistent state
     auto updated_inputs = coefficients::CoefficientInputs{
         .xi = ctx.xi,
         .F = ctx.solution.F,
         .c = ctx.solution.c,
-        .dc_deta = concentration_derivatives.dc_deta,
-        .dc_deta2 = concentration_derivatives.dc_deta2,
+        .dc_deta = all_derivatives.dc_deta,
+        .dc_deta2 = all_derivatives.dc_deta2,
         .T = ctx.solution.T
     };
     
@@ -131,12 +125,12 @@ auto MechanicalResolutionStep::solve_continuity(SolverContext& ctx) -> std::expe
 // =============================================================================
 
 auto ThermalResolutionStep::execute(SolverContext& ctx) -> StepResult {
-    auto conc_derivatives_result = ctx.solver.compute_concentration_derivatives(ctx.solution);
-    if (!conc_derivatives_result) {
-        std::cerr << "Concentration derivatives computation failed in ThermalResolution" << std::endl;
+    auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+    if (!all_derivatives_result) {
+        std::cerr << "All derivatives computation failed in ThermalResolution" << std::endl;
         return StepResult::Failed;
     }
-    auto derivatives = conc_derivatives_result.value();
+    auto derivatives = all_derivatives_result.value();
 
     auto thermal_inputs = coefficients::CoefficientInputs{
         .xi = ctx.xi,
@@ -169,12 +163,12 @@ auto ThermalResolutionStep::execute(SolverContext& ctx) -> StepResult {
 // =============================================================================
 
 auto ChemicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
-    auto conc_derivatives_result = ctx.solver.compute_concentration_derivatives(ctx.solution);
-    if (!conc_derivatives_result) {
-        std::cerr << "Concentration derivatives computation failed in ChemicalResolution" << std::endl;
+    auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+    if (!all_derivatives_result) {
+        std::cerr << "All derivatives computation failed in ThermalResolution" << std::endl;
         return StepResult::Failed;
     }
-    auto derivatives = conc_derivatives_result.value();
+    auto derivatives = all_derivatives_result.value();
 
     auto chemical_inputs = coefficients::CoefficientInputs{
         .xi = ctx.xi,
@@ -201,12 +195,12 @@ auto ChemicalResolutionStep::execute(SolverContext& ctx) -> StepResult {
 // =============================================================================
 
 auto InputCalculationStep::execute(SolverContext& ctx) -> StepResult {
-    auto conc_derivatives_result = ctx.solver.compute_concentration_derivatives(ctx.solution);
-    if (!conc_derivatives_result) {
-        std::cerr << "Concentration derivatives computation failed: " << conc_derivatives_result.error().message() << std::endl;
+    auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+    if (!all_derivatives_result) {
+        std::cerr << "All derivatives computation failed in ThermalResolution" << std::endl;
         return StepResult::Failed;
     }
-    auto derivatives = conc_derivatives_result.value();
+    auto derivatives = all_derivatives_result.value();
     
     current_inputs_ = std::make_unique<coefficients::CoefficientInputs>(
         coefficients::CoefficientInputs{

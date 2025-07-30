@@ -10,18 +10,13 @@
 #include "../thermodynamics/enthalpy_temperature_solver.hpp"
 #include "adaptive_relaxation_controller.hpp"
 #include "solver_steps.hpp"
+#include "../coefficients/derivative_calculator.hpp"
 #include <expected>
 #include <memory>
 
 namespace blast::boundary_layer::solver {
 
-// Structure to hold both first and second derivatives
-struct DerivativeState {
-  core::Matrix<double> dc_deta;  // First derivatives [n_species x n_eta]
-  core::Matrix<double> dc_deta2; // Second derivatives [n_species x n_eta]
-
-  DerivativeState(std::size_t n_species, std::size_t n_eta) : dc_deta(n_species, n_eta), dc_deta2(n_species, n_eta) {}
-};
+using DerivativeState = coefficients::UnifiedDerivativeState;
 
 // Complete solution data for all stations
 struct SolutionResult {
@@ -54,6 +49,7 @@ private:
   std::unique_ptr<coefficients::CoefficientCalculator> coeff_calculator_;
   std::unique_ptr<thermodynamics::EnthalpyTemperatureSolver> h2t_solver_;
   std::unique_ptr<coefficients::XiDerivatives> xi_derivatives_;
+  std::unique_ptr<coefficients::DerivativeCalculator> derivative_calculator_;
   std::unique_ptr<AdaptiveRelaxationController> relaxation_controller_;
 
 public:
@@ -87,12 +83,9 @@ public:
   
   auto enforce_edge_boundary_conditions(equations::SolutionState& solution,
                                       const conditions::BoundaryConditions& bc) const -> void;
-  
-  [[nodiscard]] auto compute_eta_derivatives(const equations::SolutionState& solution) const
-      -> std::expected<equations::SolutionState, SolverError>;
-  
-  [[nodiscard]] auto compute_concentration_derivatives(const equations::SolutionState& solution) const
-      -> std::expected<DerivativeState, SolverError>;
+
+  [[nodiscard]] auto compute_all_derivatives(const equations::SolutionState& solution) const
+    -> std::expected<coefficients::UnifiedDerivativeState, SolverError>;
   
   [[nodiscard]] auto solve_momentum_equation(const equations::SolutionState& solution,
                                            const coefficients::CoefficientSet& coeffs,

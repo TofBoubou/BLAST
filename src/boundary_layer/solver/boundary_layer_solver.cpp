@@ -47,6 +47,9 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
   // Create xi derivatives manager
   xi_derivatives_ = std::make_unique<coefficients::XiDerivatives>(grid_->n_eta(), mixture_.n_species());
 
+  // Create derivative calculator
+  derivative_calculator_ = std::make_unique<coefficients::DerivativeCalculator>(grid_->d_eta());
+
   relaxation_controller_ =
       std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_stagnation_point());
 }
@@ -273,13 +276,14 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
                                                 const conditions::BoundaryConditions& bc,
                                                 int station) -> std::expected<std::vector<double>, SolverError> {
 
-  // Compute dF/deta for energy equation using 4th-order scheme
-  auto dF_deta_result = coefficients::derivatives::compute_eta_derivative(solution.F, grid_->d_eta());
-  if (!dF_deta_result) {
-    return std::unexpected(SolverError("Failed to compute dF/deta: {}", std::source_location::current(),
-                                       dF_deta_result.error().message()));
+  // Get dF/deta from unified derivative calculation
+  auto all_derivatives_result = compute_all_derivatives(solution);
+  if (!all_derivatives_result) {
+      return std::unexpected(SolverError("Failed to compute derivatives for energy equation: {}", 
+                                      std::source_location::current(),
+                                      all_derivatives_result.error().message()));
   }
-  auto dF_deta = dF_deta_result.value();
+  const auto& dF_deta = all_derivatives_result.value().dF_deta;
 
   auto result = equations::solve_energy(solution.g, inputs, coeffs, bc, *xi_derivatives_, config_.simulation,
                                         solution.F, dF_deta, solution.V, station, grid_->d_eta());
@@ -494,104 +498,16 @@ auto BoundaryLayerSolver::apply_relaxation_differential(const equations::Solutio
   return relaxed;
 }
 
-auto BoundaryLayerSolver::compute_eta_derivatives(const equations::SolutionState& solution) const
-    -> std::expected<equations::SolutionState, SolverError> {
-
-  const auto n_eta = grid_->n_eta();
-  const auto n_species = mixture_.n_species();
-  const double d_eta = grid_->d_eta();
-
-  equations::SolutionState derivatives(n_eta, n_species);
-
-  // High-order finite difference derivatives using unified function
-  using namespace coefficients::derivatives;
-  auto dF_result = compute_eta_derivative(solution.F, d_eta);
-  if (!dF_result) {
-    return std::unexpected(
-        SolverError("Failed to compute dF/deta: {}", std::source_location::current(), dF_result.error().message()));
-  }
-  derivatives.F = dF_result.value();
-
-  auto dg_result = compute_eta_derivative(solution.g, d_eta);
-  if (!dg_result) {
-    return std::unexpected(
-        SolverError("Failed to compute dg/deta: {}", std::source_location::current(), dg_result.error().message()));
-  }
-  derivatives.g = dg_result.value();
-
-  auto dV_result = compute_eta_derivative(solution.V, d_eta);
-  if (!dV_result) {
-    return std::unexpected(
-        SolverError("Failed to compute dV/deta: {}", std::source_location::current(), dV_result.error().message()));
-  }
-  derivatives.V = dV_result.value();
-
-  // Species derivatives - use the high-order derivative functions
-  for (std::size_t j = 0; j < n_species; ++j) {
-    std::vector<double> c_row(n_eta);
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      c_row[i] = solution.c(j, i);
+auto BoundaryLayerSolver::compute_all_derivatives(const equations::SolutionState& solution) const
+    -> std::expected<coefficients::UnifiedDerivativeState, SolverError> {
+    
+    auto result = derivative_calculator_->compute_all_derivatives(solution);
+    if (!result) {
+        return std::unexpected(SolverError("Failed to compute derivatives: {}", 
+                                         std::source_location::current(), 
+                                         result.error().message()));
     }
-
-    auto dc_deta_result = compute_eta_derivative(c_row, d_eta);
-    if (!dc_deta_result) {
-      return std::unexpected(SolverError("Failed to compute dc/deta for species {}: {}",
-                                         std::source_location::current(), j, dc_deta_result.error().message()));
-    }
-    auto dc_deta = dc_deta_result.value();
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      derivatives.c(j, i) = dc_deta[i];
-    }
-  }
-
-  const std::array<std::size_t, 3> indices_to_print{0, 10, 19};
-
-  return derivatives;
-}
-
-auto BoundaryLayerSolver::compute_concentration_derivatives(const equations::SolutionState& solution) const
-    -> std::expected<DerivativeState, SolverError> {
-
-  const auto n_eta = grid_->n_eta();
-  const auto n_species = mixture_.n_species();
-  const double d_eta = grid_->d_eta();
-
-  DerivativeState derivatives(n_species, n_eta);
-
-  // Use cascaded approach: apply the same high-order scheme twice
-  using namespace coefficients::derivatives;
-
-  for (std::size_t j = 0; j < n_species; ++j) {
-    std::vector<double> c_row(n_eta);
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      c_row[i] = solution.c(j, i);
-    }
-
-    // Compute first derivatives
-    auto dc_deta_result = compute_eta_derivative(c_row, d_eta);
-    if (!dc_deta_result) {
-      return std::unexpected(SolverError("Failed to compute dc/deta for species {}: {}",
-                                         std::source_location::current(), j, dc_deta_result.error().message()));
-    }
-    auto dc_deta = dc_deta_result.value();
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      derivatives.dc_deta(j, i) = dc_deta[i];
-    }
-
-    // Compute second derivatives by applying the same scheme to first
-    // derivatives
-    auto dc_deta2_result = compute_eta_derivative(dc_deta, d_eta);
-    if (!dc_deta2_result) {
-      return std::unexpected(SolverError("Failed to compute dc/deta2 for species {}: {}",
-                                         std::source_location::current(), j, dc_deta2_result.error().message()));
-    }
-    auto dc_deta2 = dc_deta2_result.value();
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      derivatives.dc_deta2(j, i) = dc_deta2[i];
-    }
-  }
-
-  return derivatives;
+    return result.value();
 }
 
 auto BoundaryLayerSolver::enforce_edge_boundary_conditions(equations::SolutionState& solution,
