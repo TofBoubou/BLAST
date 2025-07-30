@@ -22,7 +22,9 @@
       "Bash(./blast config/CO2_5.yaml)",
       "Bash(./test_solvers)",
       "Bash(cd:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(gdb:*)",
+      "Bash(valgrind:*)"
     ],
     "deny": []
   }

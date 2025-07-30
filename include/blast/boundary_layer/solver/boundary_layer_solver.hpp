@@ -102,19 +102,9 @@ private:
   [[nodiscard]] auto check_convergence(const equations::SolutionState& old_solution,
                                        const equations::SolutionState& new_solution) const noexcept -> ConvergenceInfo;
 
-  // Solution initialization and extrapolation
+  // Solution initialization
   [[nodiscard]] auto create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc, double T_edge) const
       -> std::expected<equations::SolutionState, SolverError>;
-
-  [[nodiscard]] auto extrapolate_from_previous(const equations::SolutionState& previous_solution, double xi_prev,
-                                               double xi_current) const -> equations::SolutionState;
-
-  // Utility functions
-  /*     [[nodiscard]] auto apply_relaxation(
-          const equations::SolutionState& old_solution,
-          const equations::SolutionState& new_solution,
-          double relaxation_factor
-      ) const -> equations::SolutionState; */
 
   [[nodiscard]] auto
   iterate_station_adaptive(int station, double xi, const conditions::BoundaryConditions& bc,

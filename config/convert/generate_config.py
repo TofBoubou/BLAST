@@ -5,7 +5,7 @@ def generate_config():
     N = 501
     x_min, x_max = 0.0, 1.0
     v_min, v_max = 0.0, 1000.0
-    temp_min, temp_max = 2800.0, 10000.0
+    temp_min, temp_max = 5000.0, 5000.0
     wall_temp_min, wall_temp_max = 2800.0, 2800.0
     pressure_base = 7000.0
     output_dir = "test_outputs"
@@ -25,7 +25,7 @@ def generate_config():
             "chemical_non_equilibrium": True,
         },
         "numerical": {
-            "n_eta": 50,
+            "n_eta": 500,
             "eta_max": 6.0,
             "convergence_tolerance": 1.0e-6,
             "max_iterations": 100000,

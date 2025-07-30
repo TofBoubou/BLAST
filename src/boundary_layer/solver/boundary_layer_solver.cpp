@@ -95,9 +95,9 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
       }
       initial_guess = std::move(guess_result.value());
     } else {
-      // Extrapolate from previous station
-      initial_guess = extrapolate_from_previous(result.stations.back(), result.xi_solved.back(), xi);
-    }
+      // For downstream stations, use previous station as initial guess
+      initial_guess = result.stations.back();
+    } 
 
     // Solve this station
     auto station_result = solve_station(station, xi, initial_guess);
@@ -736,23 +736,6 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   }
 
   return guess;
-}
-
-auto BoundaryLayerSolver::extrapolate_from_previous(const equations::SolutionState& previous_solution, double xi_prev,
-                                                    double xi_current) const -> equations::SolutionState {
-
-  // Simple extrapolation - could be improved with higher-order methods
-  const double factor = (xi_current > xi_prev) ? 1 : 1;
-
-  auto extrapolated = previous_solution;
-
-  // Extrapolate F and g fields
-  for (std::size_t i = 0; i < extrapolated.F.size(); ++i) {
-    extrapolated.F[i] *= factor;
-    extrapolated.g[i] = std::max(0.1, extrapolated.g[i] * factor); // Keep positive
-  }
-
-  return extrapolated;
 }
 
 auto BoundaryLayerSolver::apply_relaxation_differential(const equations::SolutionState& old_solution,
