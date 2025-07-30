@@ -2,10 +2,11 @@ import numpy as np
 import yaml
 
 def generate_config():
-    N = 51
+    N = 501
     x_min, x_max = 0.0, 1.0
-    v_min, v_max = 0.0, 100.0
-    temp_min, temp_max = 3000.0, 5000.0
+    v_min, v_max = 0.0, 1000.0
+    temp_min, temp_max = 2800.0, 10000.0
+    wall_temp_min, wall_temp_max = 2800.0, 2800.0
     pressure_base = 7000.0
     output_dir = "test_outputs"
     output_file = "config_new_standard.yaml"
@@ -13,13 +14,15 @@ def generate_config():
     x_vals = np.linspace(x_min, x_max, N).round(4).tolist()
     v_vals = np.linspace(v_min, v_max, N).round(4).tolist()
     temp_vals = np.linspace(temp_min, temp_max, N).round(1).tolist()
+    wall_temp_vals = np.linspace(wall_temp_min, wall_temp_max, N).round(1).tolist()
+    
     config = {
         "simulation": {
             "body_type": "axisymmetric",
             "only_stagnation_point": False,
             "diffusion_type": "stefan_maxwell",
             "consider_thermal_diffusion": False,
-            "chemical_non_equilibrium": False,
+            "chemical_non_equilibrium": True,
         },
         "numerical": {
             "n_eta": 50,
@@ -62,7 +65,7 @@ def generate_config():
             "freestream_velocity": 500000,
         },
         "wall_parameters": {
-            "temperatures": [3100]
+            "temperatures": wall_temp_vals
         },
     }
 
@@ -74,6 +77,7 @@ def generate_config():
     print(f"X range: [{x_min}, {x_max}]")
     print(f"Velocity range: [{v_min}, {v_max}]")
     print(f"Temperature range: [{temp_min}, {temp_max}]")
+    print(f"Wall temperature range: [{wall_temp_min}, {wall_temp_max}]")
 
 if __name__ == "__main__":
     generate_config()

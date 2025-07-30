@@ -14,7 +14,8 @@
       "Bash(killall:*)",
       "Bash(true)",
       "Bash(./blast config/default.yaml)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(./blast config/config_new_standard.yaml)"
     ],
     "deny": []
   }

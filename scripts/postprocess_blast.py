@@ -21,6 +21,7 @@ import json
 from typing import Dict, List, Optional, Union, Tuple, Set
 import warnings
 from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter
 warnings.filterwarnings('ignore')
 
 # Set publication-quality plot style
@@ -344,7 +345,7 @@ class BLASTPlotter:
         return True
     
     def plot_F_and_g_map(self, save_path: Optional[Path] = None) -> bool:
-        """Plot 2D interpolated maps of F(η, ξ) and g(η, ξ)
+        """Plot 2D smoothly interpolated maps of F(η, ξ) and g(η, ξ)
         
         Returns:
             bool: True if plot was created successfully, False otherwise
@@ -366,24 +367,29 @@ class BLASTPlotter:
             F_vals = []
             g_vals = []
             
-            # Get xi coordinates from metadata if available
-            if 'metadata' in self.reader.data and 'grid' in self.reader.data['metadata']:
-                xi_coordinates = np.array(self.reader.data['metadata']['grid']['xi_coordinates'])
-            else:
-                # Create dummy xi coordinates based on number of stations
-                n_stations = len(self.reader.data['stations'])
-                xi_coordinates = np.linspace(0, 1, n_stations)
+            # Get xi coordinates from metadata - REQUIRED
+            if not ('metadata' in self.reader.data and 'grid' in self.reader.data['metadata'] and 'xi_coordinates' in self.reader.data['metadata']['grid']):
+                print("Error: xi coordinates not found in metadata. F and g mapping requires proper grid coordinates.")
+                print("Required path: metadata/grid/xi_coordinates")
+                return False
+            
+            xi_coordinates = np.array(self.reader.data['metadata']['grid']['xi_coordinates'])
+            
+            # Create station index to xi coordinate mapping
+            station_to_xi = {}
+            for i, xi_coord in enumerate(xi_coordinates):
+                station_to_xi[i] = xi_coord
             
             # Collect data from valid stations only
             stations_used = []
-            for i, (station_key, station_data) in enumerate(self.reader.data['stations'].items()):
+            for station_key, station_data in self.reader.data['stations'].items():
                 station_idx = int(station_key.split('_')[-1])
                 
                 if station_idx not in valid_stations:
                     continue
                     
-                if i < len(xi_coordinates):
-                    xi_station = xi_coordinates[i]
+                if station_idx in station_to_xi:
+                    xi_station = station_to_xi[station_idx]
                     eta_station = np.array(station_data['eta'])
                     F_station = np.array(station_data['F'])
                     g_station = np.array(station_data['g'])
@@ -407,37 +413,51 @@ class BLASTPlotter:
             F_vals = np.array(F_vals)
             g_vals = np.array(g_vals)
             
-            # Create interpolation grid
+            # Create high-resolution interpolation grid
             xi_min, xi_max = xi_vals.min(), xi_vals.max()
             eta_min, eta_max = eta_vals.min(), eta_vals.max()
             
-            xi_grid = np.linspace(xi_min, xi_max, 100)
-            eta_grid = np.linspace(eta_min, eta_max, 100)
+            xi_grid = np.linspace(xi_min, xi_max, 200)
+            eta_grid = np.linspace(eta_min, eta_max, 200)
             Xi, Eta = np.meshgrid(xi_grid, eta_grid)
             
-            # Interpolate F and g
+            # Interpolate F and g with cubic method
             points = np.column_stack((xi_vals, eta_vals))
-            F_interp = griddata(points, F_vals, (Xi, Eta), method='linear')
-            g_interp = griddata(points, g_vals, (Xi, Eta), method='linear')
+            F_interp = griddata(points, F_vals, (Xi, Eta), method='cubic')
+            g_interp = griddata(points, g_vals, (Xi, Eta), method='cubic')
+            
+            # Fill NaN values at boundaries using nearest neighbor
+            F_interp_nearest = griddata(points, F_vals, (Xi, Eta), method='nearest')
+            g_interp_nearest = griddata(points, g_vals, (Xi, Eta), method='nearest')
+            
+            # Replace NaN values
+            F_interp = np.where(np.isnan(F_interp), F_interp_nearest, F_interp)
+            g_interp = np.where(np.isnan(g_interp), g_interp_nearest, g_interp)
+            
+            # Apply conservative Gaussian smoothing
+            F_interp = gaussian_filter(F_interp, sigma=0.6)
+            g_interp = gaussian_filter(g_interp, sigma=0.6)
             
             # Create the plot
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
             fig.suptitle(f'F and g Mapping (Stations: {min(stations_used):03d}-{max(stations_used):03d})', 
                         fontsize=14, fontweight='bold')
             
-            # Plot F(η, ξ)
-            im1 = ax1.contourf(Xi, Eta, F_interp, levels=50, cmap='inferno')
+            # Plot F(η, ξ) with smooth contours
+            im1 = ax1.imshow(F_interp, extent=[xi_min, xi_max, eta_min, eta_max], 
+                 aspect='auto', origin='lower', cmap='Greys_r', interpolation='bicubic')
             ax1.set_xlabel('ξ')
             ax1.set_ylabel('η')
-            ax1.set_title('F(η, ξ) - Velocity Function')
+            ax1.set_title('F(η, ξ)')
             cbar1 = plt.colorbar(im1, ax=ax1)
             cbar1.set_label('F')
             
-            # Plot g(η, ξ)
-            im2 = ax2.contourf(Xi, Eta, g_interp, levels=50, cmap='inferno')
+            # Plot g(η, ξ) with smooth contours
+            im2 = ax2.imshow(g_interp, extent=[xi_min, xi_max, eta_min, eta_max], 
+                 aspect='auto', origin='lower', cmap='Greys_r', interpolation='bicubic')
             ax2.set_xlabel('ξ')
             ax2.set_ylabel('η')
-            ax2.set_title('g(η, ξ) - Enthalpy Function')
+            ax2.set_title('g(η, ξ)')
             cbar2 = plt.colorbar(im2, ax=ax2)
             cbar2.set_label('g')
             

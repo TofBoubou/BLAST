@@ -33,7 +33,6 @@ output:
 
 outer_edge:
   edge_points:
-    # Point de stagnation (x = 0.0)
     - x: 0.0
       radius: 1
       velocity: 0
