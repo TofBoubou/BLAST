@@ -174,7 +174,6 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
       return std::unexpected(max_iter_result.error());
     config.max_iterations = max_iter_result.value();
 
-
     return config;
 
   } catch (const core::ConfigurationError& e) {

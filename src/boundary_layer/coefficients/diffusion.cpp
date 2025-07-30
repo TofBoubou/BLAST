@@ -84,7 +84,7 @@ auto calculate_stefan_maxwell_at_point(std::span<const double> c, std::span<cons
       A(i, j) -= mass_weight[i] / (mixture.species_molecular_weight(j) * D_bin(i, j));
     }
   }
-  
+
   // Apply mass conservation constraint (last row)
   A.row(n_species - 1).setConstant(c[n_species - 1] / sum_c);
   diffusion_flux[n_species - 1] = 0.0;

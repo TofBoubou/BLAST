@@ -31,7 +31,6 @@ struct NumericalConfig {
   double convergence_tolerance = 1e-6;
   int max_iterations = 1000;
 
-
   struct Solvers {
     double h2t_tolerance = 1.0e-12;
     int h2t_max_iterations = 50000;
@@ -69,7 +68,7 @@ struct OuterEdgeConfig {
     double radius;
     double velocity;
     double enthalpy;
-        double temperature;
+    double temperature;
     double pressure;
   };
 

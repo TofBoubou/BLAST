@@ -66,10 +66,9 @@ int main(int argc, char* argv[]) {
     // Print mixture information
     std::cout << "\nMixture species:" << std::endl;
     for (std::size_t i = 0; i < mixture.n_species(); ++i) {
-      std::cout << std::format("  [{:2}] {:>8} (MW: {:8.3f} kg/kmol)", 
-                                i, 
-                                mixture.species_name(i), 
-                                mixture.species_molecular_weight(i)) << std::endl;
+      std::cout << std::format("  [{:2}] {:>8} (MW: {:8.3f} kg/kmol)", i, mixture.species_name(i),
+                               mixture.species_molecular_weight(i))
+                << std::endl;
     }
 
     // Print simulation configuration
@@ -85,7 +84,7 @@ int main(int argc, char* argv[]) {
     std::cout << "  η_max: " << config.numerical.eta_max << std::endl;
     std::cout << "  Convergence tol: " << config.numerical.convergence_tolerance << std::endl;
 
-    // Print edge conditions  
+    // Print edge conditions
     if (!config.outer_edge.edge_points.empty()) {
       auto edge = config.outer_edge.edge_points[0];
       std::cout << "\nEdge conditions:" << std::endl;

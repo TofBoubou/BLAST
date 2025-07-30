@@ -679,133 +679,137 @@ auto CoefficientCalculator::calculate_wall_properties(
 // Derivative computation implementations
 namespace derivatives {
 
-template<std::ranges::sized_range Range>
-auto compute_eta_derivative(Range&& values, double d_eta) ->
-std::expected<std::vector<double>, CoefficientError> {
-    const auto n = std::ranges::size(values);
-    std::vector<double> derivatives(n);
-    
-    if (d_eta <= 0.0) {
-        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
+template <std::ranges::sized_range Range>
+auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
+  const auto n = std::ranges::size(values);
+  std::vector<double> derivatives(n);
+
+  if (d_eta <= 0.0) {
+    return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
+  }
+
+  if (n < 2) {
+    return std::unexpected(CoefficientError("Insufficient points for derivative calculation: need at least 2 points"));
+  }
+
+  if (n < 5) {
+    // Simple finite differences for small arrays
+    derivatives[0] = (values[1] - values[0]) / d_eta;
+    for (std::size_t i = 1; i < n - 1; ++i) {
+      derivatives[i] = (values[i + 1] - values[i - 1]) / (2.0 * d_eta);
     }
-    
-    if (n < 2) {
-        return std::unexpected(CoefficientError("Insufficient points for derivative calculation: need at least 2 points"));
-    }
-    
-    if (n < 5) {
-        // Simple finite differences for small arrays
-        derivatives[0] = (values[1] - values[0]) / d_eta;
-        for (std::size_t i = 1; i < n - 1; ++i) {
-            derivatives[i] = (values[i + 1] - values[i - 1]) / (2.0 * d_eta);
-        }
-        derivatives[n - 1] = (values[n - 1] - values[n - 2]) / d_eta;
-        return derivatives;
-    }
-    
-    const double dx12 = 12.0 * d_eta;
-    
-    // Forward 5-point stencil O(h^4) for first 2 points
-    derivatives[0] = (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] +
-                      16.0 * values[3] - 3.0 * values[4]) / dx12;
-    
-    derivatives[1] = (-25.0 * values[1] + 48.0 * values[2] - 36.0 * values[3] +
-                      16.0 * values[4] - 3.0 * values[5]) / dx12;
-    
-    // Central 5-point stencil O(h^4) for interior points
-    for (std::size_t i = 2; i < n - 2; ++i) {
-        derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] +
-                         8.0 * values[i + 1] - values[i + 2]) / dx12;
-    }
-    
-    // Backward 5-point stencil O(h^4) for last 2 points
-    derivatives[n - 2] = (-1.0 * values[n - 5] + 6.0 * values[n - 4] - 18.0 * values[n - 3] +
-                         10.0 * values[n - 2] + 3.0 * values[n - 1]) / dx12;
-    
-    derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 36.0 * values[n - 3] -
-                         48.0 * values[n - 2] + 25.0 * values[n - 1]) / dx12;
-    
+    derivatives[n - 1] = (values[n - 1] - values[n - 2]) / d_eta;
     return derivatives;
+  }
+
+  const double dx12 = 12.0 * d_eta;
+
+  // Forward 5-point stencil O(h^4) for first 2 points
+  derivatives[0] =
+      (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] + 16.0 * values[3] - 3.0 * values[4]) / dx12;
+
+  derivatives[1] =
+      (-25.0 * values[1] + 48.0 * values[2] - 36.0 * values[3] + 16.0 * values[4] - 3.0 * values[5]) / dx12;
+
+  // Central 5-point stencil O(h^4) for interior points
+  for (std::size_t i = 2; i < n - 2; ++i) {
+    derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] + 8.0 * values[i + 1] - values[i + 2]) / dx12;
+  }
+
+  // Backward 5-point stencil O(h^4) for last 2 points
+  derivatives[n - 2] =
+      (-1.0 * values[n - 5] + 6.0 * values[n - 4] - 18.0 * values[n - 3] + 10.0 * values[n - 2] + 3.0 * values[n - 1]) /
+      dx12;
+
+  derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 36.0 * values[n - 3] - 48.0 * values[n - 2] +
+                        25.0 * values[n - 1]) /
+                       dx12;
+
+  return derivatives;
 }
 
-template<std::ranges::sized_range Range>
-auto compute_eta_second_derivative(Range&& values, double d_eta) ->
-std::expected<std::vector<double>, CoefficientError> {
-    const auto n = std::ranges::size(values);
-    std::vector<double> second_derivatives(n);
+template <std::ranges::sized_range Range>
+auto compute_eta_second_derivative(Range&& values,
+                                   double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
+  const auto n = std::ranges::size(values);
+  std::vector<double> second_derivatives(n);
 
-    if (d_eta <= 0.0) {
-        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
-    }
+  if (d_eta <= 0.0) {
+    return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
+  }
 
-    if (n < 3) {
-        return std::unexpected(CoefficientError("Insufficient points for second derivative calculation: need at least 3 points"));
-    }
+  if (n < 3) {
+    return std::unexpected(
+        CoefficientError("Insufficient points for second derivative calculation: need at least 3 points"));
+  }
 
-    if (n < 5) {
-        // Simple 3-point stencil for small arrays
-        const double d_eta_sq = d_eta * d_eta;
-        
-        second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
-        for (std::size_t i = 1; i < n - 1; ++i) {
-            second_derivatives[i] = (values[i-1] - 2.0 * values[i] + values[i+1]) / d_eta_sq;
-        }
-        second_derivatives[n-1] = (values[n-3] - 2.0 * values[n-2] + values[n-1]) / d_eta_sq;
-        
-        return second_derivatives;
-    }
+  if (n < 5) {
+    // Simple 3-point stencil for small arrays
+    const double d_eta_sq = d_eta * d_eta;
 
-    const double dx2_12 = 12.0 * d_eta * d_eta;
-    
-    // Forward 5-point stencil O(h^4) for first 2 points
-    second_derivatives[0] = (35.0 * values[0] - 104.0 * values[1] + 114.0 * values[2] -
-                            56.0 * values[3] + 11.0 * values[4]) / dx2_12;
-    
-    second_derivatives[1] = (35.0 * values[1] - 104.0 * values[2] + 114.0 * values[3] -
-                            56.0 * values[4] + 11.0 * values[5]) / dx2_12;
-    
-    // Central 5-point stencil O(h^4) for interior points
-    for (std::size_t i = 2; i < n - 2; ++i) {
-        second_derivatives[i] = (-values[i - 2] + 16.0 * values[i - 1] - 30.0 * values[i] +
-                                16.0 * values[i + 1] - values[i + 2]) / dx2_12;
+    second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
+    for (std::size_t i = 1; i < n - 1; ++i) {
+      second_derivatives[i] = (values[i - 1] - 2.0 * values[i] + values[i + 1]) / d_eta_sq;
     }
-    
-    // Backward 5-point stencils O(h^4) for last 2 points
-    second_derivatives[n - 2] = (-1.0 * values[n - 5] + 4.0 * values[n - 4] + 6.0 * values[n - 3] -
-                                20.0 * values[n - 2] + 11.0 * values[n - 1]) / dx2_12;
-    
-    second_derivatives[n - 1] = (11.0 * values[n - 5] - 56.0 * values[n - 4] + 114.0 * values[n - 3] -
-                                104.0 * values[n - 2] + 35.0 * values[n - 1]) / dx2_12;
-    
+    second_derivatives[n - 1] = (values[n - 3] - 2.0 * values[n - 2] + values[n - 1]) / d_eta_sq;
+
     return second_derivatives;
+  }
+
+  const double dx2_12 = 12.0 * d_eta * d_eta;
+
+  // Forward 5-point stencil O(h^4) for first 2 points
+  second_derivatives[0] =
+      (35.0 * values[0] - 104.0 * values[1] + 114.0 * values[2] - 56.0 * values[3] + 11.0 * values[4]) / dx2_12;
+
+  second_derivatives[1] =
+      (35.0 * values[1] - 104.0 * values[2] + 114.0 * values[3] - 56.0 * values[4] + 11.0 * values[5]) / dx2_12;
+
+  // Central 5-point stencil O(h^4) for interior points
+  for (std::size_t i = 2; i < n - 2; ++i) {
+    second_derivatives[i] =
+        (-values[i - 2] + 16.0 * values[i - 1] - 30.0 * values[i] + 16.0 * values[i + 1] - values[i + 2]) / dx2_12;
+  }
+
+  // Backward 5-point stencils O(h^4) for last 2 points
+  second_derivatives[n - 2] =
+      (-1.0 * values[n - 5] + 4.0 * values[n - 4] + 6.0 * values[n - 3] - 20.0 * values[n - 2] + 11.0 * values[n - 1]) /
+      dx2_12;
+
+  second_derivatives[n - 1] = (11.0 * values[n - 5] - 56.0 * values[n - 4] + 114.0 * values[n - 3] -
+                               104.0 * values[n - 2] + 35.0 * values[n - 1]) /
+                              dx2_12;
+
+  return second_derivatives;
 }
 
-template<typename Matrix>
-auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta) ->
-std::expected<Matrix, CoefficientError> { const auto n_rows = values.rows();
-    const auto n_cols = values.cols();
-    Matrix result(n_rows, n_cols);
+template <typename Matrix>
+auto compute_matrix_eta_second_derivative(const Matrix& values,
+                                          double d_eta) -> std::expected<Matrix, CoefficientError> {
+  const auto n_rows = values.rows();
+  const auto n_cols = values.cols();
+  Matrix result(n_rows, n_cols);
 
-    if (d_eta <= 0.0) {
-        return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
+  if (d_eta <= 0.0) {
+    return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
+  }
+
+  for (std::size_t i = 0; i < n_rows; ++i) {
+    std::vector<double> row_values(n_cols);
+    for (std::size_t j = 0; j < n_cols; ++j) {
+      row_values[j] = values(i, j);
     }
-
-    for (std::size_t i = 0; i < n_rows; ++i) {
-        std::vector<double> row_values(n_cols);
-        for (std::size_t j = 0; j < n_cols; ++j) {
-            row_values[j] = values(i, j);
-        }
-        auto row_derivatives_result = compute_eta_second_derivative(row_values, d_eta);
-        if (!row_derivatives_result) {
-            return std::unexpected(row_derivatives_result.error());
-        }
-        const auto& row_derivatives = row_derivatives_result.value();
-        for (std::size_t j = 0; j < n_cols; ++j) {
-            result(i, j) = row_derivatives[j];
-        }
+    auto row_derivatives_result = compute_eta_second_derivative(row_values, d_eta);
+    if (!row_derivatives_result) {
+      return std::unexpected(row_derivatives_result.error());
     }
+    const auto& row_derivatives = row_derivatives_result.value();
+    for (std::size_t j = 0; j < n_cols; ++j) {
+      result(i, j) = row_derivatives[j];
+    }
+  }
 
-    return result;
+  return result;
 }
 
 // Explicit instantiations

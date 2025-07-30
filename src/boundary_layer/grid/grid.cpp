@@ -66,15 +66,15 @@ template <typename CoordGrid>
 
 template <GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_downstream_grid(
-    NumericalConfig&& numerical_config, const io::OuterEdgeConfig& edge_config,
-    const io::OutputConfig& output_config, const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError> {
+    NumericalConfig&& numerical_config, const io::OuterEdgeConfig& edge_config, const io::OutputConfig& output_config,
+    const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError> {
 
   auto grid = BoundaryLayerGrid(numerical_config.n_eta, numerical_config.eta_max);
 
   grid.generate_eta_distribution();
 
   if (auto xi_result = grid.generate_xi_distribution(edge_config, mixture); !xi_result) {
-      return std::unexpected(xi_result.error());
+    return std::unexpected(xi_result.error());
   }
 
   auto x_edge_range = edge_config.edge_points | std::views::transform([](const auto& point) { return point.x; });
@@ -89,7 +89,8 @@ constexpr auto BoundaryLayerGrid::create_downstream_grid(
   return grid;
 }
 
-auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge_config, const thermophysics::MixtureInterface& mixture)
+auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge_config,
+                                                 const thermophysics::MixtureInterface& mixture)
     -> std::expected<void, GridError> {
 
   constexpr auto min_points = 2;
@@ -214,10 +215,10 @@ auto BoundaryLayerGrid::interpolate_x_from_xi(double xi_target,
                                                    x_derivatives[i1], x_derivatives[i2]);
 }
 
-
 // Explicit instantiations for common use cases
 template auto BoundaryLayerGrid::create_downstream_grid<const io::NumericalConfig&>(
     const io::NumericalConfig& numerical_config, const io::OuterEdgeConfig& edge_config,
-    const io::OutputConfig& output_config, const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError>;
+    const io::OutputConfig& output_config,
+    const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError>;
 
 } // namespace blast::boundary_layer::grid
