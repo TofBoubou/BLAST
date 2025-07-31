@@ -253,22 +253,22 @@ BLAST includes a comprehensive Python post-processing script that generates plot
 **Basic usage:**
 ```bash
 cd scripts
-python postprocess_blast.py --input ../test_outputs/simulation_YYYYMMDD_HHMMSS.h5 --plots all
+python3 postprocess_blast.py --input ../test_outputs/simulation_YYYYMMDD_HHMMSS.h5 --plots all
 ```
 
 **Available plot types:**
 ```bash
 # Generate all plots (profiles for up to 5 stations + F/g map + summary JSON)
-python postprocess_blast.py --input simulation.h5 --plots all
+python3 postprocess_blast.py --input simulation.h5 --plots all
 
 # Boundary layer profiles at a specific station
-python postprocess_blast.py --input simulation.h5 --plots profiles --station 0
+python3 postprocess_blast.py --input simulation.h5 --plots profiles --station 0
 
 # Generate only the 2D interpolated F(η, ξ) and g(η, ξ) maps
-python postprocess_blast.py --input simulation.h5 --plots f_g_map
+python3 postprocess_blast.py --input simulation.h5 --plots f_g_map
 
 # Generate all plots and export summary.json (same as 'all', explicit)
-python postprocess_blast.py --input simulation.h5 --plots summary
+python3 postprocess_blast.py --input simulation.h5 --plots summary
 ```
 
 **Generated outputs:**
