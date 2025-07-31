@@ -38,7 +38,7 @@ auto solve_species(const core::Matrix<double>& c_previous, const coefficients::C
   }
   auto species_coeffs = species_coeffs_result.value();
 
-  auto boundary_result = detail::build_species_boundary_conditions(c_previous, coeffs, bc, mixture, sim_config);
+  auto boundary_result = detail::build_species_boundary_conditions(c_previous, coeffs, bc, mixture, sim_config, d_eta);
 
   if (!boundary_result) {
     return std::unexpected(boundary_result.error());
@@ -278,7 +278,7 @@ auto build_species_coefficients(const core::Matrix<double>& c_previous, const co
 auto build_species_boundary_conditions(
     const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
     const conditions::BoundaryConditions& bc, const thermophysics::MixtureInterface& mixture,
-    const io::SimulationConfig& sim_config) -> std::expected<SpeciesBoundaryConditions, EquationError> {
+    const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta) -> std::expected<SpeciesBoundaryConditions, EquationError> {
 
   const auto n_species = mixture.n_species();
 
@@ -289,8 +289,6 @@ auto build_species_boundary_conditions(
 
   // Check for catalytic wall configuration
   if (sim_config.catalytic_wall) {
-    // Compute grid spacing from numerical configuration
-    const double d_eta = sim_config.numerical.eta_max / (sim_config.numerical.n_eta - 1);
     return detail::build_catalytic_boundary_conditions(c_wall, coeffs, bc, mixture, sim_config, d_eta);
   } else {
     // Equilibrium wall boundary conditions (existing behavior)

@@ -17,12 +17,13 @@ using ConfigValue =
 struct SimulationConfig {
   enum class BodyType { Axisymmetric, Cone, TwoD, FlatPlate };
   enum class DiffusionType { Ramshaw, StefanMaxwell, MPP };
+  enum class ChemicalMode { Equilibrium, Frozen, NonEquilibrium };
 
   BodyType body_type = BodyType::Axisymmetric;
   bool only_stagnation_point = true;
   DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
   bool consider_thermal_diffusion = false;
-  bool chemical_non_equilibrium = true;
+  ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
   bool catalytic_wall = false;  // Enable surface catalysis
 };
 

@@ -56,7 +56,7 @@ build_species_coefficients(const core::Matrix<double>& c_previous, const coeffic
 [[nodiscard]] auto build_species_boundary_conditions(
     const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
     const conditions::BoundaryConditions& bc, const thermophysics::MixtureInterface& mixture,
-    const io::SimulationConfig& sim_config) -> std::expected<SpeciesBoundaryConditions, EquationError>;
+    const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta) -> std::expected<SpeciesBoundaryConditions, EquationError>;
 
 // Compute fake fluxes for Le/Pr approximation
 [[nodiscard]] auto
