@@ -287,19 +287,26 @@ auto build_species_boundary_conditions(
   boundary_conds.g_bc.resize(n_species);
   boundary_conds.h_bc.resize(n_species);
 
-  for (std::size_t i = 0; i < n_species; ++i) {
-    boundary_conds.f_bc[i] = 0.0;
-    boundary_conds.g_bc[i] = 1.0;
+  // Check for catalytic wall configuration
+  if (sim_config.catalytic_wall) {
+    // Compute grid spacing from numerical configuration
+    const double d_eta = sim_config.numerical.eta_max / (sim_config.numerical.n_eta - 1);
+    return detail::build_catalytic_boundary_conditions(c_wall, coeffs, bc, mixture, sim_config, d_eta);
+  } else {
+    // Equilibrium wall boundary conditions (existing behavior)
+    for (std::size_t i = 0; i < n_species; ++i) {
+      boundary_conds.f_bc[i] = 0.0;
+      boundary_conds.g_bc[i] = 1.0;
+    }
+
+    auto eq_wall_result = detail::compute_equilibrium_wall(bc, mixture);
+    if (!eq_wall_result) {
+      return std::unexpected(eq_wall_result.error());
+    }
+
+    boundary_conds.h_bc = eq_wall_result.value();
+    return boundary_conds;
   }
-
-  auto eq_wall_result = compute_equilibrium_wall(bc, mixture);
-  if (!eq_wall_result) {
-    return std::unexpected(eq_wall_result.error());
-  }
-
-  boundary_conds.h_bc = eq_wall_result.value();
-
-  return boundary_conds;
 }
 
 auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coefficients::CoefficientSet& coeffs,
@@ -378,6 +385,65 @@ auto compute_equilibrium_wall(const conditions::BoundaryConditions& bc, const th
   }
 
   return eq_result.value();
+}
+
+// Transport number approximations for catalytic boundary conditions
+constexpr double Le = 1.2;  // Lewis number approximation
+constexpr double Pr = 0.72; // Prandtl number approximation
+
+auto build_catalytic_boundary_conditions(
+    const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
+    const conditions::BoundaryConditions& bc, const thermophysics::MixtureInterface& mixture,
+    const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta) -> std::expected<SpeciesBoundaryConditions, EquationError> {
+
+  const auto n_species = mixture.n_species();
+  const std::size_t start_idx = mixture.has_electrons() ? 1 : 0;
+
+  // Compute partial densities at wall: ρᵢ = cᵢ × ρₜₒₜₐₗ
+  std::vector<double> rho_i_wall(n_species);
+  const double rho_wall = coeffs.thermodynamic.rho[0];  // Wall density
+
+  for (std::size_t i = 0; i < n_species; ++i) {
+    rho_i_wall[i] = c_wall(i, 0) * rho_wall;
+  }
+
+  // Compute catalytic fluxes via Mutation++
+  auto cat_flux_result = mixture.surface_reaction_rates(rho_i_wall, bc.Tw());
+  if (!cat_flux_result) {
+    return std::unexpected(EquationError("Failed to compute catalytic flux: {}", std::source_location::current(),
+                                         cat_flux_result.error().message()));
+  }
+  auto cat_flux = cat_flux_result.value();
+
+  // Compute geometry factor for boundary condition scaling
+  auto factors_result = compute_geometry_factors(bc.station, bc.xi, bc, sim_config);
+  if (!factors_result) {
+    return std::unexpected(factors_result.error());
+  }
+  const double bc_fact = factors_result.value().bc_fact;
+
+  // Build boundary conditions: J_diff|wall = J_cat
+  SpeciesBoundaryConditions boundary_conds;
+  boundary_conds.f_bc.resize(n_species);
+  boundary_conds.g_bc.resize(n_species);
+  boundary_conds.h_bc.resize(n_species);
+
+  // Heavy species: catalytic boundary conditions
+  for (std::size_t i = start_idx; i < n_species; ++i) {
+    // Robin boundary condition: f_bc * dc/dη + g_bc * c = h_bc
+    boundary_conds.f_bc[i] = -coeffs.transport.l0[0] * Le / Pr / d_eta;  // Diffusive term
+    boundary_conds.g_bc[i] = 0.0;                                        // No concentration term
+    boundary_conds.h_bc[i] = cat_flux[i] * bc_fact;                      // Catalytic flux (RHS)
+  }
+
+  // Electrons: dummy values (not used in system, determined by charge neutrality)
+  if (mixture.has_electrons()) {
+    boundary_conds.f_bc[0] = 0.0;
+    boundary_conds.g_bc[0] = 0.0;
+    boundary_conds.h_bc[0] = 0.0;
+  }
+
+  return boundary_conds;
 }
 
 } // namespace detail

@@ -75,6 +75,11 @@ compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coefficient
                                             const thermophysics::MixtureInterface& mixture)
     -> std::expected<std::vector<double>, EquationError>;
 
+[[nodiscard]] auto build_catalytic_boundary_conditions(
+    const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
+    const conditions::BoundaryConditions& bc, const thermophysics::MixtureInterface& mixture,
+    const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta) -> std::expected<SpeciesBoundaryConditions, EquationError>;
+
 } // namespace detail
 
 } // namespace blast::boundary_layer::equations

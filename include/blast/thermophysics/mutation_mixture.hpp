@@ -17,6 +17,7 @@ private:
   mutable std::vector<double> species_charges_;
   mutable std::vector<double> species_mw_;
   mutable std::vector<std::string> species_names_;
+  mutable std::vector<double> surface_flux_cache_;
 
   // Helper to validate composition array
   [[nodiscard]] auto
@@ -88,6 +89,11 @@ public:
 
   [[nodiscard]] auto equilibrium_composition(double temperature, double pressure) const
       -> std::expected<std::vector<double>, ThermophysicsError> override;
+
+    [[nodiscard]] auto surface_reaction_rates(
+        std::span<const double> partial_densities,
+        double wall_temperature
+    ) const -> std::expected<std::vector<double>, ThermophysicsError> override;
 };
 
 } // namespace blast::thermophysics

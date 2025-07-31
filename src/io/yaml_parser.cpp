@@ -141,6 +141,12 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.chemical_mode = chemical_result.value();
 
+    auto catalytic_result = extract_value<bool>(node, "catalytic_wall");
+    if (!catalytic_result) {
+      return std::unexpected(catalytic_result.error());
+    }
+    config.catalytic_wall = catalytic_result.value();
+
     return config;
 
   } catch (const core::ConfigurationError& e) {
@@ -358,6 +364,11 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
       return std::unexpected(core::ConfigurationError("Wall temperatures cannot be empty"));
     }
     return config;
+
+    auto catalytic_result = extract_value<bool>(node, "catalytic_wall");
+    if (catalytic_result) {
+      config.catalytic_wall = catalytic_result.value();
+    }
 
   } catch (const core::ConfigurationError& e) {
     return std::unexpected(core::ConfigurationError(std::format("In 'wall_parameters' section: {}", e.message())));

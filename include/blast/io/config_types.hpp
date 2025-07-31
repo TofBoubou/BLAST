@@ -22,8 +22,8 @@ struct SimulationConfig {
   bool only_stagnation_point = true;
   DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
   bool consider_thermal_diffusion = false;
-  enum class ChemicalMode { Equilibrium, Frozen, NonEquilibrium };
-  ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
+  bool chemical_non_equilibrium = true;
+  bool catalytic_wall = false;  // Enable surface catalysis
 };
 
 struct NumericalConfig {
@@ -79,6 +79,7 @@ struct OuterEdgeConfig {
 
 struct WallParametersConfig {
   std::vector<double> wall_temperatures;
+  bool catalytic_wall = false;
 };
 
 struct Configuration {
