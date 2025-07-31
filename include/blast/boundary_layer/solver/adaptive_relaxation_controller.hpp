@@ -39,18 +39,18 @@ public:
     double divergence_threshold = 1; // Threshold for divergence (> 1.0)
 
     // Adaptation factors
-    double strong_increase = 1.05;    // Strong increase for ratio < 0.8
-    double moderate_increase = 1.02;  // Moderate increase for [0.8, 1.0]
-    double decrease_factor = 0.5;     // Decrease for ratio > X
-    double oscillation_penalty = 0.5; // Penalty factor for oscillations
+    double strong_increase = 1.0;    // Strong increase for ratio < 0.8
+    double moderate_increase = 1.0;  // Moderate increase for [0.8, 1.0]
+    double decrease_factor = 1;     // Decrease for ratio > X
+    double oscillation_penalty = 1; // Penalty factor for oscillations
 
     // Specialized configurations
     [[nodiscard]] static auto for_stagnation_point() -> Config {
       Config config;
-      config.initial_factor = 0.01;
+      config.initial_factor = 0.001;
       config.max_factor = 1;           // More conservative
-      config.strong_increase = 1.02;   // Slower growth
-      config.moderate_increase = 1.01; // Very moderate
+      config.strong_increase = 1.0;   // Slower growth
+      config.moderate_increase = 1.0; // Very moderate
       return config;
     }
 

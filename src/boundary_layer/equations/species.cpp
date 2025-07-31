@@ -429,9 +429,19 @@ auto build_catalytic_boundary_conditions(
   // Heavy species: catalytic boundary conditions
   for (std::size_t i = start_idx; i < n_species; ++i) {
     // Robin boundary condition: f_bc * dc/dη + g_bc * c = h_bc
-    boundary_conds.f_bc[i] = -coeffs.transport.l0[0] * Le / Pr / d_eta;  // Diffusive term
-    boundary_conds.g_bc[i] = 0.0;                                        // No concentration term
-    boundary_conds.h_bc[i] = cat_flux[i] * bc_fact;                      // Catalytic flux (RHS)
+    boundary_conds.f_bc[i] = -coeffs.transport.l0[0] * Le / Pr / d_eta;
+    boundary_conds.g_bc[i] = 0.0;                                  // No concentration term
+    
+    // J_reel
+    const double J_reel = coeffs.diffusion.J(i, 0);
+    
+    // Fake flux on the wall to compensate f_bc * dc/dη
+    // J_fake = Le/Pr * l0 * dc_deta on the wall  
+    const double dc_deta_wall = (c_wall.cols() > 1) ? (c_wall(i, 1) - c_wall(i, 0)) / d_eta : 0.0;
+    const double J_fake_wall = Le / Pr * coeffs.transport.l0[0] * dc_deta_wall;
+    
+    // h_bc = J_cat - J_reel + J_fake_wall to ensure the flux balance
+    boundary_conds.h_bc[i] = (+ cat_flux[i] - J_reel)*1 + J_fake_wall;
   }
 
   // Electrons: dummy values (not used in system, determined by charge neutrality)
