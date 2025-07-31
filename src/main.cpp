@@ -78,7 +78,13 @@ int main(int argc, char* argv[]) {
                                                                                                      : "Other")
               << std::endl;
     std::cout << "  Stagnation only: " << (config.simulation.only_stagnation_point ? "Yes" : "No") << std::endl;
-    std::cout << "  Chemical non-eq: " << (config.simulation.chemical_non_equilibrium ? "Yes" : "No") << std::endl;
+    std::cout << "  Chemical mode: ";
+    switch(config.simulation.chemical_mode) {
+      case blast::io::SimulationConfig::ChemicalMode::Equilibrium: std::cout << "Equilibrium"; break;
+      case blast::io::SimulationConfig::ChemicalMode::Frozen: std::cout << "Frozen"; break; 
+      case blast::io::SimulationConfig::ChemicalMode::NonEquilibrium: std::cout << "Non-equilibrium"; break;
+    }
+    std::cout << std::endl;
     std::cout << "  Thermal diffusion: " << (config.simulation.consider_thermal_diffusion ? "Yes" : "No") << std::endl;
     std::cout << "  Grid points (η): " << config.numerical.n_eta << std::endl;
     std::cout << "  η_max: " << config.numerical.eta_max << std::endl;

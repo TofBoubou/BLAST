@@ -46,8 +46,8 @@ auto CoefficientCalculator::calculate(const CoefficientInputs& inputs, const con
   }
   coeffs.diffusion = std::move(diffusion_result.value());
 
-  // 5. Chemical coefficients (if non-equilibrium)
-  if (sim_config_.chemical_non_equilibrium) {
+  // 5. Chemical coefficients 
+  if (sim_config_.chemical_mode == io::SimulationConfig::ChemicalMode::NonEquilibrium) {
     auto chemical_result = calculate_chemical_coefficients(inputs, coeffs.thermodynamic, bc);
     if (!chemical_result) {
       return std::unexpected(chemical_result.error());
@@ -125,10 +125,9 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
       if (!std::isfinite(c_local[j]) || c_local[j] < -1e-6) {
-                      return std::unexpected(CoefficientError(
-                          std::format("Invalid concentration at eta={} species={}: c={}", i, j, c_local[j])
-                      ));
-                  }
+        return std::unexpected(
+            CoefficientError(std::format("Invalid concentration at eta={} species={}: c={}", i, j, c_local[j])));
+      }
       sum_c += c_local[j];
     }
 

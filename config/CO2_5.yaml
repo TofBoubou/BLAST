@@ -3,7 +3,7 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_non_equilibrium: true  
+  chemical_mode: "non_equilibrium" # or "equilibrium" or "non_equilibrium"
 
 numerical:
   n_eta: 200                       
@@ -15,7 +15,6 @@ mixture:
   name: CO2_5
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
-  reference_temperature: 0.0
 
 output:
   x_stations: [0.0]

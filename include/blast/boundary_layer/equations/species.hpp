@@ -59,11 +59,12 @@ build_species_coefficients(const core::Matrix<double>& c_previous, const coeffic
     const io::SimulationConfig& sim_config) -> std::expected<SpeciesBoundaryConditions, EquationError>;
 
 // Compute fake fluxes for Le/Pr approximation
-[[nodiscard]] auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed,
-                                       const coefficients::CoefficientSet& coeffs, PhysicalQuantity auto d_eta,
-                                       double Le = 1.2, // Lewis number
-                                       double Pr = 0.72 // Prandtl number
-                                       ) -> std::expected<std::pair<core::Matrix<double>, core::Matrix<double>>, EquationError>;
+[[nodiscard]] auto
+compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coefficients::CoefficientSet& coeffs,
+                    PhysicalQuantity auto d_eta,
+                    double Le = 1.2, // Lewis number
+                    double Pr = 0.72 // Prandtl number
+                    ) -> std::expected<std::pair<core::Matrix<double>, core::Matrix<double>>, EquationError>;
 
 // Fix concentration derivatives for mass conservation
 [[nodiscard]] auto fix_concentration_derivatives(const core::Matrix<double>& c_matrix,

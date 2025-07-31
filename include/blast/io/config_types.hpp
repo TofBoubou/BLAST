@@ -22,7 +22,8 @@ struct SimulationConfig {
   bool only_stagnation_point = true;
   DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
   bool consider_thermal_diffusion = false;
-  bool chemical_non_equilibrium = true;
+  enum class ChemicalMode { Equilibrium, Frozen, NonEquilibrium };
+  ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
 };
 
 struct NumericalConfig {
@@ -46,8 +47,6 @@ struct MixtureConfig {
 
   enum class ViscosityAlgorithm { chapmanEnskog_CG, GuptaYos, chapmanEnskog_LDLT, Wilke };
   ViscosityAlgorithm viscosity_algorithm = ViscosityAlgorithm::chapmanEnskog_CG;
-
-  double reference_temperature = 0.0;
 };
 
 struct OutputConfig {

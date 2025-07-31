@@ -1,5 +1,5 @@
 #include "blast/boundary_layer/solver/adaptive_relaxation_controller.hpp"
-#include "blast/boundary_layer/solver/boundary_layer_solver.hpp"  // For SolverError definition
+#include "blast/boundary_layer/solver/boundary_layer_solver.hpp" // For SolverError definition
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -90,7 +90,7 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
 
 auto AdaptiveRelaxationController::detect_oscillations() const -> std::expected<bool, SolverError> {
   if (residual_history_.size() < 4)
-    return false;  // Pas d'erreur, juste pas assez de données
+    return false; // Pas d'erreur, juste pas assez de données
 
   // Check if residuals oscillate around a mean value
   const std::size_t n = residual_history_.size();
@@ -118,7 +118,7 @@ auto AdaptiveRelaxationController::detect_oscillations() const -> std::expected<
 
 auto AdaptiveRelaxationController::compute_residual_trend() const -> std::expected<double, SolverError> {
   if (residual_history_.size() < 3)
-    return 0.0;  // Cas normal, pas d'erreur
+    return 0.0; // Cas normal, pas d'erreur
 
   // Simple linear regression over the last few points
   const std::size_t n = std::min(residual_history_.size(), std::size_t{5});

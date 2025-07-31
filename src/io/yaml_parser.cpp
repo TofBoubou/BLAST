@@ -135,11 +135,11 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.consider_thermal_diffusion = thermal_diff_result.value();
 
-    auto chemical_result = extract_value<bool>(node, "chemical_non_equilibrium");
+    auto chemical_result = extract_enum(node, "chemical_mode", enum_mappings::chemical_modes);
     if (!chemical_result) {
       return std::unexpected(chemical_result.error());
     }
-    config.chemical_non_equilibrium = chemical_result.value();
+    config.chemical_mode = chemical_result.value();
 
     return config;
 
@@ -201,11 +201,6 @@ auto YamlParser::parse_mixture_config(const YAML::Node& node) const
     if (!visc_result)
       return std::unexpected(visc_result.error());
     config.viscosity_algorithm = visc_result.value();
-
-    auto ref_temp_result = extract_value<double>(node, "reference_temperature");
-    if (!ref_temp_result)
-      return std::unexpected(ref_temp_result.error());
-    config.reference_temperature = ref_temp_result.value();
 
     return config;
 

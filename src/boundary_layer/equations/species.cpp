@@ -24,9 +24,11 @@ auto solve_species(const core::Matrix<double>& c_previous, const coefficients::C
     return std::unexpected(EquationError("Species: mixture species count mismatch"));
   }
 
-  if (!sim_config.chemical_non_equilibrium) {
+  if (sim_config.chemical_mode == io::SimulationConfig::ChemicalMode::Equilibrium) {
     return compute_equilibrium_composition(inputs.T, bc.P_e(), mixture);
   }
+
+  if (sim_config.chemical_mode == io::SimulationConfig::ChemicalMode::Frozen) {}
 
   auto species_coeffs_result = detail::build_species_coefficients(c_previous, inputs, coeffs, bc, xi_der, mixture,
                                                                   sim_config, F_field, V_field, station, d_eta);
@@ -235,7 +237,7 @@ auto build_species_coefficients(const core::Matrix<double>& c_previous, const co
   if (!fake_fluxes_result) {
     return std::unexpected(fake_fluxes_result.error());
   }
-  
+
   auto J_fake = std::move(fake_fluxes_result.value().first);
   auto dJ_fake_deta = std::move(fake_fluxes_result.value().second);
 
@@ -301,8 +303,8 @@ auto build_species_boundary_conditions(
 }
 
 auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coefficients::CoefficientSet& coeffs,
-                         PhysicalQuantity auto d_eta, double Le,
-                         double Pr) -> std::expected<std::pair<core::Matrix<double>, core::Matrix<double>>, EquationError> {
+                         PhysicalQuantity auto d_eta, double Le, double Pr)
+    -> std::expected<std::pair<core::Matrix<double>, core::Matrix<double>>, EquationError> {
 
   const auto n_species = dc_deta_fixed.rows();
   const auto n_eta = dc_deta_fixed.cols();

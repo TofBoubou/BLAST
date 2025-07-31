@@ -34,7 +34,6 @@ def generate_config():
             "name": "CO2_5",
             "thermodynamic_database": "RRHO",
             "viscosity_algorithm": "chapman_enskog_ldlt",
-            "reference_temperature": 0.0,
         },
         "output": {
             "x_stations": x_vals,
