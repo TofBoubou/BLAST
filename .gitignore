@@ -56,7 +56,6 @@ __pycache__/
 # Simulation results and output data
 /test_outputs/
 /results/
-/results_h5/
 *.h5
 
 # Image files (generated plots/figures)

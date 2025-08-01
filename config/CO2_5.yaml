@@ -3,7 +3,7 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
+  chemical_mode: "equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: false
 
 numerical:
