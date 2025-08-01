@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-BLAST Boundary Layer Post-Processing Script - Improved Version
+BLAST Boundary Layer Post-Processing Script
 
 This script provides comprehensive post-processing capabilities for BLAST simulation results.
 It can read HDF5 output format and generate publication-quality plots with robust error handling.
+Now includes dedicated heat flux analysis.
 
 Usage:
     python postprocess_blast.py --input simulation.h5 --plots all
     python postprocess_blast.py --input simulation.h5 --plots profiles --station 0
+    python postprocess_blast.py --input simulation.h5 --plots heat_flux --station 0
 """
 
 import argparse
@@ -43,11 +45,18 @@ plt.rcParams.update({
     'savefig.dpi': 600,
 })
 
+class BLASTFileError(Exception):
+    """Custom exception for BLAST file-related errors"""
+    pass
+
 class BLASTReader:
     """Unified reader for BLAST output formats with robust error handling"""
     
     # Required fields for profile plotting
     REQUIRED_PROFILE_FIELDS = {'F', 'g', 'V', 'temperature', 'eta'}
+    
+    # Required fields for heat flux plotting  
+    REQUIRED_HEAT_FLUX_FIELDS = {'eta', 'heat_flux'}
     
     def __init__(self, input_path: Union[str, Path]):
         self.input_path = Path(input_path)
@@ -55,6 +64,7 @@ class BLASTReader:
         self.data = None
         self.metadata = None
         self.valid_stations = set()
+        self.valid_heat_flux_stations = set()
         
     def _detect_format(self) -> str:
         """Auto-detect input format"""
@@ -116,10 +126,15 @@ class BLASTReader:
                         station_data = self._read_hdf5_group(f['stations'][station_name])
                         data['stations'][station_name] = station_data
                         
-                        # Check if this station has required fields for plotting
+                        station_idx = int(station_name.split('_')[-1])
+                        
+                        # Check if this station has required fields for profile plotting
                         if self._validate_station_data(station_data):
-                            station_idx = int(station_name.split('_')[-1])
                             self.valid_stations.add(station_idx)
+                        
+                        # Check if this station has required fields for heat flux plotting
+                        if self._validate_heat_flux_data(station_data):
+                            self.valid_heat_flux_stations.add(station_idx)
                         
                     except Exception as e:
                         print(f"Warning: Failed to load station {station_name}: {e}")
@@ -127,7 +142,9 @@ class BLASTReader:
                 if len(data['stations']) == 0:
                     raise BLASTFileError("No valid station data could be loaded")
                 
-                print(f"Loaded {len(data['stations'])} stations, {len(self.valid_stations)} valid for plotting")
+                print(f"Loaded {len(data['stations'])} stations")
+                print(f"- {len(self.valid_stations)} valid for profile plotting")
+                print(f"- {len(self.valid_heat_flux_stations)} valid for heat flux plotting")
                 
                 self.data = data
                 self.metadata = data.get('metadata', {})
@@ -154,6 +171,40 @@ class BLASTReader:
                     return False
             return eta_len > 0
         except:
+            return False
+    
+    def _validate_heat_flux_data(self, station_data: Dict) -> bool:
+        """Check if station has all required fields for heat flux plotting"""
+        try:
+            # Check for eta coordinates
+            if 'eta' not in station_data or len(station_data['eta']) == 0:
+                return False
+            
+            # Check for heat_flux group
+            if 'heat_flux' not in station_data:
+                return False
+            
+            heat_flux = station_data['heat_flux']
+            
+            # Check for required subgroups
+            required_groups = ['dimensional', 'nondimensional']
+            for group in required_groups:
+                if group not in heat_flux:
+                    return False
+                
+                # Check for required fields in each group
+                required_fields = ['q_conductive', 'q_diffusive', 'q_total']
+                for field in required_fields:
+                    if field not in heat_flux[group]:
+                        return False
+                    
+                    # Check array length compatibility
+                    if len(heat_flux[group][field]) != len(station_data['eta']):
+                        return False
+            
+            return True
+            
+        except Exception:
             return False
     
     def _read_hdf5_group(self, group) -> Dict:
@@ -190,7 +241,7 @@ class BLASTReader:
         
         station_data = self.data['stations'][station_key].copy()
         
-        # Validate required fields
+        # Validate required fields for profiles
         if not self._validate_station_data(station_data):
             missing = self.REQUIRED_PROFILE_FIELDS - set(station_data.keys())
             raise ValueError(f"Station {station_index} missing required fields: {missing}")
@@ -206,11 +257,35 @@ class BLASTReader:
         
         return station_data
     
+    def get_station_heat_flux_data(self, station_index: int) -> Dict:
+        """Get heat flux data for specific station with validation"""
+        if self.data is None:
+            self.load_data()
+        
+        station_key = f'station_{station_index:03d}'
+        if station_key not in self.data['stations']:
+            available = sorted([int(k.split('_')[-1]) for k in self.data['stations'].keys()])
+            raise KeyError(f"Station {station_index} not found. Available stations: {available}")
+        
+        station_data = self.data['stations'][station_key].copy()
+        
+        # Validate required fields for heat flux
+        if not self._validate_heat_flux_data(station_data):
+            raise ValueError(f"Station {station_index} missing required heat flux fields")
+        
+        return station_data
+    
     def get_valid_stations(self) -> Set[int]:
-        """Get set of station indices that have valid data for plotting"""
+        """Get set of station indices that have valid data for profile plotting"""
         if self.data is None:
             self.load_data()
         return self.valid_stations.copy()
+    
+    def get_valid_heat_flux_stations(self) -> Set[int]:
+        """Get set of station indices that have valid data for heat flux plotting"""
+        if self.data is None:
+            self.load_data()
+        return self.valid_heat_flux_stations.copy()
     
     def get_species_names(self) -> List[str]:
         """Extract species names from metadata or data"""
@@ -338,6 +413,156 @@ class BLASTPlotter:
         if save_path:
             plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
             print(f"Profiles for station {station_index:03d} saved to: {save_path}")
+        else:
+            plt.show()
+        
+        plt.close()  # Free memory
+        return True
+    
+    def plot_heat_flux(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot heat flux analysis for a given station
+        
+        Returns:
+            bool: True if plot was created successfully, False otherwise
+        """
+        
+        try:
+            # Check if station is valid for heat flux plotting
+            valid_heat_flux_stations = self.reader.get_valid_heat_flux_stations()
+            if station_index not in valid_heat_flux_stations:
+                available = sorted(valid_heat_flux_stations)
+                print(f"Error: Station {station_index} does not have required fields for heat flux plotting.")
+                print(f"Available stations with heat flux data: {available}")
+                return False
+            
+            station_data = self.reader.get_station_heat_flux_data(station_index)
+            species_names = self.reader.get_species_names()
+            
+        except Exception as e:
+            print(f"Error loading heat flux data for station {station_index}: {e}")
+            return False
+        
+        # Create subplots with clear titles
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        fig.suptitle(f'Heat Flux Analysis - Station {station_index:03d}', 
+                    fontsize=16, fontweight='bold')
+        
+        # Get eta coordinates and heat flux data
+        eta = np.array(station_data['eta'])
+        heat_flux = station_data['heat_flux']
+        
+        # [1,1] - Dimensional flux profiles
+        q_cond_dim = np.array(heat_flux['dimensional']['q_conductive'])
+        q_diff_dim = np.array(heat_flux['dimensional']['q_diffusive']) 
+        q_total_dim = np.array(heat_flux['dimensional']['q_total'])
+        
+        axes[0, 0].plot(q_cond_dim, eta, 'black', linestyle='-', linewidth=2, label='Conductive')
+        axes[0, 0].plot(q_diff_dim, eta, 'black', linestyle='--', linewidth=2, label='Diffusive')
+        axes[0, 0].plot(q_total_dim, eta, 'black', linestyle='-.', linewidth=2, label='Total')
+        axes[0, 0].set_xlabel('Heat Flux (W/m²)')
+        axes[0, 0].set_ylabel('η')
+        axes[0, 0].grid(True, alpha=0.3)
+        axes[0, 0].legend()
+        axes[0, 0].set_title(f'Station {station_index:03d} - Dimensional Flux Profiles')
+        
+        # [1,2] - Dimensional species diffusive contributions
+        if 'q_diffusive_species' in heat_flux['dimensional']:
+            q_diff_species_dim = heat_flux['dimensional']['q_diffusive_species']
+            line_styles = ['-', '--', '-.', ':']
+            markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
+            
+            legend_added = False
+            for i, species in enumerate(species_names):
+                if i < q_diff_species_dim.shape[0]:
+                    style_idx = i % len(line_styles)
+                    marker_idx = i % len(markers)
+                    
+                    axes[0, 1].plot(q_diff_species_dim[i, :], eta,
+                                  color='black',
+                                  linestyle=line_styles[style_idx],
+                                  marker=markers[marker_idx] if markers[marker_idx] else None,
+                                  markevery=max(1, len(eta)//8),
+                                  markersize=3.5,
+                                  linewidth=1.5,
+                                  label=species)
+                    legend_added = True
+            
+            if legend_added:
+                axes[0, 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        axes[0, 1].set_xlabel('Species Diffusive Heat Flux (W/m²)')
+        axes[0, 1].set_ylabel('η')
+        axes[0, 1].grid(True, alpha=0.3)
+        axes[0, 1].set_title(f'Station {station_index:03d} - Species Contributions (Dim.)')
+        
+        # [1,3] - Focus on conductive vs diffusive (dimensional)
+        axes[0, 2].plot(q_cond_dim, eta, 'black', linestyle='-', linewidth=2, label='Conductive')
+        axes[0, 2].plot(q_diff_dim, eta, 'black', linestyle='--', linewidth=2, label='Diffusive')
+        axes[0, 2].set_xlabel('Heat Flux (W/m²)')
+        axes[0, 2].set_ylabel('η')
+        axes[0, 2].grid(True, alpha=0.3)
+        axes[0, 2].legend()
+        axes[0, 2].set_title(f'Station {station_index:03d} - Conductive vs Diffusive (Dim.)')
+        
+        # [2,1] - Nondimensional flux profiles
+        q_cond_nondim = np.array(heat_flux['nondimensional']['q_conductive'])
+        q_diff_nondim = np.array(heat_flux['nondimensional']['q_diffusive'])
+        q_total_nondim = np.array(heat_flux['nondimensional']['q_total'])
+        
+        axes[1, 0].plot(q_cond_nondim, eta, 'black', linestyle='-', linewidth=2, label='Conductive')
+        axes[1, 0].plot(q_diff_nondim, eta, 'black', linestyle='--', linewidth=2, label='Diffusive') 
+        axes[1, 0].plot(q_total_nondim, eta, 'black', linestyle='-.', linewidth=2, label='Total')
+        axes[1, 0].set_xlabel('Heat Flux (-)')
+        axes[1, 0].set_ylabel('η')
+        axes[1, 0].grid(True, alpha=0.3)
+        axes[1, 0].legend()
+        axes[1, 0].set_title(f'Station {station_index:03d} - Nondimensional Flux Profiles')
+        
+        # [2,2] - Nondimensional species diffusive contributions
+        if 'q_diffusive_species' in heat_flux['nondimensional']:
+            q_diff_species_nondim = heat_flux['nondimensional']['q_diffusive_species']
+            
+            legend_added = False
+            for i, species in enumerate(species_names):
+                if i < q_diff_species_nondim.shape[0]:
+                    style_idx = i % len(line_styles)
+                    marker_idx = i % len(markers)
+                    
+                    axes[1, 1].plot(q_diff_species_nondim[i, :], eta,
+                                  color='black',
+                                  linestyle=line_styles[style_idx],
+                                  marker=markers[marker_idx] if markers[marker_idx] else None,
+                                  markevery=max(1, len(eta)//8),
+                                  markersize=3.5,
+                                  linewidth=1.5,
+                                  label=species)
+                    legend_added = True
+            
+            if legend_added:
+                axes[1, 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        axes[1, 1].set_xlabel('Species Diffusive Heat Flux (-)')
+        axes[1, 1].set_ylabel('η')
+        axes[1, 1].grid(True, alpha=0.3)
+        axes[1, 1].set_title(f'Station {station_index:03d} - Species Contributions (Nondim.)')
+        
+        # [2,3] - Diffusive/Total ratio
+        # Avoid division by zero
+        q_ratio = np.where(np.abs(q_total_nondim) > 1e-12, 
+                          q_diff_nondim / q_total_nondim, 
+                          0.0)
+        
+        axes[1, 2].plot(q_ratio, eta, 'black', linewidth=2)
+        axes[1, 2].set_xlabel('q_diffusive / q_total (-)')
+        axes[1, 2].set_ylabel('η')
+        axes[1, 2].grid(True, alpha=0.3)
+        axes[1, 2].set_title(f'Station {station_index:03d} - Diffusive Contribution Ratio')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
+            print(f"Heat flux analysis for station {station_index:03d} saved to: {save_path}")
         else:
             plt.show()
         
@@ -485,13 +710,15 @@ class BLASTPlotter:
         print(f"Creating summary report in: {output_dir}")
         
         valid_stations = sorted(self.reader.get_valid_stations())
+        valid_heat_flux_stations = sorted(self.reader.get_valid_heat_flux_stations())
         
-        if not valid_stations:
+        if not valid_stations and not valid_heat_flux_stations:
             print("Error: No valid stations found for plotting")
             return
         
         # Track successfully plotted stations
         plotted_stations = []
+        plotted_heat_flux_stations = []
         
         # Plot profiles for valid stations (limit to first few to avoid too many plots)
         stations_to_plot = valid_stations[:5]  # Limit to first 5 valid stations
@@ -501,6 +728,14 @@ class BLASTPlotter:
             if self.plot_profiles(station_idx, save_path=profile_path):
                 plotted_stations.append(station_idx)
         
+        # Plot heat flux for valid stations (same logic: first 5)
+        heat_flux_stations_to_plot = valid_heat_flux_stations[:5]
+        
+        for station_idx in heat_flux_stations_to_plot:
+            heat_flux_path = output_dir / f'heat_flux_station_{station_idx:03d}'
+            if self.plot_heat_flux(station_idx, save_path=heat_flux_path):
+                plotted_heat_flux_stations.append(station_idx)
+        
         # Create F and g map if possible
         f_g_map_path = output_dir / 'F_g_eta_xi_map.png'
         f_g_map_created = self.plot_F_and_g_map(save_path=f_g_map_path)
@@ -509,16 +744,20 @@ class BLASTPlotter:
         try:
             summary_data = {
                 'plotted_stations': plotted_stations,
+                'plotted_heat_flux_stations': plotted_heat_flux_stations,
                 'f_g_map_created': f_g_map_created,
                 'valid_stations_total': len(valid_stations),
-                'all_valid_stations': valid_stations
+                'valid_heat_flux_stations_total': len(valid_heat_flux_stations),
+                'all_valid_stations': valid_stations,
+                'all_valid_heat_flux_stations': valid_heat_flux_stations
             }
             self._create_summary_json(output_dir / 'summary.json', summary_data)
         except Exception as e:
             print(f"Warning: Could not create summary JSON file: {e}")
         
         print(f"Summary report completed!")
-        print(f"Successfully plotted {len(plotted_stations)} stations: {plotted_stations}")
+        print(f"Successfully plotted {len(plotted_stations)} profile stations: {plotted_stations}")
+        print(f"Successfully plotted {len(plotted_heat_flux_stations)} heat flux stations: {plotted_heat_flux_stations}")
         if f_g_map_created:
             print("F and g mapping plot created successfully")
     
@@ -534,8 +773,11 @@ class BLASTPlotter:
             },
             'data_validation': {
                 'valid_stations_for_plotting': len(self.reader.get_valid_stations()),
-                'required_fields': list(self.reader.REQUIRED_PROFILE_FIELDS),
-                'valid_station_indices': sorted(self.reader.get_valid_stations())
+                'valid_heat_flux_stations_for_plotting': len(self.reader.get_valid_heat_flux_stations()),
+                'required_profile_fields': list(self.reader.REQUIRED_PROFILE_FIELDS),
+                'required_heat_flux_fields': list(self.reader.REQUIRED_HEAT_FLUX_FIELDS),
+                'valid_station_indices': sorted(self.reader.get_valid_stations()),
+                'valid_heat_flux_station_indices': sorted(self.reader.get_valid_heat_flux_stations())
             },
             'species_info': {
                 'species_names': self.reader.get_species_names(),
@@ -576,11 +818,11 @@ class BLASTPlotter:
 def main():
     """Main function with command-line interface and robust error handling"""
     
-    parser = argparse.ArgumentParser(description='BLAST Post-Processing Tool - Improved Version')
+    parser = argparse.ArgumentParser(description='BLAST Post-Processing Tool - Enhanced with Heat Flux Analysis')
     parser.add_argument('--input', '-i', type=str, required=True,
                        help='Input HDF5 file')
     parser.add_argument('--plots', '-p', type=str, default='all',
-                       choices=['all', 'profiles', 'summary', 'f_g_map'],
+                       choices=['all', 'profiles', 'heat_flux', 'summary', 'f_g_map'],
                        help='Type of plots to generate')
     parser.add_argument('--station', '-s', type=int, default=0,
                        help='Station index for profile plots')
@@ -601,14 +843,17 @@ def main():
         reader.load_data()
         
         valid_stations = reader.get_valid_stations()
+        valid_heat_flux_stations = reader.get_valid_heat_flux_stations()
+        
         print(f"Data loaded successfully:")
         print(f"  - Total stations: {len(reader.data['stations'])}")
-        print(f"  - Valid stations for plotting: {len(valid_stations)}")
-        print(f"  - Valid station indices: {sorted(valid_stations)}")
+        print(f"  - Valid stations for profile plotting: {len(valid_stations)}")
+        print(f"  - Valid stations for heat flux plotting: {len(valid_heat_flux_stations)}")
+        print(f"  - Valid profile station indices: {sorted(valid_stations)}")
+        print(f"  - Valid heat flux station indices: {sorted(valid_heat_flux_stations)}")
         
-        if not valid_stations:
-            print("Error: No stations have the required fields for plotting")
-            print(f"Required fields: {', '.join(reader.REQUIRED_PROFILE_FIELDS)}")
+        if not valid_stations and not valid_heat_flux_stations:
+            print("Error: No stations have the required fields for any type of plotting")
             return 1
         
     except Exception as e:
@@ -629,15 +874,38 @@ def main():
     try:
         if args.plots == 'all':
             if args.show:
-                success = plotter.plot_profiles(args.station)
+                # Show first available plot type for the requested station
+                if args.station in valid_stations:
+                    success = plotter.plot_profiles(args.station)
+                elif args.station in valid_heat_flux_stations:
+                    success = plotter.plot_heat_flux(args.station)
+                else:
+                    print(f"Error: Station {args.station} not available for plotting")
+                    return 1
                 if not success:
                     return 1
             else:
                 plotter.create_summary_report(output_path)
                 
         elif args.plots == 'profiles':
+            if args.station not in valid_stations:
+                print(f"Error: Station {args.station} not valid for profile plotting")
+                print(f"Available profile stations: {sorted(valid_stations)}")
+                return 1
+                
             save_path = output_path / f'profiles_station_{args.station:03d}.png' if output_path else None
             success = plotter.plot_profiles(args.station, save_path)
+            if not success:
+                return 1
+        
+        elif args.plots == 'heat_flux':
+            if args.station not in valid_heat_flux_stations:
+                print(f"Error: Station {args.station} not valid for heat flux plotting")
+                print(f"Available heat flux stations: {sorted(valid_heat_flux_stations)}")
+                return 1
+                
+            save_path = output_path / f'heat_flux_station_{args.station:03d}.png' if output_path else None
+            success = plotter.plot_heat_flux(args.station, save_path)
             if not success:
                 return 1
                 
@@ -665,11 +933,17 @@ if __name__ == '__main__':
     exit(main())
     
 """     
-python3 generate_config.py    
+Usage examples:
 
-make all
+# Generate all plots (profiles + heat flux for first 5 stations + F/g map)
+python3 postprocess_blast.py --input simulation.h5 --plots all --output results
 
-./blast config/config_50points.yaml
+# Generate only heat flux analysis for a specific station  
+python3 postprocess_blast.py --input simulation.h5 --plots heat_flux --station 2 --output results
 
-python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250721_175343.h5 --plots all --output results_h5 
- """
+# Generate only profiles for a specific station
+python3 postprocess_blast.py --input simulation.h5 --plots profiles --station 0 --output results
+
+# Interactive display of heat flux for station 1
+python3 postprocess_blast.py --input simulation.h5 --plots heat_flux --station 1 --show
+"""
