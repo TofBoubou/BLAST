@@ -39,7 +39,7 @@ private:
       -> std::expected<std::vector<double>, HeatFluxError>;
 
   [[nodiscard]] auto compute_reference_flux(
-      const conditions::BoundaryConditions& bc) const -> double;
+      const conditions::BoundaryConditions& bc, const CoefficientSet& coeffs) const -> double;
 
   [[nodiscard]] auto compute_conductive_flux_profile(
       const std::vector<double>& dT_deta, const std::vector<double>& k_local,

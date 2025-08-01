@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <iomanip>
 #include <numeric>
 
 namespace blast::boundary_layer::coefficients {
@@ -43,7 +44,8 @@ auto HeatFluxCalculator::calculate(
     return heat_flux;
   }
 
-  heat_flux.q_ref = compute_reference_flux(bc);
+  heat_flux.q_ref = compute_reference_flux(bc, coeffs);
+  std::cout << "QREF = " << heat_flux.q_ref << std::endl;
 
   auto k_local_result = compute_local_conductivities(inputs, bc);
   if (!k_local_result) {
@@ -180,15 +182,14 @@ auto HeatFluxCalculator::compute_local_conductivities(
 }
 
 auto HeatFluxCalculator::compute_reference_flux(
-    const conditions::BoundaryConditions& bc) const -> double {
+    const conditions::BoundaryConditions& bc, const CoefficientSet& coeffs) const -> double {
 
-  const double rho_inf = bc.rho_e();
-  const double u_inf = bc.ue();
-  const double delta_h = std::abs(bc.he() - bc.Tw() * 1000.0);
-  
-  const double q_ref = rho_inf * u_inf * delta_h;
-  
-  return std::max(q_ref, 1.0);
+  const double rho_e = bc.rho_e();
+  const double h_wall = coeffs.thermodynamic.h_wall;
+  const double delta_h = std::abs(bc.he() + 0.5 * bc.ue() * bc.ue() - h_wall);
+  const double q_ref = rho_e * std::sqrt(2.0 * bc.d_ue_dx() * bc.r_body()) * delta_h;
+
+  return q_ref;
 }
 
 auto HeatFluxCalculator::compute_conductive_flux_profile(
