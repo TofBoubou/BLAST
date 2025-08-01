@@ -464,6 +464,8 @@ class BLASTPlotter:
         axes[0, 0].grid(True, alpha=0.3)
         axes[0, 0].legend()
         axes[0, 0].set_title(f'Station {station_index:03d} - Dimensional Flux Profiles')
+        axes[0, 0].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[0, 0].tick_params(axis='x', rotation=45)
         
         # [1,2] - Dimensional species diffusive contributions
         if 'q_diffusive_species' in heat_flux['dimensional']:
@@ -495,6 +497,9 @@ class BLASTPlotter:
         axes[0, 1].grid(True, alpha=0.3)
         axes[0, 1].set_title(f'Station {station_index:03d} - Species Contributions (Dim.)')
         
+        axes[0, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[0, 1].tick_params(axis='x', rotation=45)
+        
         # [1,3] - Focus on conductive vs diffusive (dimensional)
         axes[0, 2].plot(q_cond_dim, eta, 'black', linestyle='-', linewidth=2, label='Conductive')
         axes[0, 2].plot(q_diff_dim, eta, 'black', linestyle='--', linewidth=2, label='Diffusive')
@@ -503,6 +508,8 @@ class BLASTPlotter:
         axes[0, 2].grid(True, alpha=0.3)
         axes[0, 2].legend()
         axes[0, 2].set_title(f'Station {station_index:03d} - Conductive vs Diffusive (Dim.)')
+        axes[0, 2].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[0, 2].tick_params(axis='x', rotation=45)
         
         # [2,1] - Nondimensional flux profiles
         q_cond_nondim = np.array(heat_flux['nondimensional']['q_conductive'])
@@ -517,6 +524,8 @@ class BLASTPlotter:
         axes[1, 0].grid(True, alpha=0.3)
         axes[1, 0].legend()
         axes[1, 0].set_title(f'Station {station_index:03d} - Nondimensional Flux Profiles')
+        axes[1, 0].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[1, 0].tick_params(axis='x', rotation=45)
         
         # [2,2] - Nondimensional species diffusive contributions
         if 'q_diffusive_species' in heat_flux['nondimensional']:
@@ -546,6 +555,9 @@ class BLASTPlotter:
         axes[1, 1].grid(True, alpha=0.3)
         axes[1, 1].set_title(f'Station {station_index:03d} - Species Contributions (Nondim.)')
         
+        axes[1, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[1, 1].tick_params(axis='x', rotation=45)
+        
         # [2,3] - Diffusive/Total ratio
         # Avoid division by zero
         q_ratio = np.where(np.abs(q_total_nondim) > 1e-12, 
@@ -557,6 +569,8 @@ class BLASTPlotter:
         axes[1, 2].set_ylabel('η')
         axes[1, 2].grid(True, alpha=0.3)
         axes[1, 2].set_title(f'Station {station_index:03d} - Diffusive Contribution Ratio')
+        axes[1, 2].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[1, 2].tick_params(axis='x', rotation=45)
         
         plt.tight_layout()
         

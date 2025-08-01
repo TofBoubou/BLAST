@@ -3,11 +3,11 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_mode: "equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: false
+  chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
+  catalytic_wall: true
 
 numerical:
-  n_eta: 2000                       
+  n_eta: 200                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-6    
   max_iterations: 10000000
