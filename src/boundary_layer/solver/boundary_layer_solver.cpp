@@ -1,5 +1,6 @@
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
+#include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
 #include "blast/boundary_layer/equations/continuity.hpp"
 #include "blast/boundary_layer/equations/energy.hpp"
 #include "blast/boundary_layer/equations/momentum.hpp"
@@ -38,6 +39,9 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
   coeff_calculator_ =
       std::make_unique<coefficients::CoefficientCalculator>(mixture_, config_.simulation, config_.numerical);
 
+  heat_flux_calculator_ = 
+      std::make_unique<coefficients::HeatFluxCalculator>(mixture_, config_.simulation, config_.numerical);
+
   // Create enthalpy-temperature solver
   thermodynamics::EnthalpyTemperatureSolverConfig h2t_config{.tolerance = config_.numerical.solvers.h2t_tolerance,
                                                              .max_iterations =
@@ -60,6 +64,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
   result.xi_solved.reserve(grid_->xi_coordinates().size());
   result.stations.reserve(grid_->xi_coordinates().size());
   result.temperature_fields.reserve(grid_->xi_coordinates().size());
+  result.heat_flux_data.reserve(grid_->xi_coordinates().size());
 
   const auto xi_stations = grid_->xi_coordinates();
 
@@ -121,6 +126,52 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     prev_c = result.stations.back().c;
 
     result.total_iterations++;
+
+    // Calculate heat flux for this converged station
+    auto derivatives_result = compute_all_derivatives(result.stations.back());
+    if (!derivatives_result) {
+      return std::unexpected(SolverError("Failed to compute derivatives for heat flux at station {}: {}", 
+                                       station, derivatives_result.error().message()));
+    }
+    auto derivatives = derivatives_result.value();
+
+    auto final_inputs = coefficients::CoefficientInputs{
+        .xi = xi,
+        .F = result.stations.back().F,
+        .c = result.stations.back().c,
+        .dc_deta = derivatives.dc_deta,
+        .dc_deta2 = derivatives.dc_deta2,
+        .T = result.stations.back().T
+    };
+
+    auto bc_result = (station == 0) 
+        ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, 
+                                                 config_.simulation, mixture_)
+        : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), 
+                                                    config_.outer_edge, config_.wall_parameters, 
+                                                    config_.simulation, mixture_);
+
+    if (!bc_result) {
+      return std::unexpected(SolverError("Failed to get boundary conditions for heat flux at station {}: {}", 
+                                       station, bc_result.error().message()));
+    }
+    auto bc = bc_result.value();
+
+    auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
+    if (!coeffs_result) {
+      return std::unexpected(SolverError("Failed to compute coefficients for heat flux at station {}: {}", 
+                                       station, coeffs_result.error().message()));
+    }
+    auto coeffs = coeffs_result.value();
+
+    auto heat_flux_result = heat_flux_calculator_->calculate(final_inputs, coeffs, bc, 
+                                                           derivatives.dT_deta, station, xi);
+    if (!heat_flux_result) {
+      return std::unexpected(SolverError("Failed to compute heat flux at station {}: {}", 
+                                       station, heat_flux_result.error().message()));
+    }
+
+    result.heat_flux_data.push_back(std::move(heat_flux_result.value()));
   }
 
   result.converged = true; // All stations solved successfully

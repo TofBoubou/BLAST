@@ -243,6 +243,109 @@ auto HDF5Writer::write_station_data(GroupHandle& station_group, const StationDat
     }
   }
 
+  // Heat flux group
+  auto heat_flux_group_result = create_group(station_group, "heat_flux");
+  if (!heat_flux_group_result) {
+    return std::unexpected(heat_flux_group_result.error());
+  }
+  auto heat_flux_group = std::move(heat_flux_group_result.value());
+
+  if (auto result = write_scalar(heat_flux_group, "q_ref", station.q_ref, "W/m²", 
+                                "Reference heat flux for non-dimensionalization"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  // Dimensional group
+  auto dimensional_group_result = create_group(heat_flux_group, "dimensional");
+  if (!dimensional_group_result) {
+    return std::unexpected(dimensional_group_result.error());
+  }
+  auto dimensional_group = std::move(dimensional_group_result.value());
+
+  if (auto result = write_vector(dimensional_group, "q_conductive", station.q_conductive_dimensional, 
+                                "W/m²", "Conductive heat flux profile"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_vector(dimensional_group, "q_diffusive", station.q_diffusive_dimensional, 
+                                "W/m²", "Diffusive heat flux profile"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_vector(dimensional_group, "q_total", station.q_total_dimensional, 
+                                "W/m²", "Total heat flux profile"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_matrix(dimensional_group, "q_diffusive_species", station.q_diffusive_species_dimensional,
+                                "W/m²", "Species diffusive heat flux contributions"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  // Non-dimensional group
+  auto nondimensional_group_result = create_group(heat_flux_group, "nondimensional");
+  if (!nondimensional_group_result) {
+    return std::unexpected(nondimensional_group_result.error());
+  }
+  auto nondimensional_group = std::move(nondimensional_group_result.value());
+
+  if (auto result = write_vector(nondimensional_group, "q_conductive", station.q_conductive_nondimensional, 
+                                "-", "Non-dimensional conductive heat flux profile"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_vector(nondimensional_group, "q_diffusive", station.q_diffusive_nondimensional, 
+                                "-", "Non-dimensional diffusive heat flux profile"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_vector(nondimensional_group, "q_total", station.q_total_nondimensional, 
+                                "-", "Non-dimensional total heat flux profile"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_matrix(nondimensional_group, "q_diffusive_species", station.q_diffusive_species_nondimensional,
+                                "-", "Non-dimensional species diffusive heat flux contributions"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  // Wall group
+  auto wall_group_result = create_group(heat_flux_group, "wall");
+  if (!wall_group_result) {
+    return std::unexpected(wall_group_result.error());
+  }
+  auto wall_group = std::move(wall_group_result.value());
+
+  if (auto result = write_scalar(wall_group, "q_conductive_dim", station.q_wall_conductive_dim, 
+                                "W/m²", "Wall conductive heat flux"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_scalar(wall_group, "q_diffusive_dim", station.q_wall_diffusive_dim, 
+                                "W/m²", "Wall diffusive heat flux"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_scalar(wall_group, "q_total_dim", station.q_wall_total_dim, 
+                                "W/m²", "Wall total heat flux"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_scalar(wall_group, "q_conductive_nondim", station.q_wall_conductive_nondim, 
+                                "-", "Non-dimensional wall conductive heat flux"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_scalar(wall_group, "q_diffusive_nondim", station.q_wall_diffusive_nondim, 
+                                "-", "Non-dimensional wall diffusive heat flux"); !result) {
+    return std::unexpected(result.error());
+  }
+
+  if (auto result = write_scalar(wall_group, "q_total_nondim", station.q_wall_total_nondim, 
+                                "-", "Non-dimensional wall total heat flux"); !result) {
+    return std::unexpected(result.error());
+  }
+
   return {};
 }
 

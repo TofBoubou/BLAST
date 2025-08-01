@@ -79,6 +79,28 @@ struct StationData {
 
   // Species data
   core::Matrix<double> species_concentrations; // [n_species x n_eta]
+
+  // Heat flux data
+  std::vector<double> q_conductive_dimensional;
+  std::vector<double> q_diffusive_dimensional;
+  std::vector<double> q_total_dimensional;
+
+  std::vector<double> q_conductive_nondimensional;
+  std::vector<double> q_diffusive_nondimensional;
+  std::vector<double> q_total_nondimensional;
+
+  core::Matrix<double> q_diffusive_species_dimensional;
+  core::Matrix<double> q_diffusive_species_nondimensional;
+
+  double q_wall_conductive_dim = 0.0;
+  double q_wall_diffusive_dim = 0.0;
+  double q_wall_total_dim = 0.0;
+
+  double q_wall_conductive_nondim = 0.0;
+  double q_wall_diffusive_nondim = 0.0;
+  double q_wall_total_nondim = 0.0;
+
+  double q_ref = 0.0;
 };
 
 // Complete output dataset

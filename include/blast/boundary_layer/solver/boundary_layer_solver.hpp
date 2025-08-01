@@ -3,6 +3,7 @@
 #include "../../io/config_types.hpp"
 #include "../../thermophysics/mixture_interface.hpp"
 #include "../coefficients/coefficient_calculator.hpp"
+#include "../coefficients/heat_flux_calculator.hpp"
 #include "../coefficients/derivative_calculator.hpp"
 #include "../coefficients/xi_derivatives.hpp"
 #include "../conditions/boundary_interpolator.hpp"
@@ -25,6 +26,7 @@ struct SolutionResult {
   std::vector<std::vector<double>> temperature_fields;
   bool converged = false;
   int total_iterations = 0;
+  std::vector<coefficients::HeatFluxCoefficients> heat_flux_data;
 };
 
 // ConvergenceInfo is now defined in adaptive_relaxation_controller.hpp
@@ -59,6 +61,7 @@ private:
   std::unique_ptr<coefficients::XiDerivatives> xi_derivatives_;
   std::unique_ptr<coefficients::DerivativeCalculator> derivative_calculator_;
   std::unique_ptr<AdaptiveRelaxationController> relaxation_controller_;
+  std::unique_ptr<coefficients::HeatFluxCalculator> heat_flux_calculator_;
 
 public:
   explicit BoundaryLayerSolver(const thermophysics::MixtureInterface& mixture, const io::Configuration& config);
