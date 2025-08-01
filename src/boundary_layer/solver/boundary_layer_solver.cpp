@@ -131,7 +131,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     auto derivatives_result = compute_all_derivatives(result.stations.back());
     if (!derivatives_result) {
       return std::unexpected(SolverError("Failed to compute derivatives for heat flux at station {}: {}", 
-                                       station, derivatives_result.error().message()));
+                                       std::source_location::current(), station, derivatives_result.error().message()));
     }
     auto derivatives = derivatives_result.value();
 
@@ -153,14 +153,14 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 
     if (!bc_result) {
       return std::unexpected(SolverError("Failed to get boundary conditions for heat flux at station {}: {}", 
-                                       station, bc_result.error().message()));
+                                       std::source_location::current(), station, bc_result.error().message()));
     }
     auto bc = bc_result.value();
 
     auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
     if (!coeffs_result) {
       return std::unexpected(SolverError("Failed to compute coefficients for heat flux at station {}: {}", 
-                                       station, coeffs_result.error().message()));
+                                       std::source_location::current(), station, coeffs_result.error().message()));
     }
     auto coeffs = coeffs_result.value();
 
@@ -168,7 +168,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
                                                            derivatives.dT_deta, station, xi);
     if (!heat_flux_result) {
       return std::unexpected(SolverError("Failed to compute heat flux at station {}: {}", 
-                                       station, heat_flux_result.error().message()));
+                                       std::source_location::current(), station, heat_flux_result.error().message()));
     }
 
     result.heat_flux_data.push_back(std::move(heat_flux_result.value()));

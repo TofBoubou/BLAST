@@ -1,4 +1,4 @@
-#include "heat_flux_calculator.hpp"
+#include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
