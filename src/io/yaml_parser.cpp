@@ -59,14 +59,15 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.mixture = std::move(mix_result.value());
 
-    //  Output
-    if (root_["output"]) {
-      auto out_result = parse_output_config(root_["output"]);
-      if (!out_result) {
-        return std::unexpected(out_result.error());
-      }
-      config.output = std::move(out_result.value());
+    // Output
+    if (!root_["output"]) {
+      return std::unexpected(core::ConfigurationError("Missing required 'output' section"));
     }
+    auto out_result = parse_output_config(root_["output"]);
+    if (!out_result) {
+      return std::unexpected(out_result.error());
+    }
+    config.output = std::move(out_result.value());
 
     // outer_edge
     if (!root_["outer_edge"]) {
@@ -86,14 +87,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       return std::unexpected(wall_result.error());
     }
     config.wall_parameters = std::move(wall_result.value());
-
-    if (root_["initial_guess"]) {
-      auto guess_result = parse_initial_guess_config(root_["initial_guess"]);
-      if (!guess_result) {
-        return std::unexpected(guess_result.error());
-      }
-      config.initial_guess = std::move(guess_result.value());
-    }
 
     return config;
 
@@ -238,52 +231,6 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
   }
 }
 
-auto YamlParser::parse_initial_guess_config(const YAML::Node& node) const
-    -> std::expected<InitialGuessConfig, core::ConfigurationError> {
-
-  InitialGuessConfig config;
-
-  try {
-    auto use_guess_result = extract_value<bool>(node, "use_initial_guess");
-    if (!use_guess_result)
-      return std::unexpected(use_guess_result.error());
-    config.use_initial_guess = use_guess_result.value();
-
-    if (config.use_initial_guess) {
-      // Parser les profils seulement si on utilise l'initial guess
-      if (node["temperature_profile"]) {
-        auto temp_profile_result = extract_value<std::vector<double>>(node, "temperature_profile");
-        if (!temp_profile_result)
-          return std::unexpected(temp_profile_result.error());
-        config.temperature_profile = temp_profile_result.value();
-      }
-
-      if (node["enthalpy_profile"]) {
-        auto enthalpy_profile_result = extract_value<std::vector<double>>(node, "enthalpy_profile");
-        if (!enthalpy_profile_result)
-          return std::unexpected(enthalpy_profile_result.error());
-        config.enthalpy_profile = enthalpy_profile_result.value();
-      }
-
-      if (node["species_profiles"]) {
-        auto sp_node = node["species_profiles"];
-        std::vector<std::vector<double>> profiles;
-
-        for (const auto& profile_node : sp_node) {
-          profiles.push_back(profile_node.as<std::vector<double>>());
-        }
-
-        config.species_profiles = profiles;
-      }
-    }
-
-    return config;
-
-  } catch (const core::ConfigurationError& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'initial_guess' section: {}", e.message())));
-  }
-}
-
 auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
     -> std::expected<OuterEdgeConfig, core::ConfigurationError> {
 
@@ -364,11 +311,6 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
       return std::unexpected(core::ConfigurationError("Wall temperatures cannot be empty"));
     }
     return config;
-
-    auto catalytic_result = extract_value<bool>(node, "catalytic_wall");
-    if (catalytic_result) {
-      config.catalytic_wall = catalytic_result.value();
-    }
 
   } catch (const core::ConfigurationError& e) {
     return std::unexpected(core::ConfigurationError(std::format("In 'wall_parameters' section: {}", e.message())));
