@@ -12,6 +12,7 @@
 #include "../thermodynamics/enthalpy_temperature_solver.hpp"
 #include "adaptive_relaxation_controller.hpp"
 #include "solver_steps.hpp"
+#include "continuation_method.hpp"
 #include <expected>
 #include <memory>
 
@@ -62,6 +63,8 @@ private:
   std::unique_ptr<coefficients::DerivativeCalculator> derivative_calculator_;
   std::unique_ptr<AdaptiveRelaxationController> relaxation_controller_;
   std::unique_ptr<coefficients::HeatFluxCalculator> heat_flux_calculator_;
+  std::unique_ptr<ContinuationMethod> continuation_;
+  io::Configuration original_config_;
 
 public:
   explicit BoundaryLayerSolver(const thermophysics::MixtureInterface& mixture, const io::Configuration& config);
@@ -107,6 +110,14 @@ public:
                                              const coefficients::CoefficientSet& coeffs,
                                              const conditions::BoundaryConditions& bc,
                                              int station) -> std::expected<core::Matrix<double>, SolverError>;
+
+  [[nodiscard]] auto config() const noexcept -> const io::Configuration& { 
+      return config_; 
+  }
+  
+  auto set_config(const io::Configuration& config) noexcept -> void {
+      config_ = config;
+  }
 
 private:
   // =============================================================================

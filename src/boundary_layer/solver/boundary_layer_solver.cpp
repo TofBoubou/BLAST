@@ -15,7 +15,7 @@ namespace blast::boundary_layer::solver {
 
 BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& mixture,
                                          const io::Configuration& config)
-    : mixture_(mixture), config_(config) {
+    : mixture_(mixture), config_(config), original_config_(config) {
 
   // Create grid
   if (config.simulation.only_stagnation_point) {
@@ -56,6 +56,8 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
 
   relaxation_controller_ =
       std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_stagnation_point());
+
+  continuation_ = std::make_unique<ContinuationMethod>();
 }
 
 auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> {
@@ -223,42 +225,56 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
     }
   }
 
-  // Get boundary conditions for this station
-  auto bc_result =
-      (station == 0)
-          ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation,
-                                                     mixture_)
-          : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
-                                                        config_.wall_parameters, config_.simulation, mixture_);
-
+  // Get boundary conditions
+  auto bc_result = (station == 0)
+      ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters,
+                                                  config_.simulation, mixture_)
+      : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(),
+                                                    config_.outer_edge, config_.wall_parameters,
+                                                    config_.simulation, mixture_);
+  
   if (!bc_result) {
-    return std::unexpected(SolverError("Failed to get boundary conditions for station {}: {}",
-                                       std::source_location::current(), station, bc_result.error().message()));
+      return std::unexpected(SolverError("Failed to get boundary conditions for station {}: {}",
+                                          std::source_location::current(), station, 
+                                          bc_result.error().message()));
   }
-
+  
   auto bc = bc_result.value();
   auto solution = initial_guess;
-
+  
   if (station == 0) {
-    relaxation_controller_ =
-        std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_stagnation_point());
+      relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
+          AdaptiveRelaxationController::Config::for_stagnation_point());
   } else {
-    relaxation_controller_ =
-        std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_downstream_station());
+      relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
+          AdaptiveRelaxationController::Config::for_downstream_station());
   }
-
+  
   auto convergence_result = iterate_station_adaptive(station, xi, bc, solution);
+  
   if (!convergence_result) {
-    return std::unexpected(convergence_result.error());
+      return std::unexpected(convergence_result.error());
   }
-
+  
   const auto& conv_info = convergence_result.value();
+  
   if (!conv_info.converged) {
-    return std::unexpected(SolverError("Station {} failed to converge after {} iterations (residual={})",
-                                       std::source_location::current(), station, conv_info.iterations,
-                                       conv_info.max_residual()));
+      // Try continuation if direct solution failed
+      if (continuation_ && conv_info.iterations > 100 && conv_info.max_residual() < 1e10) {
+          auto cont_result = continuation_->solve_with_continuation(
+              *this, station, xi, original_config_, initial_guess
+          );
+          
+          if (cont_result && cont_result.value().success) {
+              return cont_result.value().solution;
+          }
+      }
+      
+      return std::unexpected(SolverError("Station {} failed to converge after {} iterations (residual={})",
+                                          std::source_location::current(), station, 
+                                          conv_info.iterations, conv_info.max_residual()));
   }
-
+  
   return solution;
 }
 
