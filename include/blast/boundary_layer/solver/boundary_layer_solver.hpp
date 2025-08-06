@@ -67,6 +67,8 @@ private:
   io::Configuration original_config_;
 
 public:
+  friend class ContinuationMethod;
+  
   explicit BoundaryLayerSolver(const thermophysics::MixtureInterface& mixture, const io::Configuration& config);
 
   [[nodiscard]] auto solve() -> std::expected<SolutionResult, SolverError>;
@@ -116,7 +118,7 @@ public:
   }
   
   auto set_config(const io::Configuration& config) noexcept -> void {
-      config_ = config;
+      original_config_ = config;
   }
 
 private:
