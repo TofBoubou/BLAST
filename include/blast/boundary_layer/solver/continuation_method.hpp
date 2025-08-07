@@ -18,7 +18,12 @@ struct ContinuationResult {
 class ContinuationMethod {
 public:
     ContinuationMethod() = default;
-    
+
+    // Hardcoded stable conditions (exposed for solver use)
+    static constexpr double TWALL_STABLE = 3100.0;
+    static constexpr double TEDGE_STABLE = 5905.0;
+    static constexpr double PRESSURE_STABLE = 7000.0;
+
     [[nodiscard]] auto solve_with_continuation(
         BoundaryLayerSolver& solver,
         int station,
@@ -28,11 +33,6 @@ public:
     ) -> std::expected<ContinuationResult, SolverError>;
 
 private:
-    // Hardcoded stable conditions
-    static constexpr double TWALL_STABLE = 3100.0;
-    static constexpr double TEDGE_STABLE = 5905.0;
-    static constexpr double PRESSURE_STABLE = 7000.0;
-    
     // Continuation parameters
     static constexpr double LAMBDA_STEP_INITIAL = 0.01;
     static constexpr double LAMBDA_STEP_MIN = 0.00001;
@@ -40,7 +40,7 @@ private:
     static constexpr double STEP_INCREASE_FACTOR = 2.0;
     static constexpr double STEP_DECREASE_FACTOR = 0.5;
     static constexpr int MAX_STEPS = 100;
-    
+
     [[nodiscard]] auto interpolate_config(
         const io::Configuration& target,
         double lambda

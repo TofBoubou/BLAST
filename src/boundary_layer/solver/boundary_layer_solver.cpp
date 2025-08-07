@@ -241,6 +241,27 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   
   auto bc = bc_result.value();
   auto solution = initial_guess;
+
+  // Helper to build a stable initial guess for continuation method
+  auto compute_stable_guess = [&]() -> std::expected<equations::SolutionState, SolverError> {
+    io::Configuration stable_config = original_config_;
+    if (!stable_config.wall_parameters.wall_temperatures.empty()) {
+      stable_config.wall_parameters.wall_temperatures[0] = ContinuationMethod::TWALL_STABLE;
+    }
+    if (!stable_config.outer_edge.edge_points.empty()) {
+      stable_config.outer_edge.edge_points[0].temperature = ContinuationMethod::TEDGE_STABLE;
+      stable_config.outer_edge.edge_points[0].pressure = ContinuationMethod::PRESSURE_STABLE;
+    }
+
+    auto bc_stable = conditions::create_stagnation_conditions(stable_config.outer_edge, stable_config.wall_parameters,
+                                                              stable_config.simulation, mixture_);
+    if (!bc_stable) {
+      return std::unexpected(SolverError("Failed to create stable boundary conditions: {}",
+                                        std::source_location::current(), bc_stable.error().message()));
+    }
+    double T_edge_stable = stable_config.outer_edge.edge_points[0].temperature;
+    return create_initial_guess(station, xi, bc_stable.value(), T_edge_stable);
+  };
   
   if (station == 0) {
       relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
@@ -254,12 +275,15 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   
   if (!convergence_result) {
       if (continuation_ && !in_continuation_) {
-          auto cont_result = continuation_->solve_with_continuation(
-              *this, station, xi, original_config_, initial_guess
-          );
+          auto stable_guess = compute_stable_guess();
+          if (stable_guess) {
+              auto cont_result = continuation_->solve_with_continuation(
+                  *this, station, xi, original_config_, stable_guess.value()
+              );
 
-          if (cont_result && cont_result.value().success) {
-              return cont_result.value().solution;
+              if (cont_result && cont_result.value().success) {
+                  return cont_result.value().solution;
+              }
           }
       }
 
@@ -271,17 +295,20 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   if (!conv_info.converged) {
       // Try continuation if direct solution failed
       if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
-          auto cont_result = continuation_->solve_with_continuation(
-              *this, station, xi, original_config_, initial_guess
-          );
-          
-          if (cont_result && cont_result.value().success) {
-              return cont_result.value().solution;
+          auto stable_guess = compute_stable_guess();
+          if (stable_guess) {
+              auto cont_result = continuation_->solve_with_continuation(
+                  *this, station, xi, original_config_, stable_guess.value()
+              );
+
+              if (cont_result && cont_result.value().success) {
+                  return cont_result.value().solution;
+              }
           }
       }
-      
+
       return std::unexpected(SolverError("Station {} failed to converge after {} iterations (residual={})",
-                                          std::source_location::current(), station, 
+                                          std::source_location::current(), station,
                                           conv_info.iterations, conv_info.max_residual()));
   }
   
