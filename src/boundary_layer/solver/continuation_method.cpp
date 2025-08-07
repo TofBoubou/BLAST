@@ -27,7 +27,9 @@ auto ContinuationMethod::solve_with_continuation(
         auto interp_config = interpolate_config(target_config, lambda_try);
         
         solver.set_config(interp_config);
+        solver.in_continuation_ = true;
         auto result = solver.solve_station(station, xi, current_solution);
+        solver.in_continuation_ = false;
         solver.set_config(original_config);
         
         if (result) {

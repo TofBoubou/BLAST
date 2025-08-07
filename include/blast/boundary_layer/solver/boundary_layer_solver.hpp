@@ -55,7 +55,7 @@ public:
 class BoundaryLayerSolver {
 private:
   const thermophysics::MixtureInterface& mixture_;
-  const io::Configuration& config_;
+  io::Configuration config_;
   std::unique_ptr<grid::BoundaryLayerGrid> grid_;
   std::unique_ptr<coefficients::CoefficientCalculator> coeff_calculator_;
   std::unique_ptr<thermodynamics::EnthalpyTemperatureSolver> h2t_solver_;
@@ -65,6 +65,7 @@ private:
   std::unique_ptr<coefficients::HeatFluxCalculator> heat_flux_calculator_;
   std::unique_ptr<ContinuationMethod> continuation_;
   io::Configuration original_config_;
+  bool in_continuation_ = false;
 
 public:
   friend class ContinuationMethod;
@@ -113,12 +114,12 @@ public:
                                              const conditions::BoundaryConditions& bc,
                                              int station) -> std::expected<core::Matrix<double>, SolverError>;
 
-  [[nodiscard]] auto config() const noexcept -> const io::Configuration& { 
-      return config_; 
+  [[nodiscard]] auto config() const noexcept -> const io::Configuration& {
+      return config_;
   }
   
   auto set_config(const io::Configuration& config) noexcept -> void {
-      original_config_ = config;
+      config_ = config;
   }
 
 private:

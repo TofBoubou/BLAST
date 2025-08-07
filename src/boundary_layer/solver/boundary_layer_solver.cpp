@@ -253,6 +253,16 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   auto convergence_result = iterate_station_adaptive(station, xi, bc, solution);
   
   if (!convergence_result) {
+      if (continuation_ && !in_continuation_) {
+          auto cont_result = continuation_->solve_with_continuation(
+              *this, station, xi, original_config_, initial_guess
+          );
+
+          if (cont_result && cont_result.value().success) {
+              return cont_result.value().solution;
+          }
+      }
+
       return std::unexpected(convergence_result.error());
   }
   
@@ -260,7 +270,7 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   
   if (!conv_info.converged) {
       // Try continuation if direct solution failed
-      if (continuation_ && conv_info.iterations > 100 && conv_info.max_residual() < 1e10) {
+      if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
           auto cont_result = continuation_->solve_with_continuation(
               *this, station, xi, original_config_, initial_guess
           );
