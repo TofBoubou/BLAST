@@ -57,7 +57,7 @@ BLAST is a computational fluid dynamics solver specifically designed for analyzi
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/your-username/BLAST_MODERN.git
+git clone https://github.com/TofBoubou/BLAST_MODERN.git
 cd BLAST_MODERN
 ```
 
