@@ -136,12 +136,11 @@ inline const std::unordered_map<std::string, MixtureConfig::Database> databases 
     {"nasa9", MixtureConfig::Database::NASA9},
     {"nasa-9", MixtureConfig::Database::NASA9}};
 
-    inline const std::unordered_map<std::string, SimulationConfig::ChemicalMode> chemical_modes = {
+inline const std::unordered_map<std::string, SimulationConfig::ChemicalMode> chemical_modes = {
     {"equilibrium", SimulationConfig::ChemicalMode::Equilibrium},
-    {"frozen", SimulationConfig::ChemicalMode::Frozen}, 
+    {"frozen", SimulationConfig::ChemicalMode::Frozen},
     {"non_equilibrium", SimulationConfig::ChemicalMode::NonEquilibrium},
-    {"nonequilibrium", SimulationConfig::ChemicalMode::NonEquilibrium}
-};
+    {"nonequilibrium", SimulationConfig::ChemicalMode::NonEquilibrium}};
 
 } // namespace enum_mappings
 

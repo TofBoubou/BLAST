@@ -39,7 +39,7 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
   coeff_calculator_ =
       std::make_unique<coefficients::CoefficientCalculator>(mixture_, config_.simulation, config_.numerical);
 
-  heat_flux_calculator_ = 
+  heat_flux_calculator_ =
       std::make_unique<coefficients::HeatFluxCalculator>(mixture_, config_.simulation, config_.numerical);
 
   // Create enthalpy-temperature solver
@@ -132,45 +132,44 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     // Calculate heat flux for this converged station
     auto derivatives_result = compute_all_derivatives(result.stations.back());
     if (!derivatives_result) {
-      return std::unexpected(SolverError("Failed to compute derivatives for heat flux at station {}: {}", 
-                                       std::source_location::current(), station, derivatives_result.error().message()));
+      return std::unexpected(SolverError("Failed to compute derivatives for heat flux at station {}: {}",
+                                         std::source_location::current(), station,
+                                         derivatives_result.error().message()));
     }
     auto derivatives = derivatives_result.value();
 
-    auto final_inputs = coefficients::CoefficientInputs{
-        .xi = xi,
-        .F = result.stations.back().F,
-        .c = result.stations.back().c,
-        .dc_deta = derivatives.dc_deta,
-        .dc_deta2 = derivatives.dc_deta2,
-        .T = result.stations.back().T
-    };
+    auto final_inputs = coefficients::CoefficientInputs{.xi = xi,
+                                                        .F = result.stations.back().F,
+                                                        .c = result.stations.back().c,
+                                                        .dc_deta = derivatives.dc_deta,
+                                                        .dc_deta2 = derivatives.dc_deta2,
+                                                        .T = result.stations.back().T};
 
-    auto bc_result = (station == 0) 
-        ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, 
-                                                 config_.simulation, mixture_)
-        : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), 
-                                                    config_.outer_edge, config_.wall_parameters, 
-                                                    config_.simulation, mixture_);
+    auto bc_result =
+        (station == 0)
+            ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation,
+                                                       mixture_)
+            : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
+                                                          config_.wall_parameters, config_.simulation, mixture_);
 
     if (!bc_result) {
-      return std::unexpected(SolverError("Failed to get boundary conditions for heat flux at station {}: {}", 
-                                       std::source_location::current(), station, bc_result.error().message()));
+      return std::unexpected(SolverError("Failed to get boundary conditions for heat flux at station {}: {}",
+                                         std::source_location::current(), station, bc_result.error().message()));
     }
     auto bc = bc_result.value();
 
     auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
     if (!coeffs_result) {
-      return std::unexpected(SolverError("Failed to compute coefficients for heat flux at station {}: {}", 
-                                       std::source_location::current(), station, coeffs_result.error().message()));
+      return std::unexpected(SolverError("Failed to compute coefficients for heat flux at station {}: {}",
+                                         std::source_location::current(), station, coeffs_result.error().message()));
     }
     auto coeffs = coeffs_result.value();
 
-    auto heat_flux_result = heat_flux_calculator_->calculate(final_inputs, coeffs, bc, 
-                                                           derivatives.dT_deta, station, xi);
+    auto heat_flux_result =
+        heat_flux_calculator_->calculate(final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
     if (!heat_flux_result) {
-      return std::unexpected(SolverError("Failed to compute heat flux at station {}: {}", 
-                                       std::source_location::current(), station, heat_flux_result.error().message()));
+      return std::unexpected(SolverError("Failed to compute heat flux at station {}: {}",
+                                         std::source_location::current(), station, heat_flux_result.error().message()));
     }
 
     result.heat_flux_data.push_back(std::move(heat_flux_result.value()));
@@ -226,19 +225,18 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   }
 
   // Get boundary conditions
-  auto bc_result = (station == 0)
-      ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters,
-                                                  config_.simulation, mixture_)
-      : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(),
-                                                    config_.outer_edge, config_.wall_parameters,
-                                                    config_.simulation, mixture_);
-  
+  auto bc_result =
+      (station == 0)
+          ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation,
+                                                     mixture_)
+          : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
+                                                        config_.wall_parameters, config_.simulation, mixture_);
+
   if (!bc_result) {
-      return std::unexpected(SolverError("Failed to get boundary conditions for station {}: {}",
-                                          std::source_location::current(), station, 
-                                          bc_result.error().message()));
+    return std::unexpected(SolverError("Failed to get boundary conditions for station {}: {}",
+                                       std::source_location::current(), station, bc_result.error().message()));
   }
-  
+
   auto bc = bc_result.value();
   auto solution = initial_guess;
 
@@ -257,61 +255,59 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
                                                               stable_config.simulation, mixture_);
     if (!bc_stable) {
       return std::unexpected(SolverError("Failed to create stable boundary conditions: {}",
-                                        std::source_location::current(), bc_stable.error().message()));
+                                         std::source_location::current(), bc_stable.error().message()));
     }
     double T_edge_stable = stable_config.outer_edge.edge_points[0].temperature;
     return create_initial_guess(station, xi, bc_stable.value(), T_edge_stable);
   };
-  
+
   if (station == 0) {
-      relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
-          AdaptiveRelaxationController::Config::for_stagnation_point());
+    relaxation_controller_ =
+        std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_stagnation_point());
   } else {
-      relaxation_controller_ = std::make_unique<AdaptiveRelaxationController>(
-          AdaptiveRelaxationController::Config::for_downstream_station());
+    relaxation_controller_ =
+        std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_downstream_station());
   }
-  
+
   auto convergence_result = iterate_station_adaptive(station, xi, bc, solution);
-  
+
   if (!convergence_result) {
-      if (continuation_ && !in_continuation_) {
-          auto stable_guess = compute_stable_guess();
-          if (stable_guess) {
-              auto cont_result = continuation_->solve_with_continuation(
-                  *this, station, xi, original_config_, stable_guess.value()
-              );
+    if (continuation_ && !in_continuation_) {
+      auto stable_guess = compute_stable_guess();
+      if (stable_guess) {
+        auto cont_result =
+            continuation_->solve_with_continuation(*this, station, xi, original_config_, stable_guess.value());
 
-              if (cont_result && cont_result.value().success) {
-                  return cont_result.value().solution;
-              }
-          }
+        if (cont_result && cont_result.value().success) {
+          return cont_result.value().solution;
+        }
       }
+    }
 
-      return std::unexpected(convergence_result.error());
+    return std::unexpected(convergence_result.error());
   }
-  
+
   const auto& conv_info = convergence_result.value();
-  
+
   if (!conv_info.converged) {
-      // Try continuation if direct solution failed
-      if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
-          auto stable_guess = compute_stable_guess();
-          if (stable_guess) {
-              auto cont_result = continuation_->solve_with_continuation(
-                  *this, station, xi, original_config_, stable_guess.value()
-              );
+    // Try continuation if direct solution failed
+    if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
+      auto stable_guess = compute_stable_guess();
+      if (stable_guess) {
+        auto cont_result =
+            continuation_->solve_with_continuation(*this, station, xi, original_config_, stable_guess.value());
 
-              if (cont_result && cont_result.value().success) {
-                  return cont_result.value().solution;
-              }
-          }
+        if (cont_result && cont_result.value().success) {
+          return cont_result.value().solution;
+        }
       }
+    }
 
-      return std::unexpected(SolverError("Station {} failed to converge after {} iterations (residual={})",
-                                          std::source_location::current(), station,
-                                          conv_info.iterations, conv_info.max_residual()));
+    return std::unexpected(SolverError("Station {} failed to converge after {} iterations (residual={})",
+                                       std::source_location::current(), station, conv_info.iterations,
+                                       conv_info.max_residual()));
   }
-  
+
   return solution;
 }
 

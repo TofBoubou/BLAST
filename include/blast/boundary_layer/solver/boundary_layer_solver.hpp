@@ -3,16 +3,16 @@
 #include "../../io/config_types.hpp"
 #include "../../thermophysics/mixture_interface.hpp"
 #include "../coefficients/coefficient_calculator.hpp"
-#include "../coefficients/heat_flux_calculator.hpp"
 #include "../coefficients/derivative_calculator.hpp"
+#include "../coefficients/heat_flux_calculator.hpp"
 #include "../coefficients/xi_derivatives.hpp"
 #include "../conditions/boundary_interpolator.hpp"
 #include "../equations/equation_types.hpp"
 #include "../grid/grid.hpp"
 #include "../thermodynamics/enthalpy_temperature_solver.hpp"
 #include "adaptive_relaxation_controller.hpp"
-#include "solver_steps.hpp"
 #include "continuation_method.hpp"
+#include "solver_steps.hpp"
 #include <expected>
 #include <memory>
 
@@ -69,7 +69,7 @@ private:
 
 public:
   friend class ContinuationMethod;
-  
+
   explicit BoundaryLayerSolver(const thermophysics::MixtureInterface& mixture, const io::Configuration& config);
 
   [[nodiscard]] auto solve() -> std::expected<SolutionResult, SolverError>;
@@ -114,13 +114,9 @@ public:
                                              const conditions::BoundaryConditions& bc,
                                              int station) -> std::expected<core::Matrix<double>, SolverError>;
 
-  [[nodiscard]] auto config() const noexcept -> const io::Configuration& {
-      return config_;
-  }
-  
-  auto set_config(const io::Configuration& config) noexcept -> void {
-      config_ = config;
-  }
+  [[nodiscard]] auto config() const noexcept -> const io::Configuration& { return config_; }
+
+  auto set_config(const io::Configuration& config) noexcept -> void { config_ = config; }
 
 private:
   // =============================================================================

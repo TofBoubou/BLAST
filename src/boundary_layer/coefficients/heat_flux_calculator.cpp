@@ -1,16 +1,15 @@
 #include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <numeric>
 
 namespace blast::boundary_layer::coefficients {
 
-auto HeatFluxCalculator::calculate(
-    const CoefficientInputs& inputs, const CoefficientSet& coeffs,
-    const conditions::BoundaryConditions& bc, const std::vector<double>& dT_deta,
-    int station, double xi) const -> std::expected<HeatFluxCoefficients, HeatFluxError> {
+auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const CoefficientSet& coeffs,
+                                   const conditions::BoundaryConditions& bc, const std::vector<double>& dT_deta,
+                                   int station, double xi) const -> std::expected<HeatFluxCoefficients, HeatFluxError> {
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
@@ -34,12 +33,12 @@ auto HeatFluxCalculator::calculate(
     heat_flux.q_conductive_nondimensional.resize(n_eta, 0.0);
     heat_flux.q_diffusive_nondimensional.resize(n_eta, 0.0);
     heat_flux.q_total_nondimensional.resize(n_eta, 0.0);
-    
+
     heat_flux.q_diffusive_species_dimensional = core::Matrix<double>(n_species, n_eta);
     heat_flux.q_diffusive_species_nondimensional = core::Matrix<double>(n_species, n_eta);
     heat_flux.q_diffusive_species_dimensional.setZero();
     heat_flux.q_diffusive_species_nondimensional.setZero();
-    
+
     heat_flux.q_ref = 1.0;
     return heat_flux;
   }
@@ -61,8 +60,7 @@ auto HeatFluxCalculator::calculate(
 
   heat_flux.q_total_dimensional.resize(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
-    heat_flux.q_total_dimensional[i] = heat_flux.q_conductive_dimensional[i] + 
-                                       heat_flux.q_diffusive_dimensional[i];
+    heat_flux.q_total_dimensional[i] = heat_flux.q_conductive_dimensional[i] + heat_flux.q_diffusive_dimensional[i];
   }
 
   auto wall_fluxes_result = compute_wall_heat_fluxes(inputs, coeffs, bc, station, xi);
@@ -70,7 +68,7 @@ auto HeatFluxCalculator::calculate(
     return std::unexpected(wall_fluxes_result.error());
   }
   auto [q_wall_cond, q_wall_diff, q_wall_total] = wall_fluxes_result.value();
-  
+
   heat_flux.q_wall_conductive_dim = q_wall_cond;
   heat_flux.q_wall_diffusive_dim = q_wall_diff;
   heat_flux.q_wall_total_dim = q_wall_total;
@@ -79,7 +77,7 @@ auto HeatFluxCalculator::calculate(
     heat_flux.q_conductive_nondimensional.resize(n_eta);
     heat_flux.q_diffusive_nondimensional.resize(n_eta);
     heat_flux.q_total_nondimensional.resize(n_eta);
-    
+
     for (std::size_t i = 0; i < n_eta; ++i) {
       heat_flux.q_conductive_nondimensional[i] = heat_flux.q_conductive_dimensional[i] / heat_flux.q_ref;
       heat_flux.q_diffusive_nondimensional[i] = heat_flux.q_diffusive_dimensional[i] / heat_flux.q_ref;
@@ -89,7 +87,7 @@ auto HeatFluxCalculator::calculate(
     heat_flux.q_diffusive_species_nondimensional = core::Matrix<double>(n_species, n_eta);
     for (std::size_t j = 0; j < n_species; ++j) {
       for (std::size_t i = 0; i < n_eta; ++i) {
-        heat_flux.q_diffusive_species_nondimensional(j, i) = 
+        heat_flux.q_diffusive_species_nondimensional(j, i) =
             heat_flux.q_diffusive_species_dimensional(j, i) / heat_flux.q_ref;
       }
     }
@@ -104,8 +102,7 @@ auto HeatFluxCalculator::calculate(
 
 auto HeatFluxCalculator::compute_heat_flux_geometry_factors(
     int station, double xi, const conditions::BoundaryConditions& bc,
-    const WallProperties& wall_props) const 
-    -> std::expected<HeatFluxGeometryFactors, HeatFluxError> {
+    const WallProperties& wall_props) const -> std::expected<HeatFluxGeometryFactors, HeatFluxError> {
 
   HeatFluxGeometryFactors factors;
   factors.valid_geometry = true;
@@ -141,7 +138,7 @@ auto HeatFluxCalculator::compute_heat_flux_geometry_factors(
     if (xi <= 0.0 || bc.ue() <= 0.0 || bc.r_body() <= 0.0) {
       return std::unexpected(HeatFluxError("Invalid conditions for downstream heat flux calculation"));
     }
-    
+
     factors.der_fact = bc.ue() * bc.r_body() / std::sqrt(2.0 * xi) * wall_props.rho_wall;
     factors.dy_deta_factor = std::sqrt(2.0 * xi) / (bc.ue() * bc.r_body());
   }
@@ -149,13 +146,13 @@ auto HeatFluxCalculator::compute_heat_flux_geometry_factors(
   return factors;
 }
 
-auto HeatFluxCalculator::compute_local_conductivities(
-    const CoefficientInputs& inputs, const conditions::BoundaryConditions& bc) const
+auto HeatFluxCalculator::compute_local_conductivities(const CoefficientInputs& inputs,
+                                                      const conditions::BoundaryConditions& bc) const
     -> std::expected<std::vector<double>, HeatFluxError> {
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
-  
+
   std::vector<double> k_local(n_eta);
 
   for (std::size_t i = 0; i < n_eta; ++i) {
@@ -166,23 +163,23 @@ auto HeatFluxCalculator::compute_local_conductivities(
 
     auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], bc.P_e());
     if (!k_result) {
-      return std::unexpected(HeatFluxError(std::format("Failed to compute thermal conductivity at eta point {}: {}", 
-                                                       i, k_result.error().message())));
+      return std::unexpected(HeatFluxError(
+          std::format("Failed to compute thermal conductivity at eta point {}: {}", i, k_result.error().message())));
     }
-    
+
     k_local[i] = k_result.value();
-    
+
     if (k_local[i] <= 0.0 || !std::isfinite(k_local[i])) {
-      return std::unexpected(HeatFluxError(std::format("Invalid thermal conductivity at eta point {}: {}", 
-                                                       i, k_local[i])));
+      return std::unexpected(
+          HeatFluxError(std::format("Invalid thermal conductivity at eta point {}: {}", i, k_local[i])));
     }
   }
 
   return k_local;
 }
 
-auto HeatFluxCalculator::compute_reference_flux(
-    const conditions::BoundaryConditions& bc, const CoefficientSet& coeffs) const -> double {
+auto HeatFluxCalculator::compute_reference_flux(const conditions::BoundaryConditions& bc,
+                                                const CoefficientSet& coeffs) const -> double {
 
   const double rho_e = bc.rho_e();
   const double h_wall = coeffs.thermodynamic.h_wall;
@@ -207,20 +204,19 @@ auto HeatFluxCalculator::compute_conductive_flux_profile(
   return q_conductive;
 }
 
-auto HeatFluxCalculator::compute_diffusive_flux_profile(
-    const CoefficientSet& coeffs) const 
+auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& coeffs) const
     -> std::pair<std::vector<double>, core::Matrix<double>> {
 
   const auto n_eta = coeffs.diffusion.J.cols();
   const auto n_species = coeffs.diffusion.J.rows();
-  
+
   std::vector<double> q_diffusive_total(n_eta, 0.0);
   core::Matrix<double> q_diffusive_species(n_species, n_eta);
 
   for (std::size_t i = 0; i < n_eta; ++i) {
     for (std::size_t j = 0; j < n_species; ++j) {
       const double q_species_j = std::abs(coeffs.diffusion.J(j, i) * coeffs.h_species(j, i));
-      
+
       q_diffusive_species(j, i) = q_species_j;
       q_diffusive_total[i] += q_species_j;
     }
@@ -230,9 +226,8 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(
 }
 
 auto HeatFluxCalculator::compute_wall_heat_fluxes(
-    const CoefficientInputs& inputs, const CoefficientSet& coeffs,
-    const conditions::BoundaryConditions& bc, int station, double xi) const
-    -> std::expected<std::tuple<double, double, double>, HeatFluxError> {
+    const CoefficientInputs& inputs, const CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
+    int station, double xi) const -> std::expected<std::tuple<double, double, double>, HeatFluxError> {
 
   auto geo_factors_result = compute_heat_flux_geometry_factors(station, xi, bc, coeffs.wall);
   if (!geo_factors_result) {
@@ -244,14 +239,13 @@ auto HeatFluxCalculator::compute_wall_heat_fluxes(
     return std::make_tuple(0.0, 0.0, 0.0);
   }
 
-  const double dT_deta_wall = inputs.T.size() > 1 ? 
-      (inputs.T[1] - inputs.T[0]) / d_eta_ : 0.0;
-  
+  const double dT_deta_wall = inputs.T.size() > 1 ? (inputs.T[1] - inputs.T[0]) / d_eta_ : 0.0;
+
   const double q_wall_conductive = std::abs(-coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact);
 
   double q_wall_diffusive = 0.0;
   const auto n_species = coeffs.diffusion.J.rows();
-  
+
   for (std::size_t j = 0; j < n_species; ++j) {
     q_wall_diffusive += std::abs(coeffs.diffusion.J(j, 0) * coeffs.h_species(j, 0));
   }

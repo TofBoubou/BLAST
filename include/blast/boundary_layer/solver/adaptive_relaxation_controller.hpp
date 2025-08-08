@@ -31,24 +31,24 @@ public:
   // Configuration parameters
   struct Config {
     double initial_factor = 0.001; // Conservative initial factor
-    double min_factor = 0.00001;  // Absolute minimum
-    double max_factor = 1;        // Reasonable maximum
+    double min_factor = 0.00001;   // Absolute minimum
+    double max_factor = 1;         // Reasonable maximum
 
     // Thresholds based on your logic
     double excellent_threshold = 1;  // Threshold for excellent convergence (< 0.8)
     double divergence_threshold = 1; // Threshold for divergence (> 1.0)
 
     // Adaptation factors
-    double strong_increase = 1.01;    // Strong increase for ratio < 0.8
-    double moderate_increase = 1.01;  // Moderate increase for [0.8, 1.0]
-    double decrease_factor = 1;     // Decrease for ratio > X
-    double oscillation_penalty = 1; // Penalty factor for oscillations
+    double strong_increase = 1.01;   // Strong increase for ratio < 0.8
+    double moderate_increase = 1.01; // Moderate increase for [0.8, 1.0]
+    double decrease_factor = 1;      // Decrease for ratio > X
+    double oscillation_penalty = 1;  // Penalty factor for oscillations
 
     // Specialized configurations
     [[nodiscard]] static auto for_stagnation_point() -> Config {
       Config config;
       config.initial_factor = 0.001;
-      config.max_factor = 1;           // More conservative
+      config.max_factor = 1;            // More conservative
       config.strong_increase = 1.001;   // Slower growth
       config.moderate_increase = 1.001; // Very moderate
       return config;

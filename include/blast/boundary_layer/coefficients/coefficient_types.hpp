@@ -57,26 +57,26 @@ struct HeatFluxCoefficients {
   std::vector<double> q_conductive_dimensional;
   std::vector<double> q_diffusive_dimensional;
   std::vector<double> q_total_dimensional;
-  
+
   // Non-dimensional heat fluxes [-] - profiles [n_eta]
   std::vector<double> q_conductive_nondimensional;
   std::vector<double> q_diffusive_nondimensional;
   std::vector<double> q_total_nondimensional;
-  
+
   // Species contributions [n_species x n_eta] - dimensional
   core::Matrix<double> q_diffusive_species_dimensional;
   // Species contributions [n_species x n_eta] - non-dimensional
   core::Matrix<double> q_diffusive_species_nondimensional;
-  
+
   // Wall values (scalaires)
   double q_wall_conductive_dim = 0.0;
   double q_wall_diffusive_dim = 0.0;
   double q_wall_total_dim = 0.0;
-  
+
   double q_wall_conductive_nondim = 0.0;
   double q_wall_diffusive_nondim = 0.0;
   double q_wall_total_nondim = 0.0;
-  
+
   // Reference flux for non-dimensionalization
   double q_ref = 0.0;
 };

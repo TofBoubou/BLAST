@@ -165,26 +165,26 @@ auto OutputWriter::convert_solution(
     // Heat flux data
     if (station_idx < solution.heat_flux_data.size()) {
       const auto& heat_flux = solution.heat_flux_data[station_idx];
-      
+
       station_data.q_conductive_dimensional = heat_flux.q_conductive_dimensional;
       station_data.q_diffusive_dimensional = heat_flux.q_diffusive_dimensional;
       station_data.q_total_dimensional = heat_flux.q_total_dimensional;
-      
+
       station_data.q_conductive_nondimensional = heat_flux.q_conductive_nondimensional;
       station_data.q_diffusive_nondimensional = heat_flux.q_diffusive_nondimensional;
       station_data.q_total_nondimensional = heat_flux.q_total_nondimensional;
-      
+
       station_data.q_diffusive_species_dimensional = heat_flux.q_diffusive_species_dimensional;
       station_data.q_diffusive_species_nondimensional = heat_flux.q_diffusive_species_nondimensional;
-      
+
       station_data.q_wall_conductive_dim = heat_flux.q_wall_conductive_dim;
       station_data.q_wall_diffusive_dim = heat_flux.q_wall_diffusive_dim;
       station_data.q_wall_total_dim = heat_flux.q_wall_total_dim;
-      
+
       station_data.q_wall_conductive_nondim = heat_flux.q_wall_conductive_nondim;
       station_data.q_wall_diffusive_nondim = heat_flux.q_wall_diffusive_nondim;
       station_data.q_wall_total_nondim = heat_flux.q_wall_total_nondim;
-      
+
       station_data.q_ref = heat_flux.q_ref;
     }
 

@@ -3,13 +3,13 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: true
+  chemical_mode: "frozen" # "frozen" or "equilibrium" or "non_equilibrium"
+  catalytic_wall: false
 
 numerical:
   n_eta: 200                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-3    
+  convergence_tolerance: 1.0e-6    
   max_iterations: 10000000
 
 mixture:
@@ -34,7 +34,7 @@ outer_edge:
   freestream_velocity: 500000
 
 wall_parameters:
-  temperatures: [300]
+  temperatures: [2100]
 
 # ./blast config/default.yaml test_output
 # python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250713_232651.h5 --plots all --output results_h5

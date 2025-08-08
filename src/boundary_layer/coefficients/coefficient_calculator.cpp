@@ -46,7 +46,7 @@ auto CoefficientCalculator::calculate(const CoefficientInputs& inputs, const con
   }
   coeffs.diffusion = std::move(diffusion_result.value());
 
-  // 5. Chemical coefficients 
+  // 5. Chemical coefficients
   if (sim_config_.chemical_mode == io::SimulationConfig::ChemicalMode::NonEquilibrium) {
     auto chemical_result = calculate_chemical_coefficients(inputs, coeffs.thermodynamic, bc);
     if (!chemical_result) {

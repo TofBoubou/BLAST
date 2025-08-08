@@ -24,7 +24,7 @@ struct SimulationConfig {
   DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
   bool consider_thermal_diffusion = false;
   ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
-  bool catalytic_wall = false;  // Enable surface catalysis
+  bool catalytic_wall = false; // Enable surface catalysis
 };
 
 struct NumericalConfig {

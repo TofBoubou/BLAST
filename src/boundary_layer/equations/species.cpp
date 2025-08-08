@@ -28,7 +28,8 @@ auto solve_species(const core::Matrix<double>& c_previous, const coefficients::C
     return compute_equilibrium_composition(inputs.T, bc.P_e(), mixture);
   }
 
-  if (sim_config.chemical_mode == io::SimulationConfig::ChemicalMode::Frozen) {}
+  if (sim_config.chemical_mode == io::SimulationConfig::ChemicalMode::Frozen) {
+  }
 
   auto species_coeffs_result = detail::build_species_coefficients(c_previous, inputs, coeffs, bc, xi_der, mixture,
                                                                   sim_config, F_field, V_field, station, d_eta);
@@ -275,10 +276,11 @@ auto build_species_coefficients(const core::Matrix<double>& c_previous, const co
   return species_coeffs;
 }
 
-auto build_species_boundary_conditions(
-    const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
-    const conditions::BoundaryConditions& bc, const thermophysics::MixtureInterface& mixture,
-    const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta) -> std::expected<SpeciesBoundaryConditions, EquationError> {
+auto build_species_boundary_conditions(const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
+                                       const conditions::BoundaryConditions& bc,
+                                       const thermophysics::MixtureInterface& mixture,
+                                       const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta)
+    -> std::expected<SpeciesBoundaryConditions, EquationError> {
 
   const auto n_species = mixture.n_species();
 
@@ -389,17 +391,18 @@ auto compute_equilibrium_wall(const conditions::BoundaryConditions& bc, const th
 constexpr double Le = 1.2;  // Lewis number approximation
 constexpr double Pr = 0.72; // Prandtl number approximation
 
-auto build_catalytic_boundary_conditions(
-    const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
-    const conditions::BoundaryConditions& bc, const thermophysics::MixtureInterface& mixture,
-    const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta) -> std::expected<SpeciesBoundaryConditions, EquationError> {
+auto build_catalytic_boundary_conditions(const core::Matrix<double>& c_wall, const coefficients::CoefficientSet& coeffs,
+                                         const conditions::BoundaryConditions& bc,
+                                         const thermophysics::MixtureInterface& mixture,
+                                         const io::SimulationConfig& sim_config, PhysicalQuantity auto d_eta)
+    -> std::expected<SpeciesBoundaryConditions, EquationError> {
 
   const auto n_species = mixture.n_species();
   const std::size_t start_idx = mixture.has_electrons() ? 1 : 0;
 
   // Compute partial densities at wall: ρᵢ = cᵢ × ρₜₒₜₐₗ
   std::vector<double> rho_i_wall(n_species);
-  const double rho_wall = coeffs.thermodynamic.rho[0];  // Wall density
+  const double rho_wall = coeffs.thermodynamic.rho[0]; // Wall density
 
   for (std::size_t i = 0; i < n_species; ++i) {
     rho_i_wall[i] = c_wall(i, 0) * rho_wall;
@@ -430,18 +433,18 @@ auto build_catalytic_boundary_conditions(
   for (std::size_t i = start_idx; i < n_species; ++i) {
     // Robin boundary condition: f_bc * dc/dη + g_bc * c = h_bc
     boundary_conds.f_bc[i] = -coeffs.transport.l0[0] * Le / Pr / d_eta;
-    boundary_conds.g_bc[i] = 0.0;                                  // No concentration term
-    
+    boundary_conds.g_bc[i] = 0.0; // No concentration term
+
     // J_reel
     const double J_reel = coeffs.diffusion.J(i, 0);
-    
+
     // Fake flux on the wall to compensate f_bc * dc/dη
-    // J_fake = Le/Pr * l0 * dc_deta on the wall  
+    // J_fake = Le/Pr * l0 * dc_deta on the wall
     const double dc_deta_wall = (c_wall.cols() > 1) ? (c_wall(i, 1) - c_wall(i, 0)) / d_eta : 0.0;
     const double J_fake_wall = Le / Pr * coeffs.transport.l0[0] * dc_deta_wall;
-    
+
     // h_bc = J_cat - J_reel + J_fake_wall to ensure the flux balance
-    boundary_conds.h_bc[i] = (+ cat_flux[i] - J_reel)*1 + J_fake_wall;
+    boundary_conds.h_bc[i] = (+cat_flux[i] - J_reel) * 1 + J_fake_wall;
   }
 
   // Electrons: dummy values (not used in system, determined by charge neutrality)
