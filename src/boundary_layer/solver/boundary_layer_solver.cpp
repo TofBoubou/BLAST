@@ -369,6 +369,11 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     conv_info = check_convergence(solution_old, solution_new);
     conv_info.iterations = iter + 1;
 
+    if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
+      return std::unexpected(SolverError("NaN detected in residuals at station {} iteration {}", 
+                                        std::source_location::current(), station, iter));
+    }
+
     // Adaptive relaxation
     double adaptive_factor = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
     std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor

@@ -49,8 +49,8 @@ public:
       Config config;
       config.initial_factor = 0.001;
       config.max_factor = 1;            // More conservative
-      config.strong_increase = 1.001;   // Slower growth
-      config.moderate_increase = 1.001; // Very moderate
+      config.strong_increase = 1.01;   // Slower growth
+      config.moderate_increase = 1.01; // Very moderate
       return config;
     }
 

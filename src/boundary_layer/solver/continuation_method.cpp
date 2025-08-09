@@ -9,7 +9,7 @@ auto ContinuationMethod::solve_with_continuation(
     BoundaryLayerSolver& solver, int station, double xi, const io::Configuration& target_config,
     const equations::SolutionState& initial_guess) -> std::expected<ContinuationResult, SolverError> {
 
-  double lambda = 0.0;
+  double lambda = -LAMBDA_STEP_INITIAL;
   double lambda_step = LAMBDA_STEP_INITIAL;
   equations::SolutionState current_solution = initial_guess;
   const auto original_config = solver.config();
