@@ -9,6 +9,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <numeric>
 
 namespace blast::boundary_layer::solver {
@@ -370,8 +371,14 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     conv_info.iterations = iter + 1;
 
     if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
-      return std::unexpected(SolverError("NaN detected in residuals at station {} iteration {}", 
-                                        std::source_location::current(), station, iter));
+      conv_info.residual_F =
+          std::isnan(conv_info.residual_F) ? std::numeric_limits<double>::infinity() : conv_info.residual_F;
+      conv_info.residual_g =
+          std::isnan(conv_info.residual_g) ? std::numeric_limits<double>::infinity() : conv_info.residual_g;
+      conv_info.residual_c =
+          std::isnan(conv_info.residual_c) ? std::numeric_limits<double>::infinity() : conv_info.residual_c;
+      conv_info.converged = false;
+      break;
     }
 
     // Adaptive relaxation
@@ -400,8 +407,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
 
 auto BoundaryLayerSolver::solve_momentum_equation(const equations::SolutionState& solution,
                                                   const coefficients::CoefficientSet& coeffs,
-                                                  const conditions::BoundaryConditions& bc,
-                                                  double xi) -> std::expected<std::vector<double>, SolverError> {
+                                                  const conditions::BoundaryConditions& bc, double xi)
+    -> std::expected<std::vector<double>, SolverError> {
 
   auto result = equations::solve_momentum(solution.F, coeffs, bc, *xi_derivatives_, solution.V, xi, grid_->d_eta());
 
@@ -416,8 +423,8 @@ auto BoundaryLayerSolver::solve_momentum_equation(const equations::SolutionState
 auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& solution,
                                                 const coefficients::CoefficientInputs& inputs,
                                                 const coefficients::CoefficientSet& coeffs,
-                                                const conditions::BoundaryConditions& bc,
-                                                int station) -> std::expected<std::vector<double>, SolverError> {
+                                                const conditions::BoundaryConditions& bc, int station)
+    -> std::expected<std::vector<double>, SolverError> {
 
   // Get dF/deta from unified derivative calculation
   auto all_derivatives_result = compute_all_derivatives(solution);
@@ -443,8 +450,8 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
 auto BoundaryLayerSolver::solve_species_equations(const equations::SolutionState& solution,
                                                   const coefficients::CoefficientInputs& inputs,
                                                   const coefficients::CoefficientSet& coeffs,
-                                                  const conditions::BoundaryConditions& bc,
-                                                  int station) -> std::expected<core::Matrix<double>, SolverError> {
+                                                  const conditions::BoundaryConditions& bc, int station)
+    -> std::expected<core::Matrix<double>, SolverError> {
 
   auto result = equations::solve_species(solution.c, inputs, coeffs, bc, *xi_derivatives_, mixture_, config_.simulation,
                                          solution.F, solution.V, station, grid_->d_eta());
@@ -457,9 +464,11 @@ auto BoundaryLayerSolver::solve_species_equations(const equations::SolutionState
   return result.value();
 }
 
-auto BoundaryLayerSolver::update_temperature_field(
-    std::span<const double> g_field, const core::Matrix<double>& composition, const conditions::BoundaryConditions& bc,
-    std::span<const double> current_temperatures) -> std::expected<std::vector<double>, SolverError> {
+auto BoundaryLayerSolver::update_temperature_field(std::span<const double> g_field,
+                                                   const core::Matrix<double>& composition,
+                                                   const conditions::BoundaryConditions& bc,
+                                                   std::span<const double> current_temperatures)
+    -> std::expected<std::vector<double>, SolverError> {
 
   const auto n_eta = g_field.size();
   std::vector<double> enthalpy_field(n_eta);
@@ -683,9 +692,10 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(equations::SolutionSt
   }
 }
 
-auto BoundaryLayerSolver::update_edge_properties(
-    conditions::BoundaryConditions& bc, const coefficients::CoefficientInputs& inputs,
-    const core::Matrix<double>& species_matrix) const -> std::expected<void, SolverError> {
+auto BoundaryLayerSolver::update_edge_properties(conditions::BoundaryConditions& bc,
+                                                 const coefficients::CoefficientInputs& inputs,
+                                                 const core::Matrix<double>& species_matrix) const
+    -> std::expected<void, SolverError> {
 
   const auto n_eta = grid_->n_eta();
   const auto n_species = mixture_.n_species();
