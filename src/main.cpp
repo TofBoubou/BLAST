@@ -258,6 +258,46 @@ int main(int argc, char* argv[]) {
                 << (file_size / 1024.0) << " KB)" << std::endl;
     }
 
+    // Generate abaque if enabled
+    if (config.abaque.enabled) {
+      std::cout << "\n=== GENERATING ABAQUE ===" << std::endl;
+      std::cout << "Temperature range: " << config.abaque.temperature_min << " - " << config.abaque.temperature_max << " K" << std::endl;
+      std::cout << "Temperature points: " << config.abaque.temperature_points << std::endl;
+      std::cout << "Catalyticity values: ";
+      for (size_t i = 0; i < config.abaque.catalyticity_values.size(); ++i) {
+        if (i > 0) std::cout << ", ";
+        std::cout << config.abaque.catalyticity_values[i];
+      }
+      std::cout << std::endl;
+
+      auto abaque_start = std::chrono::high_resolution_clock::now();
+      
+      blast::io::AbaqueGenerator abaque_generator(solver, mixture, config);
+      auto abaque_result = abaque_generator.generate();
+      
+      if (abaque_result.success) {
+        // Save abaque results
+        std::string abaque_filename = case_name + "_abaque.h5";
+        std::filesystem::path abaque_path = std::filesystem::path(config.output.output_directory) / abaque_filename;
+        
+        if (abaque_generator.save_results(abaque_result, abaque_path)) {
+          auto abaque_end = std::chrono::high_resolution_clock::now();
+          auto abaque_duration = std::chrono::duration_cast<std::chrono::milliseconds>(abaque_end - abaque_start);
+          
+          std::cout << "✓ Abaque generated successfully!" << std::endl;
+          std::cout << "  Generation time: " << abaque_duration.count() << " ms" << std::endl;
+          
+          auto abaque_file_size = std::filesystem::file_size(abaque_path);
+          std::cout << "  Abaque file: " << abaque_path.filename().string() << " (" << std::setprecision(2) << std::fixed
+                    << (abaque_file_size / 1024.0) << " KB)" << std::endl;
+        } else {
+          std::cerr << "Failed to save abaque results to: " << abaque_path << std::endl;
+        }
+      } else {
+        std::cerr << "Failed to generate abaque" << std::endl;
+      }
+    }
+
     // Performance summary
     auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(output_end - start_time);
     std::cout << "\n=== PERFORMANCE SUMMARY ===" << std::endl;

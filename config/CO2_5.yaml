@@ -4,7 +4,7 @@ simulation:
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: false
+  catalytic_wall: true
 
 numerical:
   n_eta: 20                       
