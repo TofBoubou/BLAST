@@ -114,6 +114,29 @@ public:
                                              const conditions::BoundaryConditions& bc,
                                              int station) -> std::expected<core::Matrix<double>, SolverError>;
 
+  auto set_wall_temperature(double Tw) -> void {
+    if (!config_.wall_parameters.wall_temperatures.empty()) {
+      config_.wall_parameters.wall_temperatures[0] = Tw;
+    } else {
+      config_.wall_parameters.wall_temperatures.push_back(Tw);
+    }
+  }
+  
+  [[nodiscard]] auto get_wall_temperature() const -> double {
+    if (!config_.wall_parameters.wall_temperatures.empty()) {
+      return config_.wall_parameters.wall_temperatures[0];
+    }
+    return 300.0; // Default
+  }
+  
+  [[nodiscard]] auto get_config() -> io::Configuration& {
+    return config_;
+  }
+  
+  [[nodiscard]] auto get_mixture() -> thermophysics::MixtureInterface& {
+    return const_cast<thermophysics::MixtureInterface&>(mixture_);
+  }
+
   [[nodiscard]] auto config() const noexcept -> const io::Configuration& { return config_; }
 
   auto set_config(const io::Configuration& config) noexcept -> void { config_ = config; }

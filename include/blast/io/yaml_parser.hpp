@@ -45,6 +45,9 @@ private:
   [[nodiscard]] auto parse_wall_parameters_config(const YAML::Node& node) const
       -> std::expected<WallParametersConfig, core::ConfigurationError>;
 
+  [[nodiscard]] auto parse_abaque_config(const YAML::Node& node) const 
+    -> std::expected<AbaqueConfig, core::ConfigurationError>;
+
 public:
   explicit YamlParser(std::string file_path) : file_path_(std::move(file_path)) {} // constructor so no ->
 

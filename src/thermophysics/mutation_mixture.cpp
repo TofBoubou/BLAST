@@ -88,7 +88,9 @@ viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::exp
 } // namespace
 
 MutationMixture::MutationMixture(const io::MixtureConfig& config)
-    : mixture_(create_mutation_mixture(config).value()), n_species_(mixture_->nSpecies()),
+    : config_(config),
+      mixture_(create_mutation_mixture(config).value()), 
+      n_species_(mixture_->nSpecies()),
       has_electrons_(mixture_->hasElectrons()) {
 
   try {
@@ -490,6 +492,39 @@ auto create_mixture(const io::MixtureConfig& config)
     return std::unexpected(e);
   } catch (const std::exception& e) {
     return std::unexpected(ThermophysicsError(std::format("Failed to create mixture: {}", e.what())));
+  }
+}
+
+auto MutationMixture::reload_gsi() -> bool {
+  try {
+    // Recreate mixture with same config to reload GSI file
+    auto new_mixture_result = create_mutation_mixture(config_);
+    if (!new_mixture_result) {
+      std::cerr << "Failed to create new mixture for GSI reload" << std::endl;
+      return false;
+    }
+    
+    // Replace old mixture with new one
+    mixture_ = std::move(new_mixture_result.value());
+    
+    // Verify species count hasn't changed
+    if (mixture_->nSpecies() != n_species_) {
+      std::cerr << "Error: Species count changed after GSI reload" << std::endl;
+      return false;
+    }
+    
+    // Update cached properties if needed
+    for (std::size_t i = 0; i < n_species_; ++i) {
+      species_mw_[i] = mixture_->speciesMw(i);
+      const double charge = mixture_->speciesCharge(i) * constants::N_Avogadro / species_mw_[i];
+      species_charges_[i] = charge;
+    }
+    
+    return true;
+    
+  } catch (const std::exception& e) {
+    std::cerr << "Failed to reload GSI: " << e.what() << std::endl;
+    return false;
   }
 }
 

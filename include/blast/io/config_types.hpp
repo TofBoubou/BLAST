@@ -83,6 +83,14 @@ struct WallParametersConfig {
   bool catalytic_wall = false;
 };
 
+struct AbaqueConfig {
+  bool enabled = false;
+  std::vector<double> catalyticity_values;
+  double temperature_min = 300.0;
+  double temperature_max = 2000.0;
+  int temperature_points = 100;
+};
+
 struct Configuration {
   SimulationConfig simulation;
   NumericalConfig numerical;
@@ -91,6 +99,7 @@ struct Configuration {
   InitialGuessConfig initial_guess;
   OuterEdgeConfig outer_edge;
   WallParametersConfig wall_parameters;
+  AbaqueConfig abaque;
 };
 
 template <typename T>

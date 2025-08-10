@@ -3,6 +3,7 @@
 #include "blast/io/output/hdf5_writer.hpp"
 #include "blast/io/output/output_writer.hpp"
 #include "blast/thermophysics/mixture_interface.hpp"
+#include "blast/io/abaque_generator.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>

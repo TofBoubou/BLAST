@@ -88,6 +88,12 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.wall_parameters = std::move(wall_result.value());
 
+    auto abaque_result = parse_abaque_config(root_["abaque"]);
+    if (!abaque_result) {
+      return std::unexpected(abaque_result.error());
+    }
+    config.abaque = std::move(abaque_result.value());
+
     return config;
 
   } catch (const YAML::Exception& e) {
@@ -314,6 +320,64 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
 
   } catch (const core::ConfigurationError& e) {
     return std::unexpected(core::ConfigurationError(std::format("In 'wall_parameters' section: {}", e.message())));
+  }
+}
+
+auto YamlParser::parse_abaque_config(const YAML::Node& node) const
+    -> std::expected<AbaqueConfig, core::ConfigurationError> {
+  
+  AbaqueConfig config;
+  
+  // If no abaque section, return default (disabled)
+  if (!node) {
+    return config;
+  }
+  
+  try {
+    // Parse enabled flag
+    if (node["enabled"]) {
+      config.enabled = node["enabled"].as<bool>();
+    }
+    
+    // Only parse other fields if enabled
+    if (config.enabled) {
+      // Parse catalyticity values
+      if (!node["catalyticity_values"]) {
+        return std::unexpected(core::ConfigurationError("Missing required 'catalyticity_values' when abaque is enabled"));
+      }
+      config.catalyticity_values = node["catalyticity_values"].as<std::vector<double>>();
+      
+      if (config.catalyticity_values.empty()) {
+        return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty"));
+      }
+      
+      // Parse temperature range
+      if (node["temperature_range"]) {
+        auto range = node["temperature_range"].as<std::vector<double>>();
+        if (range.size() != 2) {
+          return std::unexpected(core::ConfigurationError("temperature_range must have exactly 2 values"));
+        }
+        config.temperature_min = range[0];
+        config.temperature_max = range[1];
+        
+        if (config.temperature_min >= config.temperature_max) {
+          return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
+        }
+      }
+      
+      // Parse temperature points
+      if (node["temperature_points"]) {
+        config.temperature_points = node["temperature_points"].as<int>();
+        if (config.temperature_points < 2) {
+          return std::unexpected(core::ConfigurationError("temperature_points must be at least 2"));
+        }
+      }
+    }
+    
+    return config;
+    
+  } catch (const YAML::Exception& e) {
+    return std::unexpected(core::ConfigurationError(std::format("In 'abaque' section: {}", e.what())));
   }
 }
 

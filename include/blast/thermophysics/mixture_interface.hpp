@@ -91,6 +91,8 @@ public:
   [[nodiscard]] virtual auto
   surface_reaction_rates(std::span<const double> partial_densities,
                          double wall_temperature) const -> std::expected<std::vector<double>, ThermophysicsError> = 0;
+
+[[nodiscard]] virtual auto reload_gsi() -> bool = 0;
 };
 
 // Factory function to create mixture implementation

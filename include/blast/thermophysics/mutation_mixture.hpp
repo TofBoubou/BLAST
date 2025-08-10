@@ -9,6 +9,7 @@ namespace blast::thermophysics {
 // Concrete implementation using Mutation++
 class MutationMixture final : public MixtureInterface {
 private:
+  io::MixtureConfig config_;
   std::unique_ptr<Mutation::Mixture> mixture_;
   const std::size_t n_species_;
   const bool has_electrons_;
@@ -92,6 +93,8 @@ public:
 
   [[nodiscard]] auto surface_reaction_rates(std::span<const double> partial_densities, double wall_temperature) const
       -> std::expected<std::vector<double>, ThermophysicsError> override;
+
+[[nodiscard]] auto reload_gsi() -> bool override;
 };
 
 } // namespace blast::thermophysics
