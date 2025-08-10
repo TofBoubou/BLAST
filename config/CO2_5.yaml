@@ -7,10 +7,10 @@ simulation:
   catalytic_wall: false
 
 numerical:
-  n_eta: 200                       
+  n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-6    
-  max_iterations: 10000000
+  convergence_tolerance: 1.0e-3    
+  max_iterations: 5000
 
 mixture:
   name: CO2_5
