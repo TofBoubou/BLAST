@@ -39,7 +39,7 @@ wall_parameters:
 abaque:
   enabled: true
   catalyticity_values: [0.0, 0.1, 0.5, 1.0]
-  temperature_range: [300, 2000]
+  temperature_range: [3000, 4000]
   temperature_points: 10
 
 # ./blast config/default.yaml test_output

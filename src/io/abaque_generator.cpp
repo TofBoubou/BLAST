@@ -10,6 +10,8 @@
 #include <H5Dpublic.h>
 #include <H5Spublic.h>
 #include <H5Ppublic.h>
+#include <H5Gpublic.h>
+#include <H5Apublic.h>
 
 namespace blast::io {
 
@@ -160,8 +162,8 @@ auto AbaqueGenerator::update_gsi_catalyticity(double gamma) -> bool {
   std::regex gamma_pattern(R"(<gamma_const>\s*([^<]+)\s*</gamma_const>)");
   std::string result_content;
   
-  auto current_pos = content.begin();
-  auto content_end = content.end();
+  auto current_pos = content.cbegin();
+  auto content_end = content.cend();
   
   std::smatch match;
   while (std::regex_search(current_pos, content_end, match, gamma_pattern)) {
