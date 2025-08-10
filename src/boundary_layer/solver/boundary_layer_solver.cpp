@@ -290,6 +290,19 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   const auto& conv_info = convergence_result.value();
 
   if (!conv_info.converged) {
+    // If we're in continuation mode, return failure immediately so continuation can handle it
+    if (in_continuation_) {
+      // Check if it was a NaN failure
+      if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
+        return std::unexpected(SolverError("NaN detected during continuation at station {} iteration {}",
+                                         std::source_location::current(), station, conv_info.iterations));
+      } else {
+        return std::unexpected(SolverError("Station {} failed to converge during continuation after {} iterations (residual={})",
+                                         std::source_location::current(), station, conv_info.iterations,
+                                         conv_info.max_residual()));
+      }
+    }
+    
     // Try continuation if direct solution failed
     if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
       auto stable_guess = compute_stable_guess();
@@ -325,7 +338,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
   auto pipeline = SolverPipeline::create_for_solver(*this);
 
   for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
-    std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
+    // std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
     const auto solution_old = solution;
 
     // Initialize coefficients and inputs
@@ -370,21 +383,29 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     conv_info.iterations = iter + 1;
 
     if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
-      return std::unexpected(SolverError("NaN detected in residuals at station {} iteration {}", 
-                                        std::source_location::current(), station, iter));
+      if (in_continuation_) {
+        // When in continuation, break the iteration loop and return non-converged result
+        // This allows the continuation method to handle the failure by reducing step size
+        conv_info.converged = false;
+        conv_info.iterations = iter + 1;
+        return conv_info;
+      } else {
+        return std::unexpected(SolverError("NaN detected in residuals at station {} iteration {}", 
+                                          std::source_location::current(), station, iter));
+      }
     }
 
     // Adaptive relaxation
     double adaptive_factor = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
-    std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor
-              << " (max residual: " << conv_info.max_residual() << ")" << std::endl;
+/*     std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor
+              << " (max residual: " << conv_info.max_residual() << ")" << std::endl; */
 
     // Apply relaxation
     solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
 
     // Convergence test
     if (conv_info.converged) {
-      std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
+      // std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
       break;
     }
 
@@ -512,7 +533,7 @@ auto BoundaryLayerSolver::check_convergence(const equations::SolutionState& old_
 
   info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
-  std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
+  // std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
 
   return info;
 }

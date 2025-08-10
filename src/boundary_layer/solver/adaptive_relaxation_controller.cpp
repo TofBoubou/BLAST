@@ -31,7 +31,7 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
   bool oscillating = false;
   if (!oscillating_result) {
     // Log l'erreur mais continue avec une valeur par défaut
-    std::cout << "[RELAXATION] Warning: " << oscillating_result.error().what() << std::endl;
+    // std::cout << "[RELAXATION] Warning: " << oscillating_result.error().what() << std::endl;
     oscillating = false; // Valeur conservatrice
   } else {
     oscillating = oscillating_result.value();
@@ -44,8 +44,8 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
     consecutive_improvements_ = 0;
     consecutive_deteriorations_ = 0;
 
-    std::cout << "[RELAXATION] Oscillations detected, reducing factor to " << std::scientific << std::setprecision(3)
-              << current_factor_ << std::endl;
+/*     std::cout << "[RELAXATION] Oscillations detected, reducing factor to " << std::scientific << std::setprecision(3)
+              << current_factor_ << std::endl; */
 
   } else if (residual_ratio > config_.divergence_threshold) {
     // Residual increases → REDUCE
@@ -55,8 +55,8 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
     const double old_factor = current_factor_;
     current_factor_ *= config_.decrease_factor;
 
-    std::cout << "[RELAXATION] Residual increased (ratio=" << residual_ratio << "), reducing factor from " << old_factor
-              << " to " << current_factor_ << std::endl;
+/*     std::cout << "[RELAXATION] Residual increased (ratio=" << residual_ratio << "), reducing factor from " << old_factor
+              << " to " << current_factor_ << std::endl; */
 
   } else if (residual_ratio >= config_.excellent_threshold && residual_ratio <= config_.divergence_threshold) {
     // Moderate convergence → SLIGHT INCREASE
@@ -66,8 +66,8 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
     const double old_factor = current_factor_;
     current_factor_ = std::min(current_factor_ * config_.moderate_increase, config_.max_factor);
 
-    std::cout << "[RELAXATION] Moderate convergence (ratio=" << residual_ratio << "), slight increase from "
-              << old_factor << " to " << current_factor_ << std::endl;
+/*     std::cout << "[RELAXATION] Moderate convergence (ratio=" << residual_ratio << "), slight increase from "
+              << old_factor << " to " << current_factor_ << std::endl; */
 
   } else if (residual_ratio < config_.excellent_threshold) {
     // Excellent convergence → STRONG INCREASE
@@ -77,8 +77,8 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
     const double old_factor = current_factor_;
     current_factor_ = std::min(current_factor_ * config_.strong_increase, config_.max_factor);
 
-    std::cout << "[RELAXATION] Excellent convergence (ratio=" << residual_ratio << "), strong increase from "
-              << old_factor << " to " << current_factor_ << std::endl;
+/*     std::cout << "[RELAXATION] Excellent convergence (ratio=" << residual_ratio << "), strong increase from "
+              << old_factor << " to " << current_factor_ << std::endl; */
   }
 
   // Clamp within bounds
