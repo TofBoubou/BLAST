@@ -548,6 +548,8 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
 
   equations::SolutionState guess(n_eta, n_species);
 
+  std::fill(guess.V.begin(), guess.V.end(), 0.0);
+
   // ===== STEP 1: RETRIEVE BOUNDARY COMPOSITIONS =====
 
   // Compute equilibrium composition at the wall (Tw, P_e)
