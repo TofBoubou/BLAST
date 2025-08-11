@@ -94,6 +94,11 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.abaque = std::move(abaque_result.value());
 
+    // Force catalytic wall when abaque generation is enabled
+    if (config.abaque.enabled) {
+      config.simulation.catalytic_wall = true;
+    }
+
     auto cont_result = parse_continuation_config(root_["continuation"]);
     if (!cont_result) {
       return std::unexpected(cont_result.error());
