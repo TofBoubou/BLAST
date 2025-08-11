@@ -8,6 +8,7 @@
 #include "../equations/equation_types.hpp"
 #include "../grid/grid.hpp"
 #include "../thermodynamics/enthalpy_temperature_solver.hpp"
+#include "solver_errors.hpp"
 #include <expected>
 #include <memory>
 
@@ -15,8 +16,6 @@ namespace blast::boundary_layer::solver {
 
 // Forward declarations
 class BoundaryLayerSolver;
-class SolverError;        // Forward declaration
-class StepExecutionError; // Forward declaration
 
 // =============================================================================
 // CORE STEP INTERFACES

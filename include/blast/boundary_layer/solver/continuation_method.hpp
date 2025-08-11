@@ -1,13 +1,13 @@
 #pragma once
 #include "../../io/config_types.hpp"
 #include "../equations/equation_types.hpp"
+#include "solver_errors.hpp"
 #include <expected>
 #include <vector>
 
 namespace blast::boundary_layer::solver {
 
 class BoundaryLayerSolver;
-class SolverError;
 
 struct ContinuationResult {
   equations::SolutionState solution;

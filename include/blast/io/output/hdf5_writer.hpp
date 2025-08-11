@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string_view>
+#include <variant>
 
 namespace blast::io::output {
 
@@ -17,6 +18,14 @@ struct HDF5Config {
   bool store_as_double = true;    // Use double precision by default
 };
 
+// Specialized error for HDF5 operations
+class HDF5Error : public OutputError {
+public:
+  explicit HDF5Error(std::string_view message,
+                     std::source_location location = std::source_location::current())
+      : OutputError(std::format("HDF5 Error: {}", message), location) {}
+};
+
 // RAII wrapper for HDF5 handles
 template <typename HandleType, auto CloseFunc> class HDF5Handle {
 private:
@@ -25,7 +34,7 @@ private:
 public:
   explicit HDF5Handle(HandleType handle) : handle_(handle) {
     if (handle_ < 0) {
-      throw OutputError("Invalid HDF5 handle");
+      throw HDF5Error("Invalid HDF5 handle");
     }
   }
 
@@ -173,20 +182,20 @@ public:
 namespace hdf5 {
 
 // Initialize HDF5 library (call once at program start)
-auto initialize() -> std::expected<void, OutputError>;
+auto initialize() -> std::expected<void, HDF5Error>;
 
 // Cleanup HDF5 library (call at program end)
 auto finalize() -> void;
 
 // Check HDF5 version compatibility
-[[nodiscard]] auto check_version() -> std::expected<std::string, OutputError>;
+[[nodiscard]] auto check_version() -> std::expected<std::string, HDF5Error>;
 
 // Validate HDF5 file
-[[nodiscard]] auto validate_file(const std::filesystem::path& file_path) -> std::expected<void, OutputError>;
+[[nodiscard]] auto validate_file(const std::filesystem::path& file_path) -> std::expected<void, HDF5Error>;
 
 // Get dataset information without loading data
 [[nodiscard]] auto get_dataset_info(const std::filesystem::path& file_path)
-    -> std::expected<std::map<std::string, std::variant<int, double, std::string>>, OutputError>;
+    -> std::expected<std::map<std::string, std::variant<int, double, std::string>>, HDF5Error>;
 
 } // namespace hdf5
 

@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace blast::core {
 
@@ -11,6 +12,7 @@ class BlastException : public std::exception {
 private:
   std::string message_;
   std::source_location location_;
+  std::vector<std::string> call_stack_;
 
 public:
   explicit BlastException(std::string message, std::source_location location = std::source_location::current())
@@ -32,8 +34,23 @@ public:
 
   [[nodiscard]] auto message() const noexcept -> const std::string& { return message_; }
 
+  void add_context(std::string context) { call_stack_.push_back(std::move(context)); }
+
+  [[nodiscard]] auto call_stack() const noexcept -> const std::vector<std::string>& { return call_stack_; }
+
   [[nodiscard]] auto full_message() const -> std::string {
-    return std::format("{} [{}:{}:{}]", message_, location_.file_name(), location_.line(), location_.function_name());
+    std::string ctx;
+    if (!call_stack_.empty()) {
+      ctx.append(" | context: ");
+      for (std::size_t i = 0; i < call_stack_.size(); ++i) {
+        ctx.append(call_stack_[i]);
+        if (i + 1 < call_stack_.size()) {
+          ctx.append(" -> ");
+        }
+      }
+    }
+    return std::format("{} [{}:{}:{}]{}", message_, location_.file_name(), location_.line(),
+                       location_.function_name(), ctx);
   }
 };
 
@@ -78,6 +95,20 @@ public:
   explicit TransformError(std::string_view message,
                           std::source_location location = std::source_location::current()) noexcept
       : BlastException(std::format("Transform Error: {}", message), location) {}
+};
+
+class NumericError : public BlastException {
+public:
+  explicit NumericError(std::string_view message,
+                        std::source_location location = std::source_location::current()) noexcept
+      : BlastException(std::format("Numeric Error: {}", message), location) {}
+};
+
+class GeometryError : public BlastException {
+public:
+  explicit GeometryError(std::string_view message,
+                         std::source_location location = std::source_location::current()) noexcept
+      : BlastException(std::format("Geometry Error: {}", message), location) {}
 };
 
 } // namespace blast::core

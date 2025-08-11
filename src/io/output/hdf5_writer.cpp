@@ -2,7 +2,9 @@
 #include <cstring>
 #include <format>
 #include <iomanip>
+#include <map>
 #include <sstream>
+#include <variant>
 #include <vector>
 
 namespace blast::io::output {
@@ -62,11 +64,19 @@ auto HDF5Writer::create_file(const std::filesystem::path& file_path) const -> st
   }
 
   // Set close degree (for proper cleanup)
-  H5Pset_fclose_degree(fapl, H5F_CLOSE_STRONG);
+  if (H5Pset_fclose_degree(fapl, H5F_CLOSE_STRONG) < 0) {
+    H5Pclose(fapl);
+    return std::unexpected(OutputError("Failed to set file close degree"));
+  }
 
   // Create the file
   auto file_id = H5Fcreate(file_path.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, fapl);
-  H5Pclose(fapl);
+  if (H5Pclose(fapl) < 0) {
+    if (file_id >= 0) {
+      H5Fclose(file_id);
+    }
+    return std::unexpected(OutputError("Failed to close file access property list"));
+  }
 
   if (file_id < 0) {
     return std::unexpected(OutputError(std::format("Failed to create HDF5 file: {}", file_path.string())));
@@ -543,13 +553,19 @@ auto HDF5Writer::create_chunked_properties_2d(std::size_t rows,
   // Set compression if enabled
   if (hdf5_config_.compression_level > 0) {
     if (hdf5_config_.use_shuffle_filter) {
-      H5Pset_shuffle(props);
+      if (H5Pset_shuffle(props) < 0) {
+        return std::unexpected(OutputError("Failed to set shuffle filter"));
+      }
     }
 
-    H5Pset_deflate(props, hdf5_config_.compression_level);
+    if (H5Pset_deflate(props, hdf5_config_.compression_level) < 0) {
+      return std::unexpected(OutputError("Failed to set deflate level"));
+    }
 
     if (hdf5_config_.use_fletcher32) {
-      H5Pset_fletcher32(props);
+      if (H5Pset_fletcher32(props) < 0) {
+        return std::unexpected(OutputError("Failed to set fletcher32 filter"));
+      }
     }
   }
 
@@ -700,13 +716,19 @@ auto HDF5Writer::create_dataset_properties() const -> std::expected<PropertyHand
   // size
   if (hdf5_config_.compression_level > 0) {
     if (hdf5_config_.use_shuffle_filter) {
-      H5Pset_shuffle(props);
+      if (H5Pset_shuffle(props) < 0) {
+        return std::unexpected(OutputError("Failed to set shuffle filter"));
+      }
     }
 
-    H5Pset_deflate(props, hdf5_config_.compression_level);
+    if (H5Pset_deflate(props, hdf5_config_.compression_level) < 0) {
+      return std::unexpected(OutputError("Failed to set deflate level"));
+    }
 
     if (hdf5_config_.use_fletcher32) {
-      H5Pset_fletcher32(props);
+      if (H5Pset_fletcher32(props) < 0) {
+        return std::unexpected(OutputError("Failed to set fletcher32 filter"));
+      }
     }
   }
 
@@ -734,13 +756,19 @@ auto HDF5Writer::create_chunked_properties(std::size_t size) const -> std::expec
   // Set compression if enabled
   if (hdf5_config_.compression_level > 0) {
     if (hdf5_config_.use_shuffle_filter) {
-      H5Pset_shuffle(props);
+      if (H5Pset_shuffle(props) < 0) {
+        return std::unexpected(OutputError("Failed to set shuffle filter"));
+      }
     }
 
-    H5Pset_deflate(props, hdf5_config_.compression_level);
+    if (H5Pset_deflate(props, hdf5_config_.compression_level) < 0) {
+      return std::unexpected(OutputError("Failed to set deflate level"));
+    }
 
     if (hdf5_config_.use_fletcher32) {
-      H5Pset_fletcher32(props);
+      if (H5Pset_fletcher32(props) < 0) {
+        return std::unexpected(OutputError("Failed to set fletcher32 filter"));
+      }
     }
   }
 
@@ -760,9 +788,9 @@ auto HDF5Writer::get_hdf5_error() const -> std::string {
 // HDF5 convenience functions
 namespace hdf5 {
 
-auto initialize() -> std::expected<void, OutputError> {
+auto initialize() -> std::expected<void, HDF5Error> {
   if (H5open() < 0) {
-    return std::unexpected(OutputError("Failed to initialize HDF5 library"));
+    return std::unexpected(HDF5Error("Failed to initialize HDF5 library"));
   }
   return {};
 }
@@ -771,28 +799,33 @@ auto finalize() -> void {
   H5close();
 }
 
-auto check_version() -> std::expected<std::string, OutputError> {
+auto check_version() -> std::expected<std::string, HDF5Error> {
   unsigned majnum, minnum, relnum;
   if (H5get_libversion(&majnum, &minnum, &relnum) < 0) {
-    return std::unexpected(OutputError("Failed to get HDF5 version"));
+    return std::unexpected(HDF5Error("Failed to get HDF5 version"));
   }
 
   return std::format("{}.{}.{}", majnum, minnum, relnum);
 }
 
-auto validate_file(const std::filesystem::path& file_path) -> std::expected<void, OutputError> {
+auto validate_file(const std::filesystem::path& file_path) -> std::expected<void, HDF5Error> {
 
   if (!std::filesystem::exists(file_path)) {
-    return std::unexpected(OutputError(std::format("File does not exist: {}", file_path.string())));
+    return std::unexpected(HDF5Error(std::format("File does not exist: {}", file_path.string())));
   }
 
   // Check if it's a valid HDF5 file
   auto result = H5Fis_hdf5(file_path.c_str());
   if (result <= 0) {
-    return std::unexpected(OutputError(std::format("Not a valid HDF5 file: {}", file_path.string())));
+    return std::unexpected(HDF5Error(std::format("Not a valid HDF5 file: {}", file_path.string())));
   }
 
   return {};
+}
+
+auto get_dataset_info(const std::filesystem::path& /*file_path*/)
+    -> std::expected<std::map<std::string, std::variant<int, double, std::string>>, HDF5Error> {
+  return std::unexpected(HDF5Error("get_dataset_info not implemented"));
 }
 
 } // namespace hdf5
