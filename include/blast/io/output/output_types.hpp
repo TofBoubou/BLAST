@@ -6,6 +6,8 @@
 #include <chrono>
 #include <expected>
 #include <filesystem>
+#include <string>
+#include <vector>
 #include <variant>
 
 namespace blast::io::output {
@@ -101,6 +103,10 @@ struct StationData {
   double q_wall_total_nondim = 0.0;
 
   double q_ref = 0.0;
+
+  // Modal temperature data (for multi-temperature models)
+  std::vector<std::vector<double>> modal_temperatures;
+  std::vector<std::string> temperature_mode_names;
 };
 
 // Complete output dataset

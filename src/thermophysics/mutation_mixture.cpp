@@ -58,8 +58,15 @@ viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::exp
   // Configure Mutation++ options
   Mutation::MixtureOptions opts(config.name);
 
-  // Set state model (always ChemNonEq1T for now)
-  opts.setStateModel("ChemNonEq1T");
+  // Set state model from configuration
+  switch (config.state_model) {
+  case io::MixtureConfig::StateModel::ChemNonEq1T:
+    opts.setStateModel("ChemNonEq1T");
+    break;
+  case io::MixtureConfig::StateModel::ChemNonEq2T:
+    opts.setStateModel("ChemNonEq2T");
+    break;
+  }
 
   // Set thermodynamic database
   auto db_result = database_to_string(config.thermodynamic_database);
@@ -479,6 +486,38 @@ auto MutationMixture::surface_reaction_rates(std::span<const double> partial_den
 
   } catch (const std::exception& e) {
     return std::unexpected(ThermophysicsError(std::format("Mutation++ surface reaction failed: {}", e.what())));
+  }
+}
+
+auto MutationMixture::get_number_energy_modes() const noexcept -> std::size_t {
+  return mixture_->nEnergyEqns();
+}
+
+auto MutationMixture::extract_modal_temperatures(std::span<const double> mass_fractions,
+                                                 double temperature_overall,
+                                                 double pressure) const
+    -> std::expected<std::vector<double>, ThermophysicsError> {
+  if (auto state_result = set_state(mass_fractions, temperature_overall, pressure); !state_result) {
+    return std::unexpected(state_result.error());
+  }
+
+  try {
+    const auto n_modes = mixture_->nEnergyEqns();
+    std::vector<double> modal_temps(n_modes);
+
+    if (n_modes == 1) {
+      modal_temps[0] = temperature_overall;
+    } else {
+      for (std::size_t i = 0; i < n_modes; ++i) {
+        modal_temps[i] = temperature_overall;
+      }
+    }
+
+    return modal_temps;
+
+  } catch (const std::exception& e) {
+    return std::unexpected(
+        ThermophysicsError(std::format("Failed to extract modal temperatures: {}", e.what())));
   }
 }
 
