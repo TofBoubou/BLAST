@@ -78,7 +78,9 @@ auto ContinuationMethod::interpolate_config(const io::Configuration& target, dou
   // Interpolate wall temperature
   if (!config.wall_parameters.wall_temperatures.empty()) {
     double Twall_target = target.wall_parameters.wall_temperatures[0];
-    config.wall_parameters.wall_temperatures[0] = TWALL_STABLE + lambda * (Twall_target - TWALL_STABLE);
+    double Twall_stable = target.continuation.wall_temperature_stable;
+    config.wall_parameters.wall_temperatures[0] =
+        Twall_stable + lambda * (Twall_target - Twall_stable);
   }
 
   // Interpolate edge conditions
@@ -86,8 +88,10 @@ auto ContinuationMethod::interpolate_config(const io::Configuration& target, dou
     auto& edge = config.outer_edge.edge_points[0];
     const auto& target_edge = target.outer_edge.edge_points[0];
 
-    edge.temperature = TEDGE_STABLE + lambda * (target_edge.temperature - TEDGE_STABLE);
-    edge.pressure = PRESSURE_STABLE + lambda * (target_edge.pressure - PRESSURE_STABLE);
+    double Tedge_stable = target.continuation.edge_temperature_stable;
+    double pressure_stable = target.continuation.pressure_stable;
+    edge.temperature = Tedge_stable + lambda * (target_edge.temperature - Tedge_stable);
+    edge.pressure = pressure_stable + lambda * (target_edge.pressure - pressure_stable);
   }
 
   return config;

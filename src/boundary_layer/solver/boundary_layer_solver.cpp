@@ -244,11 +244,11 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   auto compute_stable_guess = [&]() -> std::expected<equations::SolutionState, SolverError> {
     io::Configuration stable_config = original_config_;
     if (!stable_config.wall_parameters.wall_temperatures.empty()) {
-      stable_config.wall_parameters.wall_temperatures[0] = ContinuationMethod::TWALL_STABLE;
+      stable_config.wall_parameters.wall_temperatures[0] = original_config_.continuation.wall_temperature_stable;
     }
     if (!stable_config.outer_edge.edge_points.empty()) {
-      stable_config.outer_edge.edge_points[0].temperature = ContinuationMethod::TEDGE_STABLE;
-      stable_config.outer_edge.edge_points[0].pressure = ContinuationMethod::PRESSURE_STABLE;
+      stable_config.outer_edge.edge_points[0].temperature = original_config_.continuation.edge_temperature_stable;
+      stable_config.outer_edge.edge_points[0].pressure = original_config_.continuation.pressure_stable;
     }
 
     auto bc_stable = conditions::create_stagnation_conditions(stable_config.outer_edge, stable_config.wall_parameters,

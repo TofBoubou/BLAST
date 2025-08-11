@@ -91,6 +91,12 @@ struct AbaqueConfig {
   int temperature_points = 100;
 };
 
+struct ContinuationConfig {
+  double wall_temperature_stable = 3100.0;
+  double edge_temperature_stable = 3100.0;
+  double pressure_stable = 7000.0;
+};
+
 struct Configuration {
   SimulationConfig simulation;
   NumericalConfig numerical;
@@ -100,6 +106,7 @@ struct Configuration {
   OuterEdgeConfig outer_edge;
   WallParametersConfig wall_parameters;
   AbaqueConfig abaque;
+  ContinuationConfig continuation;
 };
 
 template <typename T>
