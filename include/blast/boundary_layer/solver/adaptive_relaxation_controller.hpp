@@ -1,6 +1,7 @@
 #pragma once
 #include "../../core/exceptions.hpp"
 #include "../equations/equation_types.hpp"
+#include "solver_errors.hpp"
 #include <algorithm>
 #include <cmath>
 #include <expected>
@@ -8,9 +9,6 @@
 #include <vector>
 
 namespace blast::boundary_layer::solver {
-
-// Forward declarations
-class SolverError;
 
 // ConvergenceInfo definition
 struct ConvergenceInfo {
@@ -85,7 +83,8 @@ public:
   }
 
   // Main method to adapt the factor
-  [[nodiscard]] auto adapt_relaxation_factor(const ConvergenceInfo& conv_info, int iteration) -> double;
+  [[nodiscard]] auto adapt_relaxation_factor(const ConvergenceInfo& conv_info,
+                                             int iteration) -> std::expected<double, RelaxationError>;
 
   // Accessors
   [[nodiscard]] auto current_factor() const noexcept -> double { return current_factor_; }
@@ -104,7 +103,7 @@ public:
 
 private:
   [[nodiscard]] auto detect_oscillations() const -> std::expected<bool, SolverError>;
-  [[nodiscard]] auto compute_residual_trend() const -> std::expected<double, SolverError>;
+  [[nodiscard]] auto compute_residual_trend() const -> std::expected<double, NumericError>;
 };
 
 // Factory functions for different problem types

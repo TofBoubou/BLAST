@@ -454,7 +454,11 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     }
 
     // Adaptive relaxation
-    double adaptive_factor = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
+    auto adaptive_factor_result = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
+    if (!adaptive_factor_result) {
+      return std::unexpected<SolverError>(adaptive_factor_result.error());
+    }
+    double adaptive_factor = adaptive_factor_result.value();
 /*     std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor
               << " (max residual: " << conv_info.max_residual() << ")" << std::endl; */
 

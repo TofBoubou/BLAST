@@ -17,10 +17,10 @@ struct HeatFluxGeometryFactors {
 };
 
 // Error type for heat flux calculations
-class HeatFluxError : public core::BlastException {
+class HeatFluxError : public core::GeometryError {
 public:
   explicit HeatFluxError(std::string_view message, std::source_location location = std::source_location::current())
-      : BlastException(std::format("Heat Flux Error: {}", message), location) {}
+      : GeometryError(std::format("Heat Flux Error: {}", message), location) {}
 };
 
 class HeatFluxCalculator {
@@ -42,7 +42,8 @@ private:
 
   [[nodiscard]] auto
   compute_conductive_flux_profile(const std::vector<double>& dT_deta, const std::vector<double>& k_local,
-                                  const HeatFluxGeometryFactors& geo_factors) const -> std::vector<double>;
+                                  const HeatFluxGeometryFactors& geo_factors) const
+      -> std::expected<std::vector<double>, HeatFluxError>;
 
   [[nodiscard]] auto compute_diffusive_flux_profile(const CoefficientSet& coeffs) const
       -> std::pair<std::vector<double>, core::Matrix<double>>;

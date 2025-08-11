@@ -12,6 +12,7 @@
 #include "../thermodynamics/enthalpy_temperature_solver.hpp"
 #include "adaptive_relaxation_controller.hpp"
 #include "continuation_method.hpp"
+#include "solver_errors.hpp"
 #include "solver_steps.hpp"
 #include <expected>
 #include <memory>
@@ -35,26 +36,6 @@ struct SolutionResult {
 };
 
 // ConvergenceInfo is now defined in adaptive_relaxation_controller.hpp
-
-// Error type for solver operations
-class SolverError : public core::BlastException {
-public:
-  explicit SolverError(std::string_view message, std::source_location location = std::source_location::current())
-      : BlastException(std::format("Solver Error: {}", message), location) {}
-
-  template <typename... Args>
-  explicit SolverError(std::string_view format_str, std::source_location location, Args&&... args)
-      : BlastException(std::format("Solver Error: {}", std::vformat(format_str, std::make_format_args(args...))),
-                       location) {}
-};
-
-// Specialized error class for step execution failures
-class StepExecutionError : public SolverError {
-public:
-  explicit StepExecutionError(std::string_view step_name, std::string_view message,
-                              std::source_location location = std::source_location::current())
-      : SolverError(std::format("Step '{}' failed: {}", step_name, message), location) {}
-};
 
 class BoundaryLayerSolver {
 private:

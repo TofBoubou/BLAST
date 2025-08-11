@@ -1,12 +1,13 @@
 #include "blast/boundary_layer/solver/adaptive_relaxation_controller.hpp"
-#include "blast/boundary_layer/solver/boundary_layer_solver.hpp" // For SolverError definition
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
-#include <iostream>
 
 namespace blast::boundary_layer::solver {
 
-auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo& conv_info, int iteration) -> double {
+auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo& conv_info,
+                                                           int iteration)
+    -> std::expected<double, RelaxationError> {
 
   const double current_residual = conv_info.max_residual();
 
@@ -19,6 +20,9 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
 
   // Compute residual change ratio
   const double residual_ratio = current_residual / previous_residual_;
+  if (!std::isfinite(residual_ratio)) {
+    return std::unexpected(RelaxationError("Invalid residual ratio computation"));
+  }
 
   // Update history
   residual_history_.push_back(current_residual);
@@ -28,14 +32,10 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
 
   // Detect oscillations
   auto oscillating_result = detect_oscillations();
-  bool oscillating = false;
   if (!oscillating_result) {
-    // Log l'erreur mais continue avec une valeur par défaut
-    // std::cout << "[RELAXATION] Warning: " << oscillating_result.error().what() << std::endl;
-    oscillating = false; // Valeur conservatrice
-  } else {
-    oscillating = oscillating_result.value();
+    return std::unexpected(RelaxationError("Oscillation detection failed", oscillating_result.error()));
   }
+  bool oscillating = oscillating_result.value();
 
   // Adaptation logic — BASED ON CONFIG THRESHOLDS AND FACTORS
   if (oscillating) {
@@ -116,7 +116,8 @@ auto AdaptiveRelaxationController::detect_oscillations() const -> std::expected<
   return sign_changes >= 2;
 }
 
-auto AdaptiveRelaxationController::compute_residual_trend() const -> std::expected<double, SolverError> {
+auto AdaptiveRelaxationController::compute_residual_trend() const
+    -> std::expected<double, NumericError> {
   if (residual_history_.size() < 3)
     return 0.0; // Cas normal, pas d'erreur
 
@@ -138,10 +139,13 @@ auto AdaptiveRelaxationController::compute_residual_trend() const -> std::expect
 
   const double denominator = n * sum_x2 - sum_x * sum_x;
   if (std::abs(denominator) < 1e-15) {
-    return std::unexpected(SolverError("Division by zero in residual trend computation"));
+    return std::unexpected(NumericError("Division by zero in residual trend computation"));
   }
 
   const double slope = (n * sum_xy - sum_x * sum_y) / denominator;
+  if (!std::isfinite(slope)) {
+    return std::unexpected(NumericError("Invalid slope in residual trend computation"));
+  }
   return slope; // Negative slope = improving, positive = worsening
 }
 

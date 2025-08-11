@@ -1,6 +1,7 @@
 #include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
 #include <algorithm>
 #include <cmath>
+#include <expected>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -52,7 +53,11 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
   }
   auto k_local = k_local_result.value();
 
-  heat_flux.q_conductive_dimensional = compute_conductive_flux_profile(dT_deta, k_local, geo_factors);
+  auto conductive_result = compute_conductive_flux_profile(dT_deta, k_local, geo_factors);
+  if (!conductive_result) {
+    return std::unexpected(conductive_result.error());
+  }
+  heat_flux.q_conductive_dimensional = std::move(conductive_result.value());
 
   auto [q_diffusive_total, q_diffusive_species] = compute_diffusive_flux_profile(coeffs);
   heat_flux.q_diffusive_dimensional = std::move(q_diffusive_total);
@@ -106,6 +111,10 @@ auto HeatFluxCalculator::compute_heat_flux_geometry_factors(
 
   HeatFluxGeometryFactors factors;
   factors.valid_geometry = true;
+
+  if (wall_props.rho_wall <= 0.0) {
+    return std::unexpected(HeatFluxError("Invalid wall density for heat flux calculation"));
+  }
 
   if (station == 0) {
     switch (sim_config_.body_type) {
@@ -184,6 +193,9 @@ auto HeatFluxCalculator::compute_reference_flux(const conditions::BoundaryCondit
   const double rho_e = bc.rho_e();
   const double h_wall = coeffs.thermodynamic.h_wall;
   const double delta_h = std::abs(bc.he() + 0.5 * bc.ue() * bc.ue() - h_wall);
+  if (rho_e <= 0.0 || bc.d_ue_dx() <= 0.0 || bc.r_body() <= 0.0) {
+    return 0.0;
+  }
   const double q_ref = rho_e * std::sqrt(2.0 * bc.d_ue_dx() * bc.r_body()) * delta_h;
 
   return q_ref;
@@ -191,11 +203,18 @@ auto HeatFluxCalculator::compute_reference_flux(const conditions::BoundaryCondit
 
 auto HeatFluxCalculator::compute_conductive_flux_profile(
     const std::vector<double>& dT_deta, const std::vector<double>& k_local,
-    const HeatFluxGeometryFactors& geo_factors) const -> std::vector<double> {
+    const HeatFluxGeometryFactors& geo_factors) const
+    -> std::expected<std::vector<double>, HeatFluxError> {
 
   const auto n_eta = dT_deta.size();
-  std::vector<double> q_conductive(n_eta);
+  if (n_eta != k_local.size()) {
+    return std::unexpected(HeatFluxError("Mismatched input sizes for conductive flux"));
+  }
+  if (std::abs(geo_factors.dy_deta_factor) < 1e-12) {
+    return std::unexpected(HeatFluxError("Invalid geometry factor: dy_deta_factor is zero"));
+  }
 
+  std::vector<double> q_conductive(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
     const double dT_dy = dT_deta[i] / geo_factors.dy_deta_factor;
     q_conductive[i] = std::abs(-k_local[i] * dT_dy);
@@ -245,7 +264,10 @@ auto HeatFluxCalculator::compute_wall_heat_fluxes(
     return std::make_tuple(0.0, 0.0, 0.0);
   }
 
-  const double dT_deta_wall = inputs.T.size() > 1 ? (inputs.T[1] - inputs.T[0]) / d_eta_ : 0.0;
+  if (inputs.T.size() < 2 || d_eta_ <= 0.0) {
+    return std::unexpected(HeatFluxError("Insufficient data for wall heat flux computation"));
+  }
+  const double dT_deta_wall = (inputs.T[1] - inputs.T[0]) / d_eta_;
 
   // Compute conductive heat flux matching the old BLAST behavior
   double q_wall_conductive = -coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact;

@@ -1,6 +1,7 @@
 #include "blast/io/yaml_parser.hpp"
 #include "blast/core/exceptions.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -245,10 +246,21 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
   OutputConfig config;
 
   try {
-    auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
-    if (!x_stations_result)
-      return std::unexpected(x_stations_result.error());
-    config.x_stations = x_stations_result.value();
+  auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
+  if (!x_stations_result)
+    return std::unexpected(x_stations_result.error());
+  config.x_stations = x_stations_result.value();
+  if (config.x_stations.empty()) {
+    return std::unexpected(core::ConfigurationError("x_stations cannot be empty"));
+  }
+  if (std::any_of(config.x_stations.begin(), config.x_stations.end(), [](double x) { return x < 0; })) {
+    return std::unexpected(core::ConfigurationError("x_stations must be non-negative"));
+  }
+  for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
+    if (config.x_stations[i] <= config.x_stations[i - 1]) {
+      return std::unexpected(core::ConfigurationError("x_stations must be in strictly increasing order"));
+    }
+  }
 
     auto output_dir_result = extract_value<std::string>(node, "output_directory");
     if (!output_dir_result)
