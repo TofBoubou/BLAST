@@ -94,6 +94,12 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.abaque = std::move(abaque_result.value());
 
+    auto cont_result = parse_continuation_config(root_["continuation"]);
+    if (!cont_result) {
+      return std::unexpected(cont_result.error());
+    }
+    config.continuation = std::move(cont_result.value());
+
     return config;
 
   } catch (const YAML::Exception& e) {
@@ -378,6 +384,32 @@ auto YamlParser::parse_abaque_config(const YAML::Node& node) const
     
   } catch (const YAML::Exception& e) {
     return std::unexpected(core::ConfigurationError(std::format("In 'abaque' section: {}", e.what())));
+  }
+}
+
+auto YamlParser::parse_continuation_config(const YAML::Node& node) const
+    -> std::expected<ContinuationConfig, core::ConfigurationError> {
+
+  ContinuationConfig config;
+
+  if (!node) {
+    return config;
+  }
+
+  try {
+    if (node["wall_temperature_stable"]) {
+      config.wall_temperature_stable = node["wall_temperature_stable"].as<double>();
+    }
+    if (node["edge_temperature_stable"]) {
+      config.edge_temperature_stable = node["edge_temperature_stable"].as<double>();
+    }
+    if (node["pressure_stable"]) {
+      config.pressure_stable = node["pressure_stable"].as<double>();
+    }
+    return config;
+  } catch (const YAML::Exception& e) {
+    return std::unexpected(
+        core::ConfigurationError(std::format("In 'continuation' section: failed to parse - {}", e.what())));
   }
 }
 

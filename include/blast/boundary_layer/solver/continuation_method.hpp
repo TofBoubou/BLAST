@@ -19,16 +19,6 @@ class ContinuationMethod {
 public:
   ContinuationMethod() = default;
 
-  // Hardcoded stable conditions (exposed for solver use)
-  /*     static constexpr double TWALL_STABLE = 3100.0;
-      static constexpr double TEDGE_STABLE = 5905.0; */
-  static constexpr double TWALL_STABLE = 3100.0;
-  static constexpr double TEDGE_STABLE = 3100.0;
-  static constexpr double PRESSURE_STABLE = 7000.0;
-/*   static constexpr double TWALL_STABLE = 300.0;
-  static constexpr double TEDGE_STABLE = 300.0;
-  static constexpr double PRESSURE_STABLE = 10000.0; */
-
   [[nodiscard]] auto solve_with_continuation(
       BoundaryLayerSolver& solver, int station, double xi, const io::Configuration& target_config,
       const equations::SolutionState& initial_guess) -> std::expected<ContinuationResult, SolverError>;
