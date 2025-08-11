@@ -7,6 +7,7 @@ CXXFLAGS = -std=c++23 -O3 -DNDEBUG -march=native -w
 PROFILE_FLAGS = -std=c++23 -pg -g -O2 -march=native -w
 SHELL := /bin/bash
 INCLUDE_FLAGS = -Iinclude -I/usr/include/hdf5/serial
+MAKEFLAGS += -j$(shell nproc)
 
 
 # Library paths and flags
@@ -29,6 +30,7 @@ LIBS = -L$(MUTATIONPP_PATH)/install/lib -lmutation++ \
        -L$(YAML_CPP_PATH)/build -lyaml-cpp \
        $(HDF5_FLAGS) \
        $(ZLIB_FLAGS) \
+       \
        -lpthread -ldl
 
 # Directories

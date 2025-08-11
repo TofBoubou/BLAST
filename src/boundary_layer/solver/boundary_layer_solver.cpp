@@ -294,9 +294,14 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
     if (in_continuation_) {
       // Check if it was a NaN failure
       if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
+/*         std::cout << "[DEBUG] CONTINUATION FAILED - NaN detected at station " << station 
+                  << " after " << conv_info.iterations << " iterations" << std::endl; */
         return std::unexpected(SolverError("NaN detected during continuation at station {} iteration {}",
                                          std::source_location::current(), station, conv_info.iterations));
       } else {
+/*         std::cout << "[DEBUG] CONTINUATION FAILED - No convergence at station " << station 
+                  << " after " << conv_info.iterations << " iterations (max_residual=" 
+                  << std::scientific << conv_info.max_residual() << ")" << std::endl; */
         return std::unexpected(SolverError("Station {} failed to converge during continuation after {} iterations (residual={})",
                                          std::source_location::current(), station, conv_info.iterations,
                                          conv_info.max_residual()));
@@ -408,6 +413,13 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
       // std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
       break;
     }
+    
+    // DEBUG: Print iteration info during continuation
+/*     if (in_continuation_ && (iter % 100 == 0 || iter < 10)) {
+      std::cout << "[DEBUG] ITER " << iter << " at station " << station 
+                << " - max_residual=" << std::scientific << conv_info.max_residual() 
+                << " adaptive_factor=" << adaptive_factor << std::endl;
+    } */
 
     // Divergence detection
     if (conv_info.max_residual() > 1e6) {
@@ -534,6 +546,12 @@ auto BoundaryLayerSolver::check_convergence(const equations::SolutionState& old_
   info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
   // std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
+  // DEBUG: Always print convergence info during continuation
+/*   if (in_continuation_) {
+    std::cout << "[DEBUG] CONVERGENCE CHECK - tol=" << std::scientific << tol 
+              << " | F_res=" << info.residual_F << " | g_res=" << info.residual_g 
+              << " | c_res=" << info.residual_c << " | converged=" << info.converged << std::endl;
+  } */
 
   return info;
 }
@@ -577,7 +595,7 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   }
   double h_wall_equilibrium = h_wall_eq_result.value();
 
-  std::cout << "ENTHALPIE AU MUR = " << h_wall_equilibrium << std::endl;
+  // std::cout << "ENTHALPIE AU MUR = " << h_wall_equilibrium << std::endl;
 
   // Compute dimensionless enthalpy at wall
   double g_wall = h_wall_equilibrium / bc.he();

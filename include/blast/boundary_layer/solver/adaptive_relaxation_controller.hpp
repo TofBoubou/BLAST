@@ -32,7 +32,7 @@ public:
   struct Config {
     double initial_factor = 0.001; // Conservative initial factor
     double min_factor = 0.00001;   // Absolute minimum
-    double max_factor = 1;         // Reasonable maximum
+    double max_factor = 0.05;         // Reasonable maximum
 
     // Thresholds based on your logic
     double excellent_threshold = 1;  // Threshold for excellent convergence (< 0.8)
@@ -49,8 +49,8 @@ public:
       Config config;
       config.initial_factor = 0.01;
       config.max_factor = 1;            // More conservative
-      config.strong_increase = 1.01;   // Slower growth
-      config.moderate_increase = 1.01; // Very moderate
+      config.strong_increase = 1.0;   // Slower growth
+      config.moderate_increase = 1.0; // Very moderate
       return config;
     }
 

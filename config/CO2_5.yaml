@@ -9,8 +9,8 @@ simulation:
 numerical:
   n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-6    
-  max_iterations: 10000
+  convergence_tolerance: 1.0e-9    
+  max_iterations: 50000
 
 mixture:
   name: CO2_5
@@ -26,7 +26,7 @@ outer_edge:
     - x: 0.0
       radius: 1
       velocity: 0
-      temperature: 5905.5
+      temperature: 7905.5
       pressure: 7.000000e+03
   
   velocity_gradient_stagnation: 4027.1213622326
@@ -34,13 +34,13 @@ outer_edge:
   freestream_velocity: 500000
 
 wall_parameters:
-  temperatures: [2000]
+  temperatures: [300]
 
 abaque:
-  enabled: false
-  catalyticity_values: [0.0, 0.01, 0.05, 0.1, 0.2, 0.4]
-  temperature_range: [2000, 3000]
-  temperature_points: 20
+  enabled: true
+  catalyticity_values: [0.0, 0.01, 0.05, 0.1, 0.2, 0.4, 0.6]
+  temperature_range: [3500, 5500]
+  temperature_points: 10
 
 # ./blast config/default.yaml test_output
 # python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250713_232651.h5 --plots all --output results_h5
