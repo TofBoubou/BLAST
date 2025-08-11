@@ -138,7 +138,8 @@ auto ThermalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, S
                                                         .dc_deta2 = derivatives.dc_deta2,
                                                         .T = ctx.solution.T};
 
-  auto g_result = ctx.solver.solve_energy_equation(ctx.solution, thermal_inputs, ctx.coeffs, ctx.bc, ctx.station);
+  auto g_result =
+      ctx.solver.solve_energy_equation(ctx.solution, thermal_inputs, ctx.coeffs, ctx.bc, ctx.mixture, ctx.station);
   if (!g_result) {
     return std::unexpected(
         StepExecutionError(name(), std::format("Energy equation failed: {}", g_result.error().message())));

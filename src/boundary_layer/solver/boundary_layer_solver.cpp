@@ -360,6 +360,7 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
                       .solution_old = const_cast<equations::SolutionState&>(solution_old),
                       .bc = bc_dynamic,
                       .coeffs = coeffs,
+                      .mixture = mixture_,
                       .station = station,
                       .xi = xi,
                       .iteration = iter,
@@ -450,6 +451,7 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
                                                 const coefficients::CoefficientInputs& inputs,
                                                 const coefficients::CoefficientSet& coeffs,
                                                 const conditions::BoundaryConditions& bc,
+                                                const thermophysics::MixtureInterface& mixture,
                                                 int station) -> std::expected<std::vector<double>, SolverError> {
 
   // Get dF/deta from unified derivative calculation
@@ -461,7 +463,7 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
   const auto& dF_deta = all_derivatives_result.value().dF_deta;
 
   auto result = equations::solve_energy(solution.g, inputs, coeffs, bc, *xi_derivatives_, config_.simulation,
-                                        solution.F, dF_deta, solution.V, station, grid_->d_eta());
+                                        solution.F, dF_deta, solution.V, mixture, station, grid_->d_eta());
 
   if (!result) {
     return std::unexpected(

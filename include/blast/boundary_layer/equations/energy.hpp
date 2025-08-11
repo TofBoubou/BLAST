@@ -3,6 +3,7 @@
 #include "../coefficients/coefficient_types.hpp"
 #include "../coefficients/xi_derivatives.hpp"
 #include "../conditions/boundary_conditions.hpp"
+#include "../../thermophysics/mixture_interface.hpp"
 #include "equation_types.hpp"
 #include "geometry_factors.hpp"
 #include <expected>
@@ -17,7 +18,8 @@ namespace blast::boundary_layer::equations {
                                 const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                                 const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                                 std::span<const double> F_field, std::span<const double> dF_deta,
-                                std::span<const double> V_field, int station,
+                                std::span<const double> V_field, const thermophysics::MixtureInterface& mixture,
+                                int station,
                                 PhysicalQuantity auto d_eta) -> std::expected<std::vector<double>, EquationError>;
 
 namespace detail {
@@ -40,7 +42,8 @@ build_energy_coefficients(std::span<const double> g_previous, const coefficients
                           const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                           const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                           std::span<const double> F_field, std::span<const double> dF_deta,
-                          std::span<const double> V_field, int station,
+                          std::span<const double> V_field, const thermophysics::MixtureInterface& mixture,
+                          int station,
                           PhysicalQuantity auto d_eta) -> std::expected<EnergyCoefficients, EquationError>;
 
 [[nodiscard]] auto build_energy_boundary_conditions(const coefficients::CoefficientInputs& inputs,
