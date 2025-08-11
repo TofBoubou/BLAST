@@ -37,14 +37,14 @@ wall_parameters:
   temperatures: [300]
 
 abaque:
-  enabled: true
-  catalyticity_values: [0.0, 0.01, 0.05, 0.1, 0.2, 0.4, 0.6]
+  enabled: false
+  catalyticity_values: [0.0, 0.01]
   temperature_range: [3500, 5500]
   temperature_points: 10
 
 continuation:
-  wall_temperature_stable: 3100.0
-  edge_temperature_stable: 3100.0
+  wall_temperature_stable: 300.0
+  edge_temperature_stable: 300.0
   pressure_stable: 7000.0
 
 # ./blast config/default.yaml test_output
