@@ -3,7 +3,7 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  consider_dufour_effect: true
+  consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: false
 
@@ -17,6 +17,7 @@ mixture:
   name: CO2_5
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
+  state_model: ChemNonEqTTv
 
 output:
   x_stations: [0.0]
@@ -28,7 +29,7 @@ outer_edge:
       radius: 1
       velocity: 0
       temperature: 5905.5
-      pressure: 7.000000e+03
+      pressure: 100
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429

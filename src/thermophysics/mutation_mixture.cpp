@@ -63,8 +63,8 @@ viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::exp
   case io::MixtureConfig::StateModel::ChemNonEq1T:
     opts.setStateModel("ChemNonEq1T");
     break;
-  case io::MixtureConfig::StateModel::ChemNonEq2T:
-    opts.setStateModel("ChemNonEq2T");
+  case io::MixtureConfig::StateModel::ChemNonEqTTv:
+    opts.setStateModel("ChemNonEqTTv");
     break;
   }
 

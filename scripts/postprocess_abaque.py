@@ -12,8 +12,8 @@ Produces a single figure with two subplots on one row:
 - Right: line plots q_wall(T_w) for each gamma (no extra interpolation)
 
 Usage:
-    python postprocess_abaque.py --input abaque.h5 --output abaque_plots/abaque_map
-    python postprocess_abaque.py --input abaque.h5 --show
+    python3 postprocess_abaque.py --input abaque.h5 --output abaque_plots/abaque_map
+    python3 postprocess_abaque.py --input abaque.h5 --show
 """
 
 import argparse
