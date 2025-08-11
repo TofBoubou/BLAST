@@ -3,13 +3,14 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_mode: "frozen" # "frozen" or "equilibrium" or "non_equilibrium"
+  consider_dufour_effect: true
+  chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: false
 
 numerical:
-  n_eta: 200                       
+  n_eta: 20                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-12    
+  convergence_tolerance: 1.0e-9    
   max_iterations: 100000
 
 mixture:
@@ -34,7 +35,7 @@ outer_edge:
   freestream_velocity: 500000
 
 wall_parameters:
-  temperatures: [300]
+  temperatures: [1000]
 
 abaque:
   enabled: false
