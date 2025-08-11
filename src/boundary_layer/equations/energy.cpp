@@ -1,9 +1,11 @@
 #include "blast/boundary_layer/equations/energy.hpp"
+#include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include "blast/boundary_layer/solvers/tridiagonal_solvers.hpp"
 #include <algorithm>
 #include <cmath>
 #include <format>
 #include <iomanip>
+#include <vector>
 
 namespace blast::boundary_layer::equations {
 
@@ -11,7 +13,8 @@ auto solve_energy(std::span<const double> g_previous, const coefficients::Coeffi
                   const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                   const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                   std::span<const double> F_field, std::span<const double> dF_deta, std::span<const double> V_field,
-                  int station, PhysicalQuantity auto d_eta) -> std::expected<std::vector<double>, EquationError> {
+                  const thermophysics::MixtureInterface& mixture, int station,
+                  PhysicalQuantity auto d_eta) -> std::expected<std::vector<double>, EquationError> {
 
   const auto n_eta = g_previous.size();
 
@@ -22,7 +25,7 @@ auto solve_energy(std::span<const double> g_previous, const coefficients::Coeffi
 
   // Build coefficients
   auto energy_coeffs_result = detail::build_energy_coefficients(g_previous, inputs, coeffs, bc, xi_der, sim_config,
-                                                                F_field, dF_deta, V_field, station, d_eta);
+                                                                F_field, dF_deta, V_field, mixture, station, d_eta);
   if (!energy_coeffs_result) {
     return std::unexpected(energy_coeffs_result.error());
   }
@@ -46,11 +49,20 @@ auto solve_energy(std::span<const double> g_previous, const coefficients::Coeffi
 
 namespace detail {
 
+[[nodiscard]] auto compute_dufour_term(const coefficients::CoefficientInputs& inputs,
+                                       const coefficients::CoefficientSet& coeffs,
+                                       const conditions::BoundaryConditions& bc,
+                                       const thermophysics::MixtureInterface& mixture,
+                                       std::size_t eta_index,
+                                       PhysicalQuantity auto d_eta)
+    -> std::expected<double, EquationError>;
+
 auto build_energy_coefficients(std::span<const double> g_previous, const coefficients::CoefficientInputs& inputs,
                                const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                                const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                                std::span<const double> F_field, std::span<const double> dF_deta,
-                               std::span<const double> V_field, int station,
+                               std::span<const double> V_field, const thermophysics::MixtureInterface& mixture,
+                               int station,
                                PhysicalQuantity auto d_eta) -> std::expected<EnergyCoefficients, EquationError> {
 
   const auto n_eta = g_previous.size();
@@ -66,6 +78,25 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
     return std::unexpected(J_fact_result.error());
   }
   const double J_fact = J_fact_result.value();
+
+  // Compute Dufour terms if enabled
+  std::vector<double> dufour_terms;
+  if (sim_config.consider_dufour_effect) {
+    dufour_terms.reserve(n_eta);
+    for (std::size_t i = 0; i < n_eta; ++i) {
+      auto dufour_result = compute_dufour_term(inputs, coeffs, bc, mixture, i, d_eta);
+      if (!dufour_result) {
+        return std::unexpected(dufour_result.error());
+      }
+      dufour_terms.push_back(dufour_result.value());
+    }
+
+    auto dufour_derivative_result = coefficients::derivatives::compute_eta_derivative(dufour_terms, d_eta);
+    if (!dufour_derivative_result) {
+      return std::unexpected(EquationError("Failed to compute Dufour term derivative"));
+    }
+    dufour_terms = std::move(dufour_derivative_result.value());
+  }
 
   EnergyCoefficients energy_coeffs;
   energy_coeffs.a.reserve(n_eta);
@@ -96,6 +127,12 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
 
     // Compute species enthalpy terms
     auto [tmp1, tmp2] = compute_species_enthalpy_terms(inputs, coeffs, bc, J_fact, i);
+
+    // Add Dufour effect contribution
+    if (sim_config.consider_dufour_effect) {
+      const double dufour_contribution = -bc.P_e() / bc.he() * dufour_terms[i];
+      tmp2 += dufour_contribution;
+    }
 
     // ----- Coefficient d[i] -----
     const double d_term = -bc.ue() * bc.ue() / bc.he() *
@@ -152,6 +189,52 @@ auto compute_species_enthalpy_terms(const coefficients::CoefficientInputs& input
   return {tmp1, tmp2};
 }
 
+[[nodiscard]] auto compute_dufour_term(const coefficients::CoefficientInputs& inputs,
+                                       const coefficients::CoefficientSet& coeffs,
+                                       const conditions::BoundaryConditions& bc,
+                                       const thermophysics::MixtureInterface& mixture,
+                                       std::size_t eta_index,
+                                       PhysicalQuantity auto d_eta) -> std::expected<double, EquationError> {
+
+  const auto n_species = inputs.c.rows();
+
+  // Get mass fractions at this eta point
+  std::vector<double> mass_fractions(n_species);
+  for (std::size_t j = 0; j < n_species; ++j) {
+    mass_fractions[j] = inputs.c(j, eta_index);
+  }
+
+  // Convert to mole fractions
+  auto mole_fractions_result = mixture.mass_fractions_to_mole_fractions(mass_fractions);
+  if (!mole_fractions_result) {
+    return std::unexpected(EquationError("Failed to compute mole fractions for Dufour term"));
+  }
+  const auto& mole_fractions = mole_fractions_result.value();
+
+  // Compute mixture molecular weight
+  auto mixture_mw_result = mixture.mixture_molecular_weight(mass_fractions);
+  if (!mixture_mw_result) {
+    return std::unexpected(EquationError("Failed to compute mixture MW for Dufour term"));
+  }
+  [[maybe_unused]] const double mixture_mw = mixture_mw_result.value();
+
+  // Calculate Dufour sum: Σ(χᵢ/ρᵢ * Jᵢ)
+  double dufour_sum = 0.0;
+  const double rho_total = coeffs.thermodynamic.rho[eta_index];
+
+  for (std::size_t j = 0; j < n_species; ++j) {
+    const double chi_j = mole_fractions[j];
+    const double rho_j = rho_total * mass_fractions[j];
+    const double J_j = coeffs.diffusion.J(j, eta_index);
+
+    if (rho_j > 1e-15) {
+      dufour_sum += chi_j / rho_j * J_j;
+    }
+  }
+
+  return dufour_sum;
+}
+
 } // namespace detail
 
 // Explicit instantiations for common use cases
@@ -159,7 +242,8 @@ template auto solve_energy<double>(std::span<const double> g_previous, const coe
                                    const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                                    const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                                    std::span<const double> F_field, std::span<const double> dF_deta,
-                                   std::span<const double> V_field, int station,
+                                   std::span<const double> V_field,
+                                   const thermophysics::MixtureInterface& mixture, int station,
                                    double d_eta) -> std::expected<std::vector<double>, EquationError>;
 
 } // namespace blast::boundary_layer::equations

@@ -27,6 +27,7 @@ struct SolverContext {
   equations::SolutionState& solution_old;
   conditions::BoundaryConditions& bc;
   coefficients::CoefficientSet& coeffs;
+  const thermophysics::MixtureInterface& mixture;
 
   const int station;
   const double xi;

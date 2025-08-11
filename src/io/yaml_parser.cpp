@@ -145,6 +145,12 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.consider_thermal_diffusion = thermal_diff_result.value();
 
+    auto dufour_result = extract_value<bool>(node, "consider_dufour_effect");
+    if (!dufour_result) {
+      return std::unexpected(dufour_result.error());
+    }
+    config.consider_dufour_effect = dufour_result.value();
+
     auto chemical_result = extract_enum(node, "chemical_mode", enum_mappings::chemical_modes);
     if (!chemical_result) {
       return std::unexpected(chemical_result.error());

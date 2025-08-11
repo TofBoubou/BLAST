@@ -23,6 +23,7 @@ struct SimulationConfig {
   bool only_stagnation_point = true;
   DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
   bool consider_thermal_diffusion = false;
+  bool consider_dufour_effect = false;
   ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
   bool catalytic_wall = false; // Enable surface catalysis
 };

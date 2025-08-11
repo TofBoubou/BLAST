@@ -106,6 +106,7 @@ public:
                                            const coefficients::CoefficientInputs& inputs,
                                            const coefficients::CoefficientSet& coeffs,
                                            const conditions::BoundaryConditions& bc,
+                                           const thermophysics::MixtureInterface& mixture,
                                            int station) -> std::expected<std::vector<double>, SolverError>;
 
   [[nodiscard]] auto solve_species_equations(const equations::SolutionState& solution,
