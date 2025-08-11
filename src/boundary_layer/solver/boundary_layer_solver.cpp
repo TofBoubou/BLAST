@@ -7,9 +7,11 @@
 #include "blast/boundary_layer/equations/species.hpp"
 #include <algorithm>
 #include <cmath>
+#include <format>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
+#include <vector>
 
 namespace blast::boundary_layer::solver {
 
@@ -173,6 +175,56 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     }
 
     result.heat_flux_data.push_back(std::move(heat_flux_result.value()));
+
+    // Extract modal temperatures if multiple energy modes are present
+    if (mixture_.get_number_energy_modes() > 1) {
+      auto extract_modal_temperatures_for_station = [&](const equations::SolutionState& sol)
+          -> std::expected<std::vector<std::vector<double>>, SolverError> {
+        const auto n_eta = grid_->n_eta();
+        const auto n_species = mixture_.n_species();
+        const auto n_modes = mixture_.get_number_energy_modes();
+        std::vector<std::vector<double>> modal_temps(n_modes, std::vector<double>(n_eta));
+
+        for (std::size_t i = 0; i < n_eta; ++i) {
+          std::vector<double> local_composition(n_species);
+          for (std::size_t j = 0; j < n_species; ++j) {
+            local_composition[j] = sol.c(j, i);
+          }
+
+          auto modal_result = mixture_.extract_modal_temperatures(local_composition, sol.T[i], bc.P_e());
+          if (!modal_result) {
+            return std::unexpected(SolverError(
+                "Failed to extract modal temperatures at eta={}: {}", std::source_location::current(), i,
+                modal_result.error().message()));
+          }
+
+          const auto& temps = modal_result.value();
+          for (std::size_t mode = 0; mode < n_modes; ++mode) {
+            modal_temps[mode][i] = temps[mode];
+          }
+        }
+
+        return modal_temps;
+      };
+
+      auto modal_temps_result = extract_modal_temperatures_for_station(result.stations.back());
+      if (!modal_temps_result) {
+        return std::unexpected(modal_temps_result.error());
+      }
+      result.modal_temperature_fields.push_back(std::move(modal_temps_result.value()));
+
+      if (result.temperature_mode_names.empty()) {
+        const auto n_modes = mixture_.get_number_energy_modes();
+        if (n_modes == 2) {
+          result.temperature_mode_names = {"T_translation_rotation", "T_vibrational_electronic"};
+        } else {
+          result.temperature_mode_names.resize(n_modes);
+          for (std::size_t m = 0; m < n_modes; ++m) {
+            result.temperature_mode_names[m] = std::format("T_mode_{}", m);
+          }
+        }
+      }
+    }
   }
 
   result.converged = true; // All stations solved successfully

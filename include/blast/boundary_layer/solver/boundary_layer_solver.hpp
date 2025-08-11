@@ -15,6 +15,8 @@
 #include "solver_steps.hpp"
 #include <expected>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace blast::boundary_layer::solver {
 
@@ -28,6 +30,8 @@ struct SolutionResult {
   bool converged = false;
   int total_iterations = 0;
   std::vector<coefficients::HeatFluxCoefficients> heat_flux_data;
+  std::vector<std::vector<std::vector<double>>> modal_temperature_fields; // [n_stations][n_modes][n_eta]
+  std::vector<std::string> temperature_mode_names;
 };
 
 // ConvergenceInfo is now defined in adaptive_relaxation_controller.hpp

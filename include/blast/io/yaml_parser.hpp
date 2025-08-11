@@ -142,6 +142,10 @@ inline const std::unordered_map<std::string, MixtureConfig::Database> databases 
     {"nasa9", MixtureConfig::Database::NASA9},
     {"nasa-9", MixtureConfig::Database::NASA9}};
 
+inline const std::unordered_map<std::string, MixtureConfig::StateModel> state_models = {
+    {"chemnoneq1t", MixtureConfig::StateModel::ChemNonEq1T},
+    {"chemnoneq2t", MixtureConfig::StateModel::ChemNonEq2T}};
+
 inline const std::unordered_map<std::string, SimulationConfig::ChemicalMode> chemical_modes = {
     {"equilibrium", SimulationConfig::ChemicalMode::Equilibrium},
     {"frozen", SimulationConfig::ChemicalMode::Frozen},

@@ -1,5 +1,6 @@
 #include "blast/io/output/hdf5_writer.hpp"
 #include <cstring>
+#include <format>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -240,6 +241,27 @@ auto HDF5Writer::write_station_data(GroupHandle& station_group, const StationDat
                                    "Species mass fractions");
         !result) {
       return std::unexpected(result.error());
+    }
+  }
+
+  // Modal temperatures (if available)
+  if (!station.modal_temperatures.empty()) {
+    auto modal_temp_group_result = create_group(station_group, "modal_temperatures");
+    if (!modal_temp_group_result) {
+      return std::unexpected(modal_temp_group_result.error());
+    }
+    auto modal_temp_group = std::move(modal_temp_group_result.value());
+
+    for (std::size_t mode = 0; mode < station.modal_temperatures.size(); ++mode) {
+      std::string mode_name =
+          (mode < station.temperature_mode_names.size()) ? station.temperature_mode_names[mode]
+                                                          : std::format("T_mode_{}", mode);
+
+      if (auto result = write_vector(modal_temp_group, mode_name, station.modal_temperatures[mode], "K",
+                                     std::format("Temperature for energy mode {}", mode));
+          !result) {
+        return std::unexpected(result.error());
+      }
     }
   }
 

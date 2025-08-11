@@ -92,7 +92,15 @@ public:
   surface_reaction_rates(std::span<const double> partial_densities,
                          double wall_temperature) const -> std::expected<std::vector<double>, ThermophysicsError> = 0;
 
-[[nodiscard]] virtual auto reload_gsi() -> bool = 0;
+  [[nodiscard]] virtual auto reload_gsi() -> bool = 0;
+
+  // Modal temperature support
+  [[nodiscard]] virtual auto extract_modal_temperatures(std::span<const double> mass_fractions,
+                                                        double temperature_overall,
+                                                        double pressure) const
+      -> std::expected<std::vector<double>, ThermophysicsError> = 0;
+
+  [[nodiscard]] virtual auto get_number_energy_modes() const noexcept -> std::size_t = 0;
 };
 
 // Factory function to create mixture implementation

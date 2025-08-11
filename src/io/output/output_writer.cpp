@@ -5,6 +5,9 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
+#include <vector>
 
 namespace blast::io::output {
 
@@ -186,6 +189,12 @@ auto OutputWriter::convert_solution(
       station_data.q_wall_total_nondim = heat_flux.q_wall_total_nondim;
 
       station_data.q_ref = heat_flux.q_ref;
+    }
+
+    // Modal temperatures if available
+    if (station_idx < solution.modal_temperature_fields.size()) {
+      station_data.modal_temperatures = solution.modal_temperature_fields[station_idx];
+      station_data.temperature_mode_names = solution.temperature_mode_names;
     }
 
     dataset.stations.push_back(std::move(station_data));
