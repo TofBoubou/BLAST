@@ -44,7 +44,7 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
   }
 
   heat_flux.q_ref = compute_reference_flux(bc, coeffs);
-  std::cout << "QREF = " << heat_flux.q_ref << std::endl;
+  // std::cout << "QREF = " << heat_flux.q_ref << std::endl;
 
   auto k_local_result = compute_local_conductivities(inputs, bc);
   if (!k_local_result) {
