@@ -210,9 +210,23 @@ auto MutationMixture::set_state(std::span<const double> mass_fractions, double t
   try {
     // Convert span to vector for Mutation++ (C API requirement)
     std::vector<double> c_vec(mass_fractions.begin(), mass_fractions.end());
-    double vars[2] = {pressure, temperature};
-
-    mixture_->setState(c_vec.data(), vars, 2);
+    
+    const auto n_modes = mixture_->nEnergyEqns();
+    if (n_modes == 1) {
+      // Modèle mono-température: {P, T}
+      double vars[2] = {pressure, temperature};
+      mixture_->setState(c_vec.data(), vars, 2);
+    } else {
+      // Modèle multi-température: {P, T_mode1, T_mode2, ...}
+      std::vector<double> vars(1 + n_modes);
+      vars[0] = pressure;
+      for (std::size_t i = 1; i <= n_modes; ++i) {
+        vars[i] = temperature; // Initialiser tous les modes à la même température
+      }
+      // Utiliser le var_set 2 (P-T set) pour les modèles multi-température
+      mixture_->setState(c_vec.data(), vars.data(), 2);
+    }
+    
     return {};
 
   } catch (const std::exception& e) {
@@ -508,10 +522,8 @@ auto MutationMixture::extract_modal_temperatures(std::span<const double> mass_fr
     if (n_modes == 1) {
       modal_temps[0] = temperature_overall;
     } else {
-      // Utiliser getTemperatures() directement
+      // Récupérer les températures modales depuis l'état Mutation++
       mixture_->getTemperatures(modal_temps.data());
-      // modal_temps[0] = T_tr (translation-rotation)
-      // modal_temps[1] = T_ve (vibration-électronique) pour n_modes == 2
     }
 
     return modal_temps;

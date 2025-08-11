@@ -29,7 +29,7 @@ outer_edge:
       radius: 1
       velocity: 0
       temperature: 5905.5
-      pressure: 7000
+      pressure: 200
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429
