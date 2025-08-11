@@ -214,11 +214,17 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& co
   core::Matrix<double> q_diffusive_species(n_species, n_eta);
 
   for (std::size_t i = 0; i < n_eta; ++i) {
+    // First compute sum without abs (matching old BLAST behavior)
     for (std::size_t j = 0; j < n_species; ++j) {
-      const double q_species_j = std::abs(coeffs.diffusion.J(j, i) * coeffs.h_species(j, i));
-
-      q_diffusive_species(j, i) = q_species_j;
+      const double q_species_j = coeffs.diffusion.J(j, i) * coeffs.h_species(j, i);
       q_diffusive_total[i] += q_species_j;
+    }
+    // Apply abs to total sum (matching old BLAST behavior)
+    q_diffusive_total[i] = std::abs(q_diffusive_total[i]);
+    
+    // For individual species, store the absolute values for output
+    for (std::size_t j = 0; j < n_species; ++j) {
+      q_diffusive_species(j, i) = std::abs(coeffs.diffusion.J(j, i) * coeffs.h_species(j, i));
     }
   }
 
@@ -241,14 +247,18 @@ auto HeatFluxCalculator::compute_wall_heat_fluxes(
 
   const double dT_deta_wall = inputs.T.size() > 1 ? (inputs.T[1] - inputs.T[0]) / d_eta_ : 0.0;
 
-  const double q_wall_conductive = std::abs(-coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact);
+  // Compute conductive heat flux matching the old BLAST behavior
+  double q_wall_conductive = -coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact;
+  q_wall_conductive = -q_wall_conductive; // To the wall (matching old code)
 
   double q_wall_diffusive = 0.0;
   const auto n_species = coeffs.diffusion.J.rows();
 
+  // Compute diffusive heat flux matching the old BLAST behavior
   for (std::size_t j = 0; j < n_species; ++j) {
-    q_wall_diffusive += std::abs(coeffs.diffusion.J(j, 0) * coeffs.h_species(j, 0));
+    q_wall_diffusive += coeffs.diffusion.J(j, 0) * coeffs.h_species(j, 0);
   }
+  q_wall_diffusive = -q_wall_diffusive; // To the wall (matching old code)
 
   const double q_wall_total = q_wall_conductive + q_wall_diffusive;
 

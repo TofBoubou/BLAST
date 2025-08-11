@@ -3,14 +3,14 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
-  chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: true
+  chemical_mode: "frozen" # "frozen" or "equilibrium" or "non_equilibrium"
+  catalytic_wall: false
 
 numerical:
-  n_eta: 20                       
+  n_eta: 200                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-3    
-  max_iterations: 50000
+  convergence_tolerance: 1.0e-12    
+  max_iterations: 100000
 
 mixture:
   name: CO2_5
@@ -26,7 +26,7 @@ outer_edge:
     - x: 0.0
       radius: 1
       velocity: 0
-      temperature: 7905.5
+      temperature: 5905.5
       pressure: 7.000000e+03
   
   velocity_gradient_stagnation: 4027.1213622326
@@ -37,14 +37,14 @@ wall_parameters:
   temperatures: [300]
 
 abaque:
-  enabled: true
+  enabled: false
   catalyticity_values: [0.0, 0.01]
   temperature_range: [3500, 5500]
   temperature_points: 20
 
 continuation:
   wall_temperature_stable: 3000.0
-  edge_temperature_stable: 3000.0
+  edge_temperature_stable: 5905.5
   pressure_stable: 7000.0
 
 # ./blast config/default.yaml test_output
