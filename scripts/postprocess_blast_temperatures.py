@@ -236,6 +236,8 @@ class BLASTPlotter:
         axes[0, 0].set_ylabel('η')
         axes[0, 0].grid(True, alpha=0.3)
         axes[0, 0].set_title(f'Station {station_index:03d} - Physical Temperature')
+        axes[0, 0].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[0, 0].tick_params(axis='x', rotation=45)
 
         # [0,1] Modal temperatures overlay
         line_styles = ['-', '--', '-.', ':']
@@ -259,6 +261,8 @@ class BLASTPlotter:
         axes[0, 1].set_ylabel('η')
         axes[0, 1].grid(True, alpha=0.3)
         axes[0, 1].set_title(f'Station {station_index:03d} - Modal Temperatures')
+        axes[0, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        axes[0, 1].tick_params(axis='x', rotation=45)
         if legend_added:
             axes[0, 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 
@@ -280,6 +284,8 @@ class BLASTPlotter:
             axes[0, 2].set_ylabel('η')
             axes[0, 2].grid(True, alpha=0.3)
             axes[0, 2].set_title(f'Station {station_index:03d} - Modal Deviations')
+            axes[0, 2].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+            axes[0, 2].tick_params(axis='x', rotation=45)
             axes[0, 2].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         else:
             axes[0, 2].axis('off')
@@ -292,6 +298,8 @@ class BLASTPlotter:
             axes[1, 0].set_ylabel('η')
             axes[1, 0].grid(True, alpha=0.3)
             axes[1, 0].set_title(f'Station {station_index:03d} - Temperature Gradient')
+            axes[1, 0].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+            axes[1, 0].tick_params(axis='x', rotation=45)
         else:
             axes[1, 0].axis('off')
 
@@ -314,6 +322,8 @@ class BLASTPlotter:
             axes[1, 1].set_ylabel('η')
             axes[1, 1].grid(True, alpha=0.3)
             axes[1, 1].set_title(f'Station {station_index:03d} - Modal Ratios')
+            axes[1, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+            axes[1, 1].tick_params(axis='x', rotation=45)
             axes[1, 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         else:
             axes[1, 1].axis('off')

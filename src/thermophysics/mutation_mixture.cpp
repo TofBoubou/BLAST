@@ -508,9 +508,10 @@ auto MutationMixture::extract_modal_temperatures(std::span<const double> mass_fr
     if (n_modes == 1) {
       modal_temps[0] = temperature_overall;
     } else {
-      for (std::size_t i = 0; i < n_modes; ++i) {
-        modal_temps[i] = temperature_overall;
-      }
+      // Utiliser getTemperatures() directement
+      mixture_->getTemperatures(modal_temps.data());
+      // modal_temps[0] = T_tr (translation-rotation)
+      // modal_temps[1] = T_ve (vibration-électronique) pour n_modes == 2
     }
 
     return modal_temps;
