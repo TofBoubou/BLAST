@@ -12,19 +12,28 @@ auto YamlParser::load() -> std::expected<void, core::FileError> {
   try {
     root_ = YAML::LoadFile(file_path_);
     return {};
-  } catch (const YAML::BadFile& e) {
-    return std::unexpected(core::FileError{"Failed to open YAML file", file_path_});
-  } catch (const YAML::ParserException& e) {
-    return std::unexpected(core::FileError{std::format("YAML parsing error: {}", e.what()), file_path_});
-  } catch (const std::exception& e) { // YAML::BadFile inherit from std::exception so no problem
-    return std::unexpected(core::FileError{std::format("Unexpected error during YAML load: {}", e.what()), file_path_});
+  } catch (const YAML::BadFile &e) {
+    return std::unexpected(
+        core::FileError{"Failed to open YAML file", file_path_});
+  } catch (const YAML::ParserException &e) {
+    return std::unexpected(core::FileError{
+        std::format("YAML parsing error: {}", e.what()), file_path_});
+  } catch (const std::exception
+               &e) { // YAML::BadFile inherit from std::exception so no problem
+    return std::unexpected(core::FileError{
+        std::format("Unexpected error during YAML load: {}", e.what()),
+        file_path_});
   }
 }
 
-auto YamlParser::parse() const -> std::expected<Configuration, core::ConfigurationError> {
+auto YamlParser::parse() const
+    -> std::expected<Configuration, core::ConfigurationError> {
   try {
-    if (!root_ || root_.IsNull()) { // !root_ is override in YAML so we check if it's empty
-      return std::unexpected(core::ConfigurationError("No YAML content loaded. Call load() first."));
+    if (!root_ ||
+        root_
+            .IsNull()) { // !root_ is override in YAML so we check if it's empty
+      return std::unexpected(core::ConfigurationError(
+          "No YAML content loaded. Call load() first."));
     }
 
     Configuration config;
@@ -32,19 +41,23 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     // Simulation
     if (!root_["simulation"]) { // !root_ is override in YAML so we check if
                                 // it's empty
-      return std::unexpected(core::ConfigurationError("Missing required 'simulation' section"));
+      return std::unexpected(
+          core::ConfigurationError("Missing required 'simulation' section"));
     }
     auto sim_result = parse_simulation_config(root_["simulation"]);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
-    config.simulation = std::move(sim_result.value()); // emptying sim_result, avoid a copy
+    config.simulation =
+        std::move(sim_result.value()); // emptying sim_result, avoid a copy
 
     // Numerical parameters
     if (!root_["numerical"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'numerical' section"));
+      return std::unexpected(
+          core::ConfigurationError("Missing required 'numerical' section"));
     }
-    auto num_result = parse_numerical_config(root_["numerical"]); // The root changes
+    auto num_result =
+        parse_numerical_config(root_["numerical"]); // The root changes
     if (!num_result) {
       return std::unexpected(num_result.error());
     }
@@ -52,7 +65,8 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Mixture
     if (!root_["mixture"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'mixture' section"));
+      return std::unexpected(
+          core::ConfigurationError("Missing required 'mixture' section"));
     }
     auto mix_result = parse_mixture_config(root_["mixture"]);
     if (!mix_result) {
@@ -62,7 +76,8 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Output
     if (!root_["output"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'output' section"));
+      return std::unexpected(
+          core::ConfigurationError("Missing required 'output' section"));
     }
     auto out_result = parse_output_config(root_["output"]);
     if (!out_result) {
@@ -72,7 +87,8 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // outer_edge
     if (!root_["outer_edge"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'outer_edge' section"));
+      return std::unexpected(
+          core::ConfigurationError("Missing required 'outer_edge' section"));
     }
     auto edge_result = parse_outer_edge_config(root_["outer_edge"]);
     if (!edge_result) {
@@ -81,7 +97,8 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     config.outer_edge = std::move(edge_result.value());
 
     if (!root_["wall_parameters"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'wall_parameters' section"));
+      return std::unexpected(core::ConfigurationError(
+          "Missing required 'wall_parameters' section"));
     }
     auto wall_result = parse_wall_parameters_config(root_["wall_parameters"]);
     if (!wall_result) {
@@ -108,21 +125,23 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     return config;
 
-  } catch (const YAML::Exception& e) {
-    return std::unexpected(
-        core::ConfigurationError(std::format("YAML parsing error: {} at line {}", e.what(), e.mark.line)));
-  } catch (const std::exception& e) {
-    return std::unexpected(core::ConfigurationError(std::format("Unexpected error during parsing: {}", e.what())));
+  } catch (const YAML::Exception &e) {
+    return std::unexpected(core::ConfigurationError(std::format(
+        "YAML parsing error: {} at line {}", e.what(), e.mark.line)));
+  } catch (const std::exception &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("Unexpected error during parsing: {}", e.what())));
   }
 }
 
-auto YamlParser::parse_simulation_config(const YAML::Node& node) const
+auto YamlParser::parse_simulation_config(const YAML::Node &node) const
     -> std::expected<SimulationConfig, core::ConfigurationError> {
 
   SimulationConfig config;
 
   try {
-    auto body_type_result = extract_enum(node, "body_type", enum_mappings::body_types);
+    auto body_type_result =
+        extract_enum(node, "body_type", enum_mappings::body_types);
     if (!body_type_result) {
       return std::unexpected(body_type_result.error());
     }
@@ -134,13 +153,15 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.only_stagnation_point = only_stag_result.value();
 
-    auto diffusion_result = extract_enum(node, "diffusion_type", enum_mappings::diffusion_types);
+    auto diffusion_result =
+        extract_enum(node, "diffusion_type", enum_mappings::diffusion_types);
     if (!diffusion_result) {
       return std::unexpected(diffusion_result.error());
     }
     config.diffusion_type = diffusion_result.value();
 
-    auto thermal_diff_result = extract_value<bool>(node, "consider_thermal_diffusion");
+    auto thermal_diff_result =
+        extract_value<bool>(node, "consider_thermal_diffusion");
     if (!thermal_diff_result) {
       return std::unexpected(thermal_diff_result.error());
     }
@@ -152,7 +173,8 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.consider_dufour_effect = dufour_result.value();
 
-    auto chemical_result = extract_enum(node, "chemical_mode", enum_mappings::chemical_modes);
+    auto chemical_result =
+        extract_enum(node, "chemical_mode", enum_mappings::chemical_modes);
     if (!chemical_result) {
       return std::unexpected(chemical_result.error());
     }
@@ -166,12 +188,13 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
 
     return config;
 
-  } catch (const core::ConfigurationError& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'simulation' section: {}", e.message())));
+  } catch (const core::ConfigurationError &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("In 'simulation' section: {}", e.message())));
   }
 }
 
-auto YamlParser::parse_numerical_config(const YAML::Node& node) const
+auto YamlParser::parse_numerical_config(const YAML::Node &node) const
     -> std::expected<NumericalConfig, core::ConfigurationError> {
 
   NumericalConfig config;
@@ -199,12 +222,13 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
 
     return config;
 
-  } catch (const core::ConfigurationError& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'numerical' section: {}", e.message())));
+  } catch (const core::ConfigurationError &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("In 'numerical' section: {}", e.message())));
   }
 }
 
-auto YamlParser::parse_mixture_config(const YAML::Node& node) const
+auto YamlParser::parse_mixture_config(const YAML::Node &node) const
     -> std::expected<MixtureConfig, core::ConfigurationError> {
 
   MixtureConfig config;
@@ -215,19 +239,22 @@ auto YamlParser::parse_mixture_config(const YAML::Node& node) const
       return std::unexpected(name_result.error());
     config.name = name_result.value();
 
-    auto db_result = extract_enum(node, "thermodynamic_database", enum_mappings::databases);
+    auto db_result =
+        extract_enum(node, "thermodynamic_database", enum_mappings::databases);
     if (!db_result)
       return std::unexpected(db_result.error());
     config.thermodynamic_database = db_result.value();
 
-    auto visc_result = extract_enum(node, "viscosity_algorithm", enum_mappings::viscosity_algorithms);
+    auto visc_result = extract_enum(node, "viscosity_algorithm",
+                                    enum_mappings::viscosity_algorithms);
     if (!visc_result)
       return std::unexpected(visc_result.error());
     config.viscosity_algorithm = visc_result.value();
 
     // Optional state model selection (defaults to ChemNonEq1T)
     if (node["state_model"]) {
-      auto state_result = extract_enum(node, "state_model", enum_mappings::state_models);
+      auto state_result =
+          extract_enum(node, "state_model", enum_mappings::state_models);
       if (!state_result)
         return std::unexpected(state_result.error());
       config.state_model = state_result.value();
@@ -235,57 +262,66 @@ auto YamlParser::parse_mixture_config(const YAML::Node& node) const
 
     return config;
 
-  } catch (const core::ConfigurationError& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'mixture' section: {}", e.message())));
+  } catch (const core::ConfigurationError &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("In 'mixture' section: {}", e.message())));
   }
 }
 
-auto YamlParser::parse_output_config(const YAML::Node& node) const
+auto YamlParser::parse_output_config(const YAML::Node &node) const
     -> std::expected<OutputConfig, core::ConfigurationError> {
 
   OutputConfig config;
 
   try {
-  auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
-  if (!x_stations_result)
-    return std::unexpected(x_stations_result.error());
-  config.x_stations = x_stations_result.value();
-  if (config.x_stations.empty()) {
-    return std::unexpected(core::ConfigurationError("x_stations cannot be empty"));
-  }
-  if (std::any_of(config.x_stations.begin(), config.x_stations.end(), [](double x) { return x < 0; })) {
-    return std::unexpected(core::ConfigurationError("x_stations must be non-negative"));
-  }
-  for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
-    if (config.x_stations[i] <= config.x_stations[i - 1]) {
-      return std::unexpected(core::ConfigurationError("x_stations must be in strictly increasing order"));
+    auto x_stations_result =
+        extract_value<std::vector<double>>(node, "x_stations");
+    if (!x_stations_result)
+      return std::unexpected(x_stations_result.error());
+    config.x_stations = x_stations_result.value();
+    if (config.x_stations.empty()) {
+      return std::unexpected(
+          core::ConfigurationError("x_stations cannot be empty"));
     }
-  }
+    if (std::any_of(config.x_stations.begin(), config.x_stations.end(),
+                    [](double x) { return x < 0; })) {
+      return std::unexpected(
+          core::ConfigurationError("x_stations must be non-negative"));
+    }
+    for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
+      if (config.x_stations[i] <= config.x_stations[i - 1]) {
+        return std::unexpected(core::ConfigurationError(
+            "x_stations must be in strictly increasing order"));
+      }
+    }
 
-    auto output_dir_result = extract_value<std::string>(node, "output_directory");
+    auto output_dir_result =
+        extract_value<std::string>(node, "output_directory");
     if (!output_dir_result)
       return std::unexpected(output_dir_result.error());
     config.output_directory = output_dir_result.value();
 
     return config;
 
-  } catch (const core::ConfigurationError& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'output' section: {}", e.message())));
+  } catch (const core::ConfigurationError &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("In 'output' section: {}", e.message())));
   }
 }
 
-auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
+auto YamlParser::parse_outer_edge_config(const YAML::Node &node) const
     -> std::expected<OuterEdgeConfig, core::ConfigurationError> {
 
   OuterEdgeConfig config;
 
   try {
     if (!node["edge_points"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'edge_points' in outer_edge"));
+      return std::unexpected(core::ConfigurationError(
+          "Missing required 'edge_points' in outer_edge"));
     }
 
     auto points_node = node["edge_points"];
-    for (const auto& point_node : points_node) {
+    for (const auto &point_node : points_node) {
       OuterEdgeConfig::EdgePoint point;
 
       auto x_result = extract_value<double>(point_node, "x");
@@ -303,7 +339,8 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
         return std::unexpected(velocity_result.error());
       point.velocity = velocity_result.value();
 
-      auto temperature_result = extract_value<double>(point_node, "temperature");
+      auto temperature_result =
+          extract_value<double>(point_node, "temperature");
       if (!temperature_result)
         return std::unexpected(temperature_result.error());
       point.temperature = temperature_result.value();
@@ -313,33 +350,57 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
         return std::unexpected(pressure_result.error());
       point.pressure = pressure_result.value();
 
+      if (point_node["boundary_override"]) {
+        auto override_result =
+            extract_value<bool>(point_node, "boundary_override");
+        if (!override_result)
+          return std::unexpected(override_result.error());
+        point.boundary_override = override_result.value();
+      }
+
+      if (point_node["mass_fraction_condition"]) {
+        auto mf_result = extract_value<std::vector<double>>(
+            point_node, "mass_fraction_condition");
+        if (!mf_result)
+          return std::unexpected(mf_result.error());
+        point.mass_fraction_condition = mf_result.value();
+      } else if (point.boundary_override) {
+        return std::unexpected(
+            core::ConfigurationError("'mass_fraction_condition' is required "
+                                     "when 'boundary_override' is true"));
+      }
+
       config.edge_points.push_back(point);
     }
 
     // Scalars (unchanged)
-    auto vel_grad_result = extract_value<double>(node, "velocity_gradient_stagnation");
+    auto vel_grad_result =
+        extract_value<double>(node, "velocity_gradient_stagnation");
     if (!vel_grad_result)
       return std::unexpected(vel_grad_result.error());
     config.velocity_gradient_stagnation = vel_grad_result.value();
 
-    auto freestream_dens_result = extract_value<double>(node, "freestream_density");
+    auto freestream_dens_result =
+        extract_value<double>(node, "freestream_density");
     if (!freestream_dens_result)
       return std::unexpected(freestream_dens_result.error());
     config.freestream_density = freestream_dens_result.value();
 
-    auto freestream_vel_result = extract_value<double>(node, "freestream_velocity");
+    auto freestream_vel_result =
+        extract_value<double>(node, "freestream_velocity");
     if (!freestream_vel_result)
       return std::unexpected(freestream_vel_result.error());
     config.freestream_velocity = freestream_vel_result.value();
 
     return config;
 
-  } catch (const core::ConfigurationError& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'outer_edge' section: {}", e.message())));
+  } catch (const core::ConfigurationError &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("In 'outer_edge' section: {}", e.message())));
   }
 }
 
-auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
+auto YamlParser::parse_wall_parameters_config(const YAML::Node &node) const
     -> std::expected<WallParametersConfig, core::ConfigurationError> {
 
   WallParametersConfig config;
@@ -351,74 +412,83 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
     config.wall_temperatures = temp_result.value();
 
     if (config.wall_temperatures.empty()) {
-      return std::unexpected(core::ConfigurationError("Wall temperatures cannot be empty"));
+      return std::unexpected(
+          core::ConfigurationError("Wall temperatures cannot be empty"));
     }
     return config;
 
-  } catch (const core::ConfigurationError& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'wall_parameters' section: {}", e.message())));
+  } catch (const core::ConfigurationError &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("In 'wall_parameters' section: {}", e.message())));
   }
 }
 
-auto YamlParser::parse_abaque_config(const YAML::Node& node) const
+auto YamlParser::parse_abaque_config(const YAML::Node &node) const
     -> std::expected<AbaqueConfig, core::ConfigurationError> {
-  
+
   AbaqueConfig config;
-  
+
   // If no abaque section, return default (disabled)
   if (!node) {
     return config;
   }
-  
+
   try {
     // Parse enabled flag
     if (node["enabled"]) {
       config.enabled = node["enabled"].as<bool>();
     }
-    
+
     // Only parse other fields if enabled
     if (config.enabled) {
       // Parse catalyticity values
       if (!node["catalyticity_values"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'catalyticity_values' when abaque is enabled"));
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'catalyticity_values' when abaque is enabled"));
       }
-      config.catalyticity_values = node["catalyticity_values"].as<std::vector<double>>();
-      
+      config.catalyticity_values =
+          node["catalyticity_values"].as<std::vector<double>>();
+
       if (config.catalyticity_values.empty()) {
-        return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty"));
+        return std::unexpected(
+            core::ConfigurationError("catalyticity_values cannot be empty"));
       }
-      
+
       // Parse temperature range
       if (node["temperature_range"]) {
         auto range = node["temperature_range"].as<std::vector<double>>();
         if (range.size() != 2) {
-          return std::unexpected(core::ConfigurationError("temperature_range must have exactly 2 values"));
+          return std::unexpected(core::ConfigurationError(
+              "temperature_range must have exactly 2 values"));
         }
         config.temperature_min = range[0];
         config.temperature_max = range[1];
-        
+
         if (config.temperature_min >= config.temperature_max) {
-          return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
+          return std::unexpected(core::ConfigurationError(
+              "temperature_min must be less than temperature_max"));
         }
       }
-      
+
       // Parse temperature points
       if (node["temperature_points"]) {
         config.temperature_points = node["temperature_points"].as<int>();
         if (config.temperature_points < 2) {
-          return std::unexpected(core::ConfigurationError("temperature_points must be at least 2"));
+          return std::unexpected(core::ConfigurationError(
+              "temperature_points must be at least 2"));
         }
       }
     }
-    
+
     return config;
-    
-  } catch (const YAML::Exception& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'abaque' section: {}", e.what())));
+
+  } catch (const YAML::Exception &e) {
+    return std::unexpected(core::ConfigurationError(
+        std::format("In 'abaque' section: {}", e.what())));
   }
 }
 
-auto YamlParser::parse_continuation_config(const YAML::Node& node) const
+auto YamlParser::parse_continuation_config(const YAML::Node &node) const
     -> std::expected<ContinuationConfig, core::ConfigurationError> {
 
   ContinuationConfig config;
@@ -429,18 +499,20 @@ auto YamlParser::parse_continuation_config(const YAML::Node& node) const
 
   try {
     if (node["wall_temperature_stable"]) {
-      config.wall_temperature_stable = node["wall_temperature_stable"].as<double>();
+      config.wall_temperature_stable =
+          node["wall_temperature_stable"].as<double>();
     }
     if (node["edge_temperature_stable"]) {
-      config.edge_temperature_stable = node["edge_temperature_stable"].as<double>();
+      config.edge_temperature_stable =
+          node["edge_temperature_stable"].as<double>();
     }
     if (node["pressure_stable"]) {
       config.pressure_stable = node["pressure_stable"].as<double>();
     }
     return config;
-  } catch (const YAML::Exception& e) {
-    return std::unexpected(
-        core::ConfigurationError(std::format("In 'continuation' section: failed to parse - {}", e.what())));
+  } catch (const YAML::Exception &e) {
+    return std::unexpected(core::ConfigurationError(std::format(
+        "In 'continuation' section: failed to parse - {}", e.what())));
   }
 }
 
