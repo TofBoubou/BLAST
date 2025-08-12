@@ -8,7 +8,7 @@ simulation:
   catalytic_wall: false
 
 numerical:
-  n_eta: 20                       
+  n_eta: 200                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9    
   max_iterations: 100000
@@ -17,7 +17,7 @@ mixture:
   name: CO2_5
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
-  state_model: ChemNonEqTTv
+  state_model: ChemNonEq1T # ChemNonEq1T or ChemNonEqTTv
 
 output:
   x_stations: [0.0]
@@ -29,14 +29,14 @@ outer_edge:
       radius: 1
       velocity: 0
       temperature: 5905.5
-      pressure: 200
+      pressure: 7000
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429
   freestream_velocity: 500000
 
 wall_parameters:
-  temperatures: [700]
+  temperatures: [300]
 
 abaque:
   enabled: false
@@ -51,3 +51,5 @@ continuation:
 
 # ./blast config/default.yaml test_output
 # python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250713_232651.h5 --plots all --output results_h5
+# python3 scripts/postprocess_blast_temperatures.py --input test_outputs/simulation_20250811_032725.h5 --plots all
+# python3 scripts/postprocess_abaque.py --input test_outputs/simulation_abaque.h5
