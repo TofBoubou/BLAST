@@ -1,4 +1,5 @@
 #include "blast/boundary_layer/solvers/tridiagonal_solvers.hpp"
+#include "blast/boundary_layer/solver/solver_errors.hpp"
 #include <algorithm>
 #include <iomanip>
 #include <iostream>

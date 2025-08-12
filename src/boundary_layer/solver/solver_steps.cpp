@@ -239,7 +239,9 @@ auto SolverPipeline::create_for_solver(BoundaryLayerSolver& solver) -> SolverPip
 }
 
 auto SolverPipeline::execute_all(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
-  for (auto& step : steps_) {
+  for (std::size_t i = 0; i < steps_.size(); ++i) {
+    auto& step = steps_[i];
+    
     // Backup current context to allow rollback on failure
     auto solution_backup = ctx.solution;
     auto old_solution_backup = ctx.solution_old;
@@ -253,7 +255,12 @@ auto SolverPipeline::execute_all(SolverContext& ctx) -> std::expected<void, Step
       ctx.solution_old = std::move(old_solution_backup);
       ctx.bc = std::move(bc_backup);
       ctx.coeffs = std::move(coeffs_backup);
-      return std::unexpected(result.error());
+      
+      // Add context information about which step failed
+      return std::unexpected(StepExecutionError(
+          std::format("Step {}/{}: {}", i + 1, steps_.size(), step->name()),
+          std::format("Pipeline execution failed: {}", result.error().what())
+      ));
     }
   }
   return {};

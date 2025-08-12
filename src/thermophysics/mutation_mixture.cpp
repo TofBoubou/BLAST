@@ -7,6 +7,14 @@
 
 namespace blast::thermophysics {
 
+// Macro to eliminate repetitive try/catch blocks when calling Mutation++ library
+#define MUTATION_CALL(expression, error_message) \
+  try { \
+    return expression; \
+  } catch (const std::exception& e) { \
+    return std::unexpected(ThermophysicsError(std::format(error_message ": {}", e.what()))); \
+  }
+
 namespace {
 // Helper to convert config enums to Mutation++ strings
 [[nodiscard]] auto
@@ -94,14 +102,25 @@ viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::exp
 }
 } // namespace
 
+namespace {
+// Helper function to create mixture or throw exception
+std::unique_ptr<Mutation::Mixture> create_mixture_or_throw(const io::MixtureConfig& config) {
+  auto mixture_result = create_mutation_mixture(config);
+  if (!mixture_result) {
+    throw ThermophysicsError(
+        std::format("Failed to create Mutation++ mixture: {}", mixture_result.error().what()));
+  }
+  return std::move(mixture_result.value());
+}
+} // anonymous namespace
+
 MutationMixture::MutationMixture(const io::MixtureConfig& config)
     : config_(config),
-      mixture_(create_mutation_mixture(config).value()), 
+      mixture_(create_mixture_or_throw(config)),
       n_species_(mixture_->nSpecies()),
       has_electrons_(mixture_->hasElectrons()) {
 
   try {
-
     // Cache species properties
     species_mw_.reserve(n_species_);
     species_charges_.reserve(n_species_);
@@ -118,11 +137,7 @@ MutationMixture::MutationMixture(const io::MixtureConfig& config)
     }
 
   } catch (const std::exception& e) {
-    auto mixture_result = create_mutation_mixture(config);
-    if (!mixture_result) {
-      throw ThermophysicsError(std::format("Failed to create Mutation++ mixture: {}", mixture_result.error().what()));
-    }
-    throw ThermophysicsError(std::format("Failed to create Mutation++ mixture: {}", e.what()));
+    throw ThermophysicsError(std::format("Failed to initialize species cache: {}", e.what()));
   }
 }
 
@@ -241,11 +256,7 @@ auto MutationMixture::mixture_enthalpy(std::span<const double> mass_fractions, d
     return std::unexpected(state_result.error());
   }
 
-  try {
-    return mixture_->mixtureHMass();
-  } catch (const std::exception& e) {
-    return std::unexpected(ThermophysicsError(std::format("Failed to compute enthalpy: {}", e.what())));
-  }
+  MUTATION_CALL(mixture_->mixtureHMass(), "Failed to compute enthalpy");
 }
 
 auto MutationMixture::species_enthalpies(double temperature) const
@@ -279,11 +290,7 @@ auto MutationMixture::frozen_cp(std::span<const double> mass_fractions, double t
     return std::unexpected(state_result.error());
   }
 
-  try {
-    return mixture_->mixtureFrozenCpMass();
-  } catch (const std::exception& e) {
-    return std::unexpected(ThermophysicsError(std::format("Failed to compute frozen Cp: {}", e.what())));
-  }
+  MUTATION_CALL(mixture_->mixtureFrozenCpMass(), "Failed to compute frozen Cp");
 }
 
 auto MutationMixture::viscosity(std::span<const double> mass_fractions, double temperature,
@@ -293,11 +300,7 @@ auto MutationMixture::viscosity(std::span<const double> mass_fractions, double t
     return std::unexpected(state_result.error());
   }
 
-  try {
-    return mixture_->viscosity();
-  } catch (const std::exception& e) {
-    return std::unexpected(ThermophysicsError(std::format("Failed to compute viscosity: {}", e.what())));
-  }
+  MUTATION_CALL(mixture_->viscosity(), "Failed to compute viscosity");
 }
 
 auto MutationMixture::frozen_thermal_conductivity(std::span<const double> mass_fractions, double temperature,
@@ -307,11 +310,7 @@ auto MutationMixture::frozen_thermal_conductivity(std::span<const double> mass_f
     return std::unexpected(state_result.error());
   }
 
-  try {
-    return mixture_->frozenThermalConductivity();
-  } catch (const std::exception& e) {
-    return std::unexpected(ThermophysicsError(std::format("Failed to compute thermal conductivity: {}", e.what())));
-  }
+  MUTATION_CALL(mixture_->frozenThermalConductivity(), "Failed to compute thermal conductivity");
 }
 
 auto MutationMixture::binary_diffusion_coefficients(double temperature, double pressure) const
@@ -499,7 +498,7 @@ auto MutationMixture::surface_reaction_rates(std::span<const double> partial_den
     return surface_flux_cache_;
 
   } catch (const std::exception& e) {
-    return std::unexpected(ThermophysicsError(std::format("Mutation++ surface reaction failed: {}", e.what())));
+    return std::unexpected(ThermophysicsError(std::format("Failed to compute surface reaction rates: {}", e.what())));
   }
 }
 

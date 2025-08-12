@@ -40,8 +40,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Warning: Could not auto-configure MPP_DATA_DIRECTORY: " << e.what() << std::endl;
   }
 
-  try {
-    std::cout << "=== BLAST Boundary Layer Solver ===" << std::endl;
+  std::cout << "=== BLAST Boundary Layer Solver ===" << std::endl;
     std::cout << "Loading configuration from: " << argv[1] << std::endl;
 
     // Load configuration
@@ -51,7 +50,7 @@ int main(int argc, char* argv[]) {
       std::cerr << "Failed to load config: " << config_result.error().message() << "\n";
       return 1;
     }
-    auto config = config_result.value();
+    auto config = std::move(config_result.value());
     std::cout << "✓ Configuration loaded successfully" << std::endl;
 
     // Create mixture
@@ -220,7 +219,7 @@ int main(int argc, char* argv[]) {
         return 1;
       }
 
-      auto& solution = solution_result.value();
+      auto solution = std::move(solution_result.value());
       auto solve_time = std::chrono::high_resolution_clock::now();
       auto solve_duration = std::chrono::duration_cast<std::chrono::milliseconds>(solve_time - start_time);
 
@@ -291,7 +290,7 @@ int main(int argc, char* argv[]) {
         return 1;
       }
 
-      auto& output_files = output_result.value();
+      const auto& output_files = std::move(output_result.value());
       std::cout << "✓ Output written successfully!" << std::endl;
       std::cout << "  Output time: " << output_duration.count() << " ms" << std::endl;
       std::cout << "\nGenerated files:" << std::endl;
@@ -314,13 +313,7 @@ int main(int argc, char* argv[]) {
     std::cout << "\nPost-processing recommendations:" << std::endl;
     std::cout << "  • Open .h5 files with HDFView or Python (h5py, pandas)" << std::endl;
 
-    return 0;
-
-  } catch (const std::exception& e) {
-    std::cerr << "Error: " << e.what() << "\n";
-
-    // Cleanup
-    blast::io::output::hdf5::finalize();
-    return 1;
-  }
+  // Cleanup HDF5 before exit
+  blast::io::output::hdf5::finalize();
+  return 0;
 }

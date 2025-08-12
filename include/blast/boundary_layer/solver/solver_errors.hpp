@@ -40,4 +40,32 @@ public:
       : SolverError(std::format("Step '{}' failed: {}", step_name, message), location) {}
 };
 
+class ConvergenceError : public SolverError {
+public:
+  explicit ConvergenceError(std::string_view message, 
+                           std::source_location location = std::source_location::current())
+      : SolverError(std::format("Convergence Error: {}", message), location) {}
+};
+
+class BoundaryConditionError : public SolverError {
+public:
+  explicit BoundaryConditionError(std::string_view message,
+                                 std::source_location location = std::source_location::current())
+      : SolverError(std::format("Boundary Condition Error: {}", message), location) {}
+};
+
+class GridError : public SolverError {
+public:
+  explicit GridError(std::string_view message,
+                    std::source_location location = std::source_location::current())
+      : SolverError(std::format("Grid Error: {}", message), location) {}
+};
+
+class InitializationError : public SolverError {
+public:
+  explicit InitializationError(std::string_view message,
+                              std::source_location location = std::source_location::current())
+      : SolverError(std::format("Initialization Error: {}", message), location) {}
+};
+
 } // namespace blast::boundary_layer::solver

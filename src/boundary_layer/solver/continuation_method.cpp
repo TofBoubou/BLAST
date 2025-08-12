@@ -68,7 +68,7 @@ auto ContinuationMethod::solve_with_continuation(
     }
   }
 
-  return std::unexpected(SolverError("Continuation max steps exceeded", std::source_location::current()));
+  return std::unexpected(ConvergenceError("Continuation max steps exceeded"));
 }
 
 auto ContinuationMethod::interpolate_config(const io::Configuration& target, double lambda) const -> io::Configuration {
