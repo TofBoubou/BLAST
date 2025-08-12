@@ -282,6 +282,8 @@ outer_edge:
       velocity: 0
       temperature: 5905.5
       pressure: 7000
+      boundary_override: false  # or true to use specific mass fractions
+      mass_fraction_condition: [0.1, 0.2, 0.3, 0.2, 0.2]
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429

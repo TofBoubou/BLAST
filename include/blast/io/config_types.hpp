@@ -12,7 +12,8 @@
 namespace blast::io {
 
 using ConfigValue =
-    std::variant<bool, int, double, std::string, std::vector<double>, std::vector<int>, std::vector<std::string>>;
+    std::variant<bool, int, double, std::string, std::vector<double>,
+                 std::vector<int>, std::vector<std::string>>;
 
 struct SimulationConfig {
   enum class BodyType { Axisymmetric, Cone, TwoD, FlatPlate };
@@ -47,7 +48,12 @@ struct MixtureConfig {
   enum class Database { RRHO, NASA7, NASA9 };
   Database thermodynamic_database = Database::NASA9;
 
-  enum class ViscosityAlgorithm { chapmanEnskog_CG, GuptaYos, chapmanEnskog_LDLT, Wilke };
+  enum class ViscosityAlgorithm {
+    chapmanEnskog_CG,
+    GuptaYos,
+    chapmanEnskog_LDLT,
+    Wilke
+  };
   ViscosityAlgorithm viscosity_algorithm = ViscosityAlgorithm::chapmanEnskog_CG;
 
   // State model controlling energy mode treatment
@@ -75,6 +81,8 @@ struct OuterEdgeConfig {
     double enthalpy;
     double temperature;
     double pressure;
+    bool boundary_override = false;
+    std::optional<std::vector<double>> mass_fraction_condition;
   };
 
   std::vector<EdgePoint> edge_points;
@@ -115,7 +123,7 @@ struct Configuration {
 };
 
 template <typename T>
-concept DefaultApplicable = requires(T& t) {
+concept DefaultApplicable = requires(T &t) {
   { t.apply_defaults() } -> std::same_as<void>;
 };
 
