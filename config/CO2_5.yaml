@@ -5,7 +5,7 @@ simulation:
   consider_thermal_diffusion: false
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: false
+  catalytic_wall: true
 
 numerical:
   n_eta: 200                       
@@ -17,7 +17,7 @@ mixture:
   name: CO2_5
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
-  state_model: ChemNonEq1T
+  state_model: ChemNonEq1T 
 
 output:
   x_stations: [0.0]
@@ -36,7 +36,7 @@ outer_edge:
   freestream_velocity: 500000
 
 wall_parameters:
-  temperatures: [300]
+  temperatures: [2100]
 
 abaque:
   enabled: false
