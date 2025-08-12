@@ -216,8 +216,8 @@ auto HeatFluxCalculator::compute_conductive_flux_profile(
 
   std::vector<double> q_conductive(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
-    const double dT_dy = dT_deta[i] / geo_factors.dy_deta_factor;
-    q_conductive[i] = std::abs(-k_local[i] * dT_dy);
+      const double dT_dy = dT_deta[i] / geo_factors.dy_deta_factor;
+      q_conductive[i] = -k_local[i] * dT_dy;
   }
 
   return q_conductive;
@@ -233,17 +233,10 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& co
   core::Matrix<double> q_diffusive_species(n_species, n_eta);
 
   for (std::size_t i = 0; i < n_eta; ++i) {
-    // First compute sum without abs (matching old BLAST behavior)
     for (std::size_t j = 0; j < n_species; ++j) {
       const double q_species_j = coeffs.diffusion.J(j, i) * coeffs.h_species(j, i);
-      q_diffusive_total[i] += q_species_j;
-    }
-    // Apply abs to total sum (matching old BLAST behavior)
-    q_diffusive_total[i] = std::abs(q_diffusive_total[i]);
-    
-    // For individual species, store the absolute values for output
-    for (std::size_t j = 0; j < n_species; ++j) {
-      q_diffusive_species(j, i) = std::abs(coeffs.diffusion.J(j, i) * coeffs.h_species(j, i));
+      q_diffusive_species(j, i) = q_species_j; 
+      q_diffusive_total[i] += q_species_j;     
     }
   }
 
