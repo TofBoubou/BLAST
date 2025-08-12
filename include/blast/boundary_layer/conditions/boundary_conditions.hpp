@@ -28,6 +28,7 @@ struct EdgeConditions {
 
 struct WallConditions {
   double temperature;
+  bool catalytic = false;
 };
 
 struct BoundaryConditions {
@@ -43,6 +44,7 @@ struct BoundaryConditions {
   [[nodiscard]] constexpr auto he() const noexcept { return edge.enthalpy; }
   [[nodiscard]] constexpr auto rho_e() const noexcept { return edge.density; }
   [[nodiscard]] constexpr auto Tw() const noexcept { return wall.temperature; }
+  [[nodiscard]] constexpr auto catalytic() const noexcept { return wall.catalytic; }
   [[nodiscard]] constexpr auto r_body() const noexcept { return edge.body_radius; }
   [[nodiscard]] constexpr auto d_xi_dx() const noexcept { return edge.d_xi_dx; }
   [[nodiscard]] constexpr auto d_ue_dx() const noexcept { return edge.d_ue_dx; }
