@@ -209,7 +209,7 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
       .density = density,
       .species_fractions = species_fractions,
       .d_xi_dx = edge_config.velocity_gradient_stagnation,
-      .d_ue_dx = 0.0,
+      .d_ue_dx = edge_config.velocity_gradient_stagnation,
       .d_he_dx = 0.0,
       .d_he_dxi = 0.0,
       .body_radius = edge_point.radius
