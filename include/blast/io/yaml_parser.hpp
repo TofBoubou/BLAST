@@ -135,6 +135,11 @@ inline const std::unordered_map<std::string, MixtureConfig::ViscosityAlgorithm> 
     {"chapman_enskog_ldlt", MixtureConfig::ViscosityAlgorithm::chapmanEnskog_LDLT},
     {"wilke", MixtureConfig::ViscosityAlgorithm::Wilke}};
 
+inline const std::unordered_map<std::string, MixtureConfig::ThermalConductivityAlgorithm> thermal_conductivity_algorithms = {
+    {"chapman_enskog_cg", MixtureConfig::ThermalConductivityAlgorithm::chapmanEnskog_CG},
+    {"chapman_enskog_ldlt", MixtureConfig::ThermalConductivityAlgorithm::chapmanEnskog_LDLT},
+    {"wilke", MixtureConfig::ThermalConductivityAlgorithm::Wilke}};
+
 inline const std::unordered_map<std::string, MixtureConfig::Database> databases = {
     {"rrho", MixtureConfig::Database::RRHO},
     {"nasa7", MixtureConfig::Database::NASA7},

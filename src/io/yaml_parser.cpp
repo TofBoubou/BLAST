@@ -241,6 +241,14 @@ auto YamlParser::parse_mixture_config(const YAML::Node& node) const
       return std::unexpected(visc_result.error());
     config.viscosity_algorithm = visc_result.value();
 
+    // Optional thermal conductivity algorithm (defaults to chapmanEnskog_CG)
+    if (node["thermal_conductivity_algorithm"]) {
+      auto thermal_result = extract_enum(node, "thermal_conductivity_algorithm", enum_mappings::thermal_conductivity_algorithms);
+      if (!thermal_result)
+        return std::unexpected(thermal_result.error());
+      config.thermal_conductivity_algorithm = thermal_result.value();
+    }
+
     // Optional state model selection (defaults to ChemNonEq1T)
     if (node["state_model"]) {
       auto state_result = extract_enum(node, "state_model", enum_mappings::state_models);

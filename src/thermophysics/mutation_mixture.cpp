@@ -45,17 +45,15 @@ viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::exp
   return std::unexpected(ThermophysicsError("Unknown viscosity algorithm type"));
 }
 
-[[nodiscard]] constexpr auto thermal_cond_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo)
+[[nodiscard]] constexpr auto thermal_cond_algo_to_string(io::MixtureConfig::ThermalConductivityAlgorithm algo)
     -> std::expected<std::string_view, ThermophysicsError> {
-  // Simplified mapping for thermal conductivity
   switch (algo) {
-  case io::MixtureConfig::ViscosityAlgorithm::Wilke:
+  case io::MixtureConfig::ThermalConductivityAlgorithm::Wilke:
     return "Wilke";
-  case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_CG:
-  case io::MixtureConfig::ViscosityAlgorithm::chapmanEnskog_LDLT:
-    return "Chapmann-Enskog_LDLT";
-  case io::MixtureConfig::ViscosityAlgorithm::GuptaYos:
+  case io::MixtureConfig::ThermalConductivityAlgorithm::chapmanEnskog_CG:
     return "Chapmann-Enskog_CG";
+  case io::MixtureConfig::ThermalConductivityAlgorithm::chapmanEnskog_LDLT:
+    return "Chapmann-Enskog_LDLT";
   }
   return std::unexpected(ThermophysicsError("Unknown thermal conductivity algorithm type"));
 }
@@ -91,7 +89,7 @@ viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::exp
   opts.setViscosityAlgorithm(visc_result.value());
 
   // Set thermal conductivity algorithm
-  auto thermal_result = thermal_cond_algo_to_string(config.viscosity_algorithm);
+  auto thermal_result = thermal_cond_algo_to_string(config.thermal_conductivity_algorithm);
   if (!thermal_result) {
     return std::unexpected(thermal_result.error());
   }

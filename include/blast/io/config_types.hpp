@@ -50,6 +50,9 @@ struct MixtureConfig {
   enum class ViscosityAlgorithm { chapmanEnskog_CG, GuptaYos, chapmanEnskog_LDLT, Wilke };
   ViscosityAlgorithm viscosity_algorithm = ViscosityAlgorithm::chapmanEnskog_CG;
 
+  enum class ThermalConductivityAlgorithm { chapmanEnskog_CG, chapmanEnskog_LDLT, Wilke };
+  ThermalConductivityAlgorithm thermal_conductivity_algorithm = ThermalConductivityAlgorithm::chapmanEnskog_CG;
+
   // State model controlling energy mode treatment
   enum class StateModel { ChemNonEq1T, ChemNonEqTTv };
   StateModel state_model = StateModel::ChemNonEq1T;
