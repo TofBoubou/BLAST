@@ -423,6 +423,56 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
                                                       station, iter, pipeline_result.error().what())));
     }
 
+    if (config_.simulation.adiabatic_wall) {
+      const double h_wall_computed = solution.g[0] * bc_dynamic.he();
+      std::vector<double> c_wall(n_species);
+      for (std::size_t j = 0; j < n_species; ++j) {
+        c_wall[j] = solution.c(j, 0);
+      }
+      auto temperature_from_enthalpy = [&](double h_target) -> std::expected<double, NumericError> {
+        double T = get_wall_temperature();
+        for (int k = 0; k < 50; ++k) {
+          auto state_res = mixture_.set_state(c_wall, T, bc_dynamic.P_e());
+          if (!state_res) {
+            return std::unexpected(
+                NumericError(std::format("Failed to set state at wall: {}", state_res.error().message())));
+          }
+          auto h_res = mixture_.mixture_enthalpy(c_wall, T, bc_dynamic.P_e());
+          if (!h_res) {
+            return std::unexpected(
+                NumericError(std::format("Failed to compute enthalpy at wall: {}", h_res.error().message())));
+          }
+          auto cp_res = mixture_.frozen_cp(c_wall, T, bc_dynamic.P_e());
+          if (!cp_res) {
+            return std::unexpected(
+                NumericError(std::format("Failed to compute cp at wall: {}", cp_res.error().message())));
+          }
+          const double h = h_res.value();
+          const double cp = cp_res.value();
+          const double dT = (h_target - h) / cp;
+          T += dT;
+          if (std::abs(dT) < 1e-6 * T) {
+            return T;
+          }
+        }
+        return std::unexpected(NumericError("temperature_from_enthalpy did not converge"));
+      };
+
+      auto T_wall_result = temperature_from_enthalpy(h_wall_computed);
+      if (!T_wall_result) {
+        return std::unexpected(T_wall_result.error());
+      }
+      const double T_wall_new = T_wall_result.value();
+      const double relaxation = 0.5;
+      const double T_wall_old = get_wall_temperature();
+      const double T_wall_relaxed = T_wall_old + relaxation * (T_wall_new - T_wall_old);
+      set_wall_temperature(T_wall_relaxed);
+      bc_dynamic.update_wall_temperature(T_wall_relaxed);
+      if (iter % 10 == 0) {
+        std::cout << "  Adiabatic wall: T_wall = " << T_wall_relaxed << " K" << std::endl;
+      }
+    }
+
     // Complete new solution construction
     equations::SolutionState solution_new(n_eta, n_species);
     solution_new.V = solution.V;
@@ -485,8 +535,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
 
 auto BoundaryLayerSolver::solve_momentum_equation(const equations::SolutionState& solution,
                                                   const coefficients::CoefficientSet& coeffs,
-                                                  const conditions::BoundaryConditions& bc,
-                                                  double xi) -> std::expected<std::vector<double>, SolverError> {
+                                                  const conditions::BoundaryConditions& bc, double xi)
+    -> std::expected<std::vector<double>, SolverError> {
 
   auto result = equations::solve_momentum(solution.F, coeffs, bc, *xi_derivatives_, solution.V, xi, grid_->d_eta());
 
@@ -501,8 +551,8 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
                                                 const coefficients::CoefficientInputs& inputs,
                                                 const coefficients::CoefficientSet& coeffs,
                                                 const conditions::BoundaryConditions& bc,
-                                                const thermophysics::MixtureInterface& mixture,
-                                                int station) -> std::expected<std::vector<double>, SolverError> {
+                                                const thermophysics::MixtureInterface& mixture, int station)
+    -> std::expected<std::vector<double>, SolverError> {
 
   // Get dF/deta from unified derivative calculation
   auto all_derivatives_result = compute_all_derivatives(solution);
@@ -527,8 +577,8 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
 auto BoundaryLayerSolver::solve_species_equations(const equations::SolutionState& solution,
                                                   const coefficients::CoefficientInputs& inputs,
                                                   const coefficients::CoefficientSet& coeffs,
-                                                  const conditions::BoundaryConditions& bc,
-                                                  int station) -> std::expected<core::Matrix<double>, SolverError> {
+                                                  const conditions::BoundaryConditions& bc, int station)
+    -> std::expected<core::Matrix<double>, SolverError> {
 
   auto result = equations::solve_species(solution.c, inputs, coeffs, bc, *xi_derivatives_, mixture_, config_.simulation,
                                          solution.F, solution.V, station, grid_->d_eta());
@@ -540,9 +590,11 @@ auto BoundaryLayerSolver::solve_species_equations(const equations::SolutionState
   return result.value();
 }
 
-auto BoundaryLayerSolver::update_temperature_field(
-    std::span<const double> g_field, const core::Matrix<double>& composition, const conditions::BoundaryConditions& bc,
-    std::span<const double> current_temperatures) -> std::expected<std::vector<double>, SolverError> {
+auto BoundaryLayerSolver::update_temperature_field(std::span<const double> g_field,
+                                                   const core::Matrix<double>& composition,
+                                                   const conditions::BoundaryConditions& bc,
+                                                   std::span<const double> current_temperatures)
+    -> std::expected<std::vector<double>, SolverError> {
 
   const auto n_eta = g_field.size();
   std::vector<double> enthalpy_field(n_eta);
@@ -617,10 +669,22 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
 
   std::fill(guess.V.begin(), guess.V.end(), 0.0);
 
+  double T_wall_local = bc.Tw();
+  if (config_.simulation.adiabatic_wall) {
+    T_wall_local = 0.3 * T_edge;
+    auto& cfg = const_cast<io::Configuration&>(config_);
+    if (cfg.wall_parameters.wall_temperatures.empty()) {
+      cfg.wall_parameters.wall_temperatures.push_back(T_wall_local);
+    } else {
+      cfg.wall_parameters.wall_temperatures[0] = T_wall_local;
+    }
+    std::cout << "Adiabatic wall initialization: T_wall_guess = " << T_wall_local << " K" << std::endl;
+  }
+
   // ===== STEP 1: RETRIEVE BOUNDARY COMPOSITIONS =====
 
   // Compute equilibrium composition at the wall (Tw, P_e)
-  auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
+  auto equilibrium_result = mixture_.equilibrium_composition(T_wall_local, bc.P_e());
   if (!equilibrium_result) {
     return std::unexpected(NumericError(std::format("Failed to compute equilibrium composition at wall conditions: {}",
                                                     equilibrium_result.error().message())));
@@ -637,7 +701,7 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   // ===== STEP 1.5: COMPUTE WALL EQUILIBRIUM ENTHALPY =====
 
   // Calculate enthalpy of equilibrium mixture at wall conditions
-  auto h_wall_eq_result = mixture_.mixture_enthalpy(c_wall_equilibrium, bc.Tw(), bc.P_e());
+  auto h_wall_eq_result = mixture_.mixture_enthalpy(c_wall_equilibrium, T_wall_local, bc.P_e());
   if (!h_wall_eq_result) {
     return std::unexpected(NumericError(
         std::format("Failed to compute wall equilibrium enthalpy: {}", h_wall_eq_result.error().message())));
@@ -697,7 +761,7 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   for (std::size_t i = 0; i < n_eta; ++i) {
     const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
     double F_normalized = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
-    guess.T[i] = bc.Tw() + F_normalized * (T_edge - bc.Tw());
+    guess.T[i] = T_wall_local + F_normalized * (T_edge - T_wall_local);
   }
 
   return guess;
@@ -772,9 +836,10 @@ auto BoundaryLayerSolver::enforce_edge_boundary_conditions(equations::SolutionSt
   }
 }
 
-auto BoundaryLayerSolver::update_edge_properties(
-    conditions::BoundaryConditions& bc, const coefficients::CoefficientInputs& inputs,
-    const core::Matrix<double>& species_matrix) const -> std::expected<void, SolverError> {
+auto BoundaryLayerSolver::update_edge_properties(conditions::BoundaryConditions& bc,
+                                                 const coefficients::CoefficientInputs& inputs,
+                                                 const core::Matrix<double>& species_matrix) const
+    -> std::expected<void, SolverError> {
 
   const auto n_eta = grid_->n_eta();
   const auto n_species = mixture_.n_species();

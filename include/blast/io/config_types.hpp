@@ -26,6 +26,7 @@ struct SimulationConfig {
   bool consider_dufour_effect = false;
   ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
   bool catalytic_wall = false; // Enable surface catalysis
+  bool adiabatic_wall = false; // Solve with adiabatic wall
 };
 
 struct NumericalConfig {

@@ -13,8 +13,8 @@ auto solve_energy(std::span<const double> g_previous, const coefficients::Coeffi
                   const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                   const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                   std::span<const double> F_field, std::span<const double> dF_deta, std::span<const double> V_field,
-                  const thermophysics::MixtureInterface& mixture, int station,
-                  PhysicalQuantity auto d_eta) -> std::expected<std::vector<double>, EquationError> {
+                  const thermophysics::MixtureInterface& mixture, int station, PhysicalQuantity auto d_eta)
+    -> std::expected<std::vector<double>, EquationError> {
 
   const auto n_eta = g_previous.size();
 
@@ -60,8 +60,8 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
                                const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                                std::span<const double> F_field, std::span<const double> dF_deta,
                                std::span<const double> V_field, const thermophysics::MixtureInterface& mixture,
-                               int station,
-                               PhysicalQuantity auto d_eta) -> std::expected<EnergyCoefficients, EquationError> {
+                               int station, PhysicalQuantity auto d_eta)
+    -> std::expected<EnergyCoefficients, EquationError> {
 
   const auto n_eta = g_previous.size();
   const auto n_species = inputs.c.rows();
@@ -148,14 +148,17 @@ auto build_energy_boundary_conditions(const coefficients::CoefficientInputs& inp
                                       const coefficients::CoefficientSet& coeffs,
                                       const conditions::BoundaryConditions& bc, const io::SimulationConfig& sim_config,
                                       int station, PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions {
+  if (sim_config.adiabatic_wall) {
+    return EnergyBoundaryConditions{.f_bc = 1.0, .g_bc = 0.0, .h_bc = 0.0};
+  }
 
   return EnergyBoundaryConditions{.f_bc = 0.0, .g_bc = 1.0, .h_bc = coeffs.thermodynamic.h_wall / bc.he()};
 }
 
 auto compute_species_enthalpy_terms(const coefficients::CoefficientInputs& inputs,
                                     const coefficients::CoefficientSet& coeffs,
-                                    const conditions::BoundaryConditions& bc, double J_fact,
-                                    std::size_t eta_index) -> std::tuple<double, double> {
+                                    const conditions::BoundaryConditions& bc, double J_fact, std::size_t eta_index)
+    -> std::tuple<double, double> {
 
   const auto n_species = inputs.c.rows();
   double tmp1 = 0.0;

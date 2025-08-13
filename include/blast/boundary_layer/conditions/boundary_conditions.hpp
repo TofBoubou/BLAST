@@ -35,7 +35,7 @@ struct WallConditions {
 
 struct BoundaryConditions {
   EdgeConditions edge;
-  WallConditions wall;
+  mutable WallConditions wall;
   double beta;
   int station;
   double xi;
@@ -58,6 +58,8 @@ struct BoundaryConditions {
   void update_edge_density(double new_density) noexcept { edge.density = new_density; }
 
   void update_edge_viscosity(double new_viscosity) noexcept { edge.viscosity = new_viscosity; }
+
+  void update_wall_temperature(double T_new) const noexcept { wall.temperature = T_new; }
 };
 
 class BoundaryConditionError : public core::BlastException {

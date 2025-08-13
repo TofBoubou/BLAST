@@ -180,6 +180,14 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.catalytic_wall = catalytic_result.value();
 
+    if (node["adiabatic_wall"]) {
+      config.adiabatic_wall = node["adiabatic_wall"].as<bool>();
+    }
+    if (config.adiabatic_wall && config.catalytic_wall) {
+      return std::unexpected(
+          core::ConfigurationError("Cannot have both adiabatic_wall and catalytic_wall enabled simultaneously"));
+    }
+
     return config;
 
   } catch (const core::ConfigurationError& e) {
@@ -243,7 +251,8 @@ auto YamlParser::parse_mixture_config(const YAML::Node& node) const
 
     // Optional thermal conductivity algorithm (defaults to chapmanEnskog_CG)
     if (node["thermal_conductivity_algorithm"]) {
-      auto thermal_result = extract_enum(node, "thermal_conductivity_algorithm", enum_mappings::thermal_conductivity_algorithms);
+      auto thermal_result =
+          extract_enum(node, "thermal_conductivity_algorithm", enum_mappings::thermal_conductivity_algorithms);
       if (!thermal_result)
         return std::unexpected(thermal_result.error());
       config.thermal_conductivity_algorithm = thermal_result.value();
