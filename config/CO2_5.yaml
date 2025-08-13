@@ -5,7 +5,7 @@ simulation:
   consider_thermal_diffusion: false
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: true
+  catalytic_wall: false
 
 numerical:
   n_eta: 200                       

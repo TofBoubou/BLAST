@@ -129,27 +129,58 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
   return 2.0 * xi * d_ue_dxi / ue;
 }
 
-auto create_stagnation_conditions(const io::OuterEdgeConfig& edge_config, const io::WallParametersConfig& wall_config,
-                                  const io::SimulationConfig& sim_config,
-                                  const thermophysics::MixtureInterface& mixture)
+[[nodiscard]] static auto get_species_fractions(
+    const io::OuterEdgeConfig::EdgePoint& edge_point,
+    const thermophysics::MixtureInterface& mixture)
+    -> std::expected<std::vector<double>, BoundaryConditionError> {
+  
+  if (edge_point.boundary_override) {
+    // Utiliser les fractions spécifiées par l'utilisateur
+    if (!edge_point.mass_fraction_condition) {
+      return std::unexpected(BoundaryConditionError(
+        "mass_fraction_condition missing despite boundary_override being true"));
+    }
+    
+    // Vérifier que le nombre d'espèces correspond
+    if (edge_point.mass_fraction_condition->size() != mixture.n_species()) {
+      return std::unexpected(BoundaryConditionError(
+        std::format("mass_fraction_condition size ({}) doesn't match number of species ({})",
+                   edge_point.mass_fraction_condition->size(), mixture.n_species())));
+    }
+    
+    return edge_point.mass_fraction_condition.value();
+  } else {
+    // Comportement par défaut : calculer l'équilibre
+    auto eq_result = mixture.equilibrium_composition(edge_point.temperature, edge_point.pressure);
+    if (!eq_result) {
+      return std::unexpected(BoundaryConditionError(
+        std::format("Failed to compute equilibrium composition: {}", eq_result.error().message())));
+    }
+    return eq_result.value();
+  }
+}
+
+[[nodiscard]] auto create_stagnation_conditions(const io::OuterEdgeConfig& edge_config,
+                                               const io::WallParametersConfig& wall_config,
+                                               const io::SimulationConfig& sim_config,
+                                               const thermophysics::MixtureInterface& mixture)
     -> std::expected<BoundaryConditions, BoundaryConditionError> {
 
   if (edge_config.edge_points.empty()) {
     return std::unexpected(BoundaryConditionError("No edge points defined"));
   }
-
   if (wall_config.wall_temperatures.empty()) {
     return std::unexpected(BoundaryConditionError("No wall temperatures defined"));
   }
 
   const auto& edge_point = edge_config.edge_points[0];
 
-  auto eq_result = mixture.equilibrium_composition(edge_point.temperature, edge_point.pressure);
-  if (!eq_result) {
-    return std::unexpected(BoundaryConditionError(
-        std::format("Failed to compute equilibrium composition: {}", eq_result.error().message())));
+  // Utilise la nouvelle fonction helper pour obtenir les fractions d'espèces
+  auto species_fractions_result = get_species_fractions(edge_point, mixture);
+  if (!species_fractions_result) {
+    return std::unexpected(species_fractions_result.error());
   }
-  auto species_fractions = eq_result.value();
+  auto species_fractions = species_fractions_result.value();
 
   auto h_result = mixture.mixture_enthalpy(species_fractions, edge_point.temperature, edge_point.pressure);
   if (!h_result) {
@@ -170,203 +201,269 @@ auto create_stagnation_conditions(const io::OuterEdgeConfig& edge_config, const 
   }
   auto viscosity = visc_result.value();
 
-  EdgeConditions edge{.pressure = edge_point.pressure,
-                      .viscosity = viscosity,
-                      .velocity = edge_point.velocity,
-                      .enthalpy = enthalpy,
-                      .density = density,
-                      .species_fractions = species_fractions,
-                      .d_xi_dx = edge_config.velocity_gradient_stagnation,
-                      .d_ue_dx = edge_config.velocity_gradient_stagnation,
-                      .d_he_dx = 0.0,
-                      .d_he_dxi = 0.0,
-                      .body_radius = edge_point.radius};
+  EdgeConditions edge{
+      .pressure = edge_point.pressure,
+      .viscosity = viscosity,
+      .velocity = edge_point.velocity,
+      .enthalpy = enthalpy,
+      .density = density,
+      .species_fractions = species_fractions,
+      .d_xi_dx = edge_config.velocity_gradient_stagnation,
+      .d_ue_dx = 0.0,
+      .d_he_dx = 0.0,
+      .d_he_dxi = 0.0,
+      .body_radius = edge_point.radius
+  };
 
   WallConditions wall{.temperature = wall_config.wall_temperatures[0]};
 
-  return BoundaryConditions{.edge = std::move(edge),
-                            .wall = std::move(wall),
-                            .beta = compute_beta(0, 0.0, sim_config),
-                            .station = 0,
-                            .xi = 0.0};
+  return BoundaryConditions{
+      .edge = edge,
+      .wall = wall,
+      .beta = 0.0,
+      .station = 0,
+      .xi = 0.0
+  };
 }
 
-auto interpolate_boundary_conditions(
-    int station, double xi, std::span<const double> xi_grid, const io::OuterEdgeConfig& edge_config,
-    const io::WallParametersConfig& wall_config, const io::SimulationConfig& sim_config,
-    const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryConditions, BoundaryConditionError> {
-
+[[nodiscard]] auto interpolate_boundary_conditions(
+    int station, double xi, std::span<const double> xi_grid,
+    const io::OuterEdgeConfig& edge_config,
+    const io::WallParametersConfig& wall_config,
+    const io::SimulationConfig& sim_config,
+    const thermophysics::MixtureInterface& mixture)
+    -> std::expected<BoundaryConditions, BoundaryConditionError>
+{
   // Stagnation point special case
   if (station == 0) {
     return create_stagnation_conditions(edge_config, wall_config, sim_config, mixture);
   }
 
-  // Find interpolation interval in xi space
+  // Locate xi interval
   auto interval_result = search_interval(xi_grid, xi);
   if (!interval_result) {
-    return std::unexpected(
-        BoundaryConditionError(std::format("Failed to find xi={} in grid: {}", xi, interval_result.error().message())));
+    return std::unexpected(BoundaryConditionError(
+        std::format("Failed to find xi = {} in grid: {}", xi, interval_result.error().message())));
   }
-
   const auto [i1, i2] = interval_result.value();
 
-  // Extract x coordinates for interpolation
-  auto x_grid = extract_edge_property(edge_config.edge_points, &io::OuterEdgeConfig::EdgePoint::x);
+  // Extract x-grid from edge config and interpolate x at current xi
+  const auto x_grid = extract_edge_property(edge_config.edge_points, &io::OuterEdgeConfig::EdgePoint::x);
+  const double x_interp = (i1 == i2)
+      ? x_grid[i1]
+      : linear_interpolate(xi, xi_grid[i1], xi_grid[i2], x_grid[i1], x_grid[i2]);
 
-  // Compute interpolated x position
-  const double x_interp =
-      (i1 == i2) ? x_grid[i1] : linear_interpolate(xi, xi_grid[i1], xi_grid[i2], x_grid[i1], x_grid[i2]);
-
-  // Find interval in physical x space
+  // Find interval in physical x
   auto x_interval_result = search_interval(std::span(x_grid), x_interp);
   if (!x_interval_result) {
-    return std::unexpected(BoundaryConditionError(std::format("Failed to find x={} in edge grid", x_interp)));
+    return std::unexpected(BoundaryConditionError(
+        std::format("Failed to find x = {} in edge grid", x_interp)));
   }
-
   const auto [ix1, ix2] = x_interval_result.value();
 
-  auto u_edge = extract_edge_property(edge_config.edge_points, &io::OuterEdgeConfig::EdgePoint::velocity);
-  auto t_edge = extract_edge_property(edge_config.edge_points, &io::OuterEdgeConfig::EdgePoint::temperature);
+  // Prepare edge properties and their derivatives
+  const auto u_edge = extract_edge_property(edge_config.edge_points, &io::OuterEdgeConfig::EdgePoint::velocity);
+  const auto t_edge = extract_edge_property(edge_config.edge_points, &io::OuterEdgeConfig::EdgePoint::temperature);
 
   auto du_dx_result = compute_property_derivatives(u_edge, x_grid);
   if (!du_dx_result) {
-    return std::unexpected(
-        BoundaryConditionError(std::format("Failed to compute d_ue_dx: {}", du_dx_result.error().message())));
+    return std::unexpected(BoundaryConditionError(
+        std::format("Failed to compute d_ue_dx: {}", du_dx_result.error().message())));
   }
-  auto du_dx = du_dx_result.value();
+  const auto du_dx = du_dx_result.value();
 
   auto dt_dx_result = compute_property_derivatives(t_edge, x_grid);
   if (!dt_dx_result) {
-    return std::unexpected(
-        BoundaryConditionError(std::format("Failed to compute d_te_dx: {}", dt_dx_result.error().message())));
+    return std::unexpected(BoundaryConditionError(
+        std::format("Failed to compute d_te_dx: {}", dt_dx_result.error().message())));
   }
-  auto dt_dx = dt_dx_result.value();
+  const auto dt_dx = dt_dx_result.value();
 
   const double d_ue_dx_interp = interpolate_property(du_dx, ix1, ix2, x_grid, x_interp);
   const double d_te_dx_interp = interpolate_property(dt_dx, ix1, ix2, x_grid, x_interp);
 
-  auto interp_linear = [&](auto member_ptr) {
-    auto values = extract_edge_property(edge_config.edge_points, member_ptr);
+  // Helpers for (Hermite) interpolation of scalar fields defined on edge points
+  const auto interp_linear = [&](auto member_ptr) {
+    const auto values = extract_edge_property(edge_config.edge_points, member_ptr);
     return interpolate_property(values, ix1, ix2, x_grid, x_interp);
   };
 
-  auto interp_hermite = [&](auto member_ptr) -> std::expected<double, BoundaryConditionError> {
-    auto values = extract_edge_property(edge_config.edge_points, member_ptr);
-    auto derivatives_result = compute_property_derivatives(values, x_grid);
-    if (!derivatives_result) {
-      return std::unexpected(derivatives_result.error());
-    }
-    return interpolate_property(values, ix1, ix2, x_grid, x_interp, derivatives_result.value());
+  const auto interp_hermite = [&](auto member_ptr) -> std::expected<double, BoundaryConditionError> {
+    const auto values = extract_edge_property(edge_config.edge_points, member_ptr);
+    auto dvals_dx = compute_property_derivatives(values, x_grid);
+    if (!dvals_dx) return std::unexpected(dvals_dx.error());
+    return interpolate_property(values, ix1, ix2, x_grid, x_interp, dvals_dx.value());
   };
 
-  auto pressure_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::pressure);
-  if (!pressure_result) {
-    return std::unexpected(pressure_result.error());
-  }
-
-  auto velocity_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::velocity);
-  if (!velocity_result) {
-    return std::unexpected(velocity_result.error());
-  }
-
+  // Interpolate primitive edge conditions (Hermite for smoothness)
+  auto pressure_result    = interp_hermite(&io::OuterEdgeConfig::EdgePoint::pressure);
+  if (!pressure_result)   return std::unexpected(pressure_result.error());
+  auto velocity_result    = interp_hermite(&io::OuterEdgeConfig::EdgePoint::velocity);
+  if (!velocity_result)   return std::unexpected(velocity_result.error());
   auto temperature_result = interp_hermite(&io::OuterEdgeConfig::EdgePoint::temperature);
-  if (!temperature_result) {
-    return std::unexpected(temperature_result.error());
-  }
+  if (!temperature_result) return std::unexpected(temperature_result.error());
 
-  const double radius_interp = interp_linear(&io::OuterEdgeConfig::EdgePoint::radius);
-
-  // Calculate derived properties from interpolated temperature and pressure
+  const double pressure_interp    = pressure_result.value();
   const double temperature_interp = temperature_result.value();
-  const double pressure_interp = pressure_result.value();
+  const double radius_interp      = interp_linear(&io::OuterEdgeConfig::EdgePoint::radius);
 
-  auto eq_result = mixture.equilibrium_composition(temperature_interp, pressure_interp);
-  if (!eq_result) {
-    return std::unexpected(BoundaryConditionError("Failed to compute equilibrium composition"));
+  // === Species fractions: override vs equilibrium ===
+  std::vector<double> species_fractions;
+  {
+    const bool all_override = std::all_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
+                                          [](const auto& p){ return p.boundary_override; });
+    const bool none_override = std::none_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
+                                            [](const auto& p){ return p.boundary_override; });
+
+    if (!all_override && !none_override) {
+      return std::unexpected(BoundaryConditionError(
+        "All edge points must have the same boundary_override setting for interpolation"));
+    }
+
+    if (all_override) {
+      // Interpolate each species mass fraction provided at edge points
+      const std::size_t n_species = mixture.n_species();
+      if (n_species == 0) {
+        return std::unexpected(BoundaryConditionError("Mixture reports zero species"));
+      }
+      species_fractions.assign(n_species, 0.0);
+
+      for (std::size_t j = 0; j < n_species; ++j) {
+        std::vector<double> yj_values;
+        yj_values.reserve(edge_config.edge_points.size());
+        for (const auto& pt : edge_config.edge_points) {
+          if (!pt.mass_fraction_condition) {
+            return std::unexpected(BoundaryConditionError(
+              "Missing mass_fraction_condition in edge point with boundary_override = true"));
+          }
+          const auto& y = *pt.mass_fraction_condition;
+          if (y.size() != n_species) {
+            return std::unexpected(BoundaryConditionError(
+              std::format("mass_fraction_condition size mismatch (got {}, expected {})",
+                          y.size(), n_species)));
+          }
+          yj_values.push_back(y[j]);
+        }
+        // Interpolate species j at x_interp
+        species_fractions[j] = interpolate_property(yj_values, ix1, ix2, x_grid, x_interp);
+        if (!std::isfinite(species_fractions[j])) {
+          return std::unexpected(BoundaryConditionError(
+            std::format("Non-finite interpolated mass fraction for species {} at x = {}", j, x_interp)));
+        }
+      }
+
+      // Clean small negatives (interp artifacts), enforce non-negativity and renormalize
+      for (auto& v : species_fractions) {
+        if (v < 0.0 && v > -1e-12) v = 0.0;
+        if (v < 0.0) {
+          return std::unexpected(BoundaryConditionError(
+            "Interpolated mass fractions contain negative values beyond tolerance"));
+        }
+      }
+      double sum = std::accumulate(species_fractions.begin(), species_fractions.end(), 0.0);
+      if (!(sum > 0.0) || !std::isfinite(sum)) {
+        return std::unexpected(BoundaryConditionError("Sum of interpolated mass fractions is not positive/finite"));
+      }
+      for (auto& v : species_fractions) v /= sum;
+    } else {
+      // Default: equilibrium composition at interpolated (T, p)
+      auto eq_result = mixture.equilibrium_composition(temperature_interp, pressure_interp);
+      if (!eq_result) {
+        return std::unexpected(BoundaryConditionError("Failed to compute equilibrium composition"));
+      }
+      species_fractions = std::move(eq_result.value());
+      if (species_fractions.empty()) {
+        return std::unexpected(BoundaryConditionError("Equilibrium composition returned empty vector"));
+      }
+    }
   }
-  auto species_fractions = eq_result.value();
 
+  // Thermophysical properties based on chosen composition
   auto h_result = mixture.mixture_enthalpy(species_fractions, temperature_interp, pressure_interp);
   if (!h_result) {
     return std::unexpected(BoundaryConditionError("Failed to compute enthalpy"));
   }
-  auto enthalpy_interp = h_result.value();
+  const double enthalpy_interp = h_result.value();
 
   auto mw_result = mixture.mixture_molecular_weight(species_fractions);
   if (!mw_result) {
     return std::unexpected(BoundaryConditionError("Failed to compute MW"));
   }
-  auto density_interp =
+  const double density_interp =
       pressure_interp * mw_result.value() / (temperature_interp * thermophysics::constants::R_universal);
 
   auto visc_result = mixture.viscosity(species_fractions, temperature_interp, pressure_interp);
   if (!visc_result) {
     return std::unexpected(BoundaryConditionError("Failed to compute viscosity"));
   }
-  auto viscosity_interp = visc_result.value();
+  const double viscosity_interp = visc_result.value();
 
-  // Calculate dh/dx from dt/dx
+  // dh/dx from Cp(T,p,Y) * dT/dx
   auto cp_result = mixture.frozen_cp(species_fractions, temperature_interp, pressure_interp);
   if (!cp_result) {
     return std::unexpected(BoundaryConditionError("Failed to compute Cp"));
   }
   const double d_he_dx_interp = cp_result.value() * d_te_dx_interp;
 
-  // By definition: dξ/dx = ρ_e(x) * μ_e(x) * u_e(x) * r_body(x)²
+  // By definition: dξ/dx = ρ_e * μ_e * u_e * r(x)^2
   const double d_xi_dx_calculated =
       density_interp * viscosity_interp * velocity_result.value() * radius_interp * radius_interp;
 
-  if (d_xi_dx_calculated <= 0.0 || !std::isfinite(d_xi_dx_calculated)) {
-    return std::unexpected(
-        BoundaryConditionError(std::format("Invalid calculated d_xi_dx={} at x={}", d_xi_dx_calculated, x_interp)));
+  if (!(d_xi_dx_calculated > 0.0) || !std::isfinite(d_xi_dx_calculated)) {
+    return std::unexpected(BoundaryConditionError(
+      std::format("Invalid calculated d_xi_dx = {} at x = {}", d_xi_dx_calculated, x_interp)));
   }
 
-  EdgeConditions edge{.pressure = pressure_interp,
-                      .viscosity = viscosity_interp,
-                      .velocity = velocity_result.value(),
-                      .enthalpy = enthalpy_interp,
-                      .density = density_interp,
-                      .species_fractions = species_fractions,
-                      .d_xi_dx = d_xi_dx_calculated,
-                      .d_ue_dx = d_ue_dx_interp,
-                      .d_he_dx = d_he_dx_interp,
-                      .d_he_dxi = 0.0,
-                      .body_radius = radius_interp};
-
+  // Wall temperature (Hermite)
   if (wall_config.wall_temperatures.size() != edge_config.edge_points.size()) {
-    return std::unexpected(
-        BoundaryConditionError(std::format("Wall temperatures array size ({}) doesn't match edge points size ({})",
-                                           wall_config.wall_temperatures.size(), edge_config.edge_points.size())));
+    return std::unexpected(BoundaryConditionError(
+        std::format("Wall temperatures size ({}) doesn't match edge points size ({})",
+                    wall_config.wall_temperatures.size(), edge_config.edge_points.size())));
   }
-
-  auto wall_temp_derivatives_result = compute_property_derivatives(wall_config.wall_temperatures, x_grid);
-  if (!wall_temp_derivatives_result) {
-    return std::unexpected(BoundaryConditionError(std::format("Failed to compute wall temperature derivatives: {}",
-                                                              wall_temp_derivatives_result.error().message())));
+  auto dTw_dx = compute_property_derivatives(wall_config.wall_temperatures, x_grid);
+  if (!dTw_dx) {
+    return std::unexpected(BoundaryConditionError(
+        std::format("Failed to compute wall temperature derivatives: {}", dTw_dx.error().message())));
   }
-
-  const double wall_temp = interpolate_property(wall_config.wall_temperatures, ix1, ix2, x_grid, x_interp,
-                                                wall_temp_derivatives_result.value());
-
-  if (wall_temp <= 0.0 || !std::isfinite(wall_temp)) {
+  const double wall_temp = interpolate_property(wall_config.wall_temperatures, ix1, ix2, x_grid, x_interp, dTw_dx.value());
+  if (!(wall_temp > 0.0) || !std::isfinite(wall_temp)) {
     return std::unexpected(BoundaryConditionError(std::format("Invalid wall temperature: {} K", wall_temp)));
   }
 
-  WallConditions wall{.temperature = wall_temp};
+  EdgeConditions edge{
+    .pressure          = pressure_interp,
+    .viscosity         = viscosity_interp,
+    .velocity          = velocity_result.value(),
+    .enthalpy          = enthalpy_interp,
+    .density           = density_interp,
+    .species_fractions = species_fractions,
+    .d_xi_dx           = d_xi_dx_calculated,
+    .d_ue_dx           = d_ue_dx_interp,
+    .d_he_dx           = d_he_dx_interp,
+    .d_he_dxi          = 0.0, // set below
+    .body_radius       = radius_interp
+  };
 
   const double d_ue_dxi = edge.d_ue_dx / edge.d_xi_dx;
   edge.d_he_dxi = edge.d_he_dx / edge.d_xi_dx;
 
   if (!std::isfinite(d_ue_dxi) || !std::isfinite(edge.d_he_dxi)) {
     return std::unexpected(BoundaryConditionError(
-        std::format("Invalid computed derivatives: d_ue_dxi={}, d_he_dxi={}", d_ue_dxi, edge.d_he_dxi)));
+        std::format("Invalid computed derivatives: d_ue_dxi = {}, d_he_dxi = {}",
+                    d_ue_dxi, edge.d_he_dxi)));
   }
 
-  return BoundaryConditions{.edge = std::move(edge),
-                            .wall = std::move(wall),
-                            .beta = compute_beta(station, xi, sim_config, edge.velocity, d_ue_dxi),
-                            .station = station,
-                            .xi = xi};
+  WallConditions wall{ .temperature = wall_temp };
+
+  return BoundaryConditions{
+    .edge    = std::move(edge),
+    .wall    = std::move(wall),
+    .beta    = compute_beta(station, xi, sim_config, /*u_e=*/velocity_result.value(), d_ue_dxi),
+    .station = station,
+    .xi      = xi
+  };
 }
+
+
 
 } // namespace blast::boundary_layer::conditions

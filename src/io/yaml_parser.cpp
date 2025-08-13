@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 
 namespace blast::io {
 
@@ -313,10 +314,36 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
         return std::unexpected(pressure_result.error());
       point.pressure = pressure_result.value();
 
+      if (point_node["boundary_override"]) {
+        point.boundary_override = point_node["boundary_override"].as<bool>();
+        
+        if (point.boundary_override) {
+          if (!point_node["mass_fraction_condition"]) {
+            return std::unexpected(core::ConfigurationError(
+              "mass_fraction_condition is required when boundary_override is true"));
+          }
+          
+          auto mass_fractions = point_node["mass_fraction_condition"].as<std::vector<double>>();
+          
+          double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
+          if (std::abs(sum - 1.0) > 1e-6) {
+            return std::unexpected(core::ConfigurationError(
+              std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+          }
+          
+          if (std::any_of(mass_fractions.begin(), mass_fractions.end(), 
+                         [](double val) { return val < 0.0; })) {
+            return std::unexpected(core::ConfigurationError(
+              "All mass fractions must be non-negative"));
+          }
+          
+          point.mass_fraction_condition = mass_fractions;
+        }
+      }
+
       config.edge_points.push_back(point);
     }
 
-    // Scalars (unchanged)
     auto vel_grad_result = extract_value<double>(node, "velocity_gradient_stagnation");
     if (!vel_grad_result)
       return std::unexpected(vel_grad_result.error());
@@ -336,6 +363,8 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
 
   } catch (const core::ConfigurationError& e) {
     return std::unexpected(core::ConfigurationError(std::format("In 'outer_edge' section: {}", e.message())));
+  } catch (const YAML::Exception& e) {
+    return std::unexpected(core::ConfigurationError(std::format("In 'outer_edge' section: YAML error - {}", e.what())));
   }
 }
 

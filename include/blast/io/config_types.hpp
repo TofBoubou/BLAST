@@ -75,6 +75,9 @@ struct OuterEdgeConfig {
     double enthalpy;
     double temperature;
     double pressure;
+
+    bool boundary_override = false;
+    std::optional<std::vector<double>> mass_fraction_condition;
   };
 
   std::vector<EdgePoint> edge_points;
