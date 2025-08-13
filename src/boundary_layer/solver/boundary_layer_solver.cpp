@@ -793,10 +793,14 @@ auto BoundaryLayerSolver::update_edge_properties(
   }
   const double mu_e_new = mu_result.value();
 
-  // Update boundary conditions with new equilibrium values
+  // Update boundary conditions with new values
   bc.update_edge_density(rho_e_new);
   bc.update_edge_viscosity(mu_e_new);
-  bc.edge.species_fractions = edge_composition_eq;
+  
+  // Only update species fractions if boundary_override is false
+  if (!bc.edge.boundary_override) {
+    bc.edge.species_fractions = edge_composition_eq;
+  }
 
   return {};
 }

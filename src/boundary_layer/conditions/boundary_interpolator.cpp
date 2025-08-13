@@ -212,7 +212,8 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
       .d_ue_dx = edge_config.velocity_gradient_stagnation,
       .d_he_dx = 0.0,
       .d_he_dxi = 0.0,
-      .body_radius = edge_point.radius
+      .body_radius = edge_point.radius,
+      .boundary_override = edge_point.boundary_override
   };
 
   WallConditions wall{.temperature = wall_config.wall_temperatures[0]};
@@ -308,12 +309,13 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
   const double radius_interp      = interp_linear(&io::OuterEdgeConfig::EdgePoint::radius);
 
   // === Species fractions: override vs equilibrium ===
+  const bool all_override = std::all_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
+                                        [](const auto& p){ return p.boundary_override; });
+  const bool none_override = std::none_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
+                                          [](const auto& p){ return p.boundary_override; });
+  
   std::vector<double> species_fractions;
   {
-    const bool all_override = std::all_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
-                                          [](const auto& p){ return p.boundary_override; });
-    const bool none_override = std::none_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
-                                            [](const auto& p){ return p.boundary_override; });
 
     if (!all_override && !none_override) {
       return std::unexpected(BoundaryConditionError(
@@ -441,7 +443,8 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
     .d_ue_dx           = d_ue_dx_interp,
     .d_he_dx           = d_he_dx_interp,
     .d_he_dxi          = 0.0, // set below
-    .body_radius       = radius_interp
+    .body_radius       = radius_interp,
+    .boundary_override = all_override
   };
 
   const double d_ue_dxi = edge.d_ue_dx / edge.d_xi_dx;
