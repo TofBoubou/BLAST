@@ -102,7 +102,6 @@ int main(int argc, char* argv[]) {
       std::cout << "\nEdge conditions:" << std::endl;
       std::cout << "  Pressure: " << edge.pressure << " Pa" << std::endl;
       std::cout << "  Temperature: " << edge.temperature << " K" << std::endl;
-      std::cout << "  Enthalpy: " << edge.enthalpy / 1000.0 << " kJ/kg" << std::endl;
       if (!config.wall_parameters.wall_temperatures.empty()) {
         std::cout << "  Wall temp: " << config.wall_parameters.wall_temperatures[0] << " K" << std::endl;
       } else {

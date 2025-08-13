@@ -134,21 +134,21 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
     const thermophysics::MixtureInterface& mixture)
     -> std::expected<std::vector<double>, BoundaryConditionError> {
   
-  if (edge_point.boundary_override) {
+  if (edge_point.boundary_override_enabled()) {
     // Utiliser les fractions spécifiées par l'utilisateur
-    if (!edge_point.mass_fraction_condition) {
+    if (!edge_point.mass_fraction_condition()) {
       return std::unexpected(BoundaryConditionError(
-        "mass_fraction_condition missing despite boundary_override being true"));
+        "mass_fraction_condition missing despite boundary_override being enabled"));
     }
     
     // Vérifier que le nombre d'espèces correspond
-    if (edge_point.mass_fraction_condition->size() != mixture.n_species()) {
+    if (edge_point.mass_fraction_condition()->size() != mixture.n_species()) {
       return std::unexpected(BoundaryConditionError(
         std::format("mass_fraction_condition size ({}) doesn't match number of species ({})",
-                   edge_point.mass_fraction_condition->size(), mixture.n_species())));
+                   edge_point.mass_fraction_condition()->size(), mixture.n_species())));
     }
     
-    return edge_point.mass_fraction_condition.value();
+    return edge_point.mass_fraction_condition().value();
   } else {
     // Comportement par défaut : calculer l'équilibre
     auto eq_result = mixture.equilibrium_composition(edge_point.temperature, edge_point.pressure);
@@ -213,7 +213,7 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
       .d_he_dx = 0.0,
       .d_he_dxi = 0.0,
       .body_radius = edge_point.radius,
-      .boundary_override = edge_point.boundary_override
+      .boundary_override = edge_point.boundary_override_enabled()
   };
 
   WallConditions wall{.temperature = wall_config.wall_temperatures[0]};
@@ -310,9 +310,9 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
 
   // === Species fractions: override vs equilibrium ===
   const bool all_override = std::all_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
-                                        [](const auto& p){ return p.boundary_override; });
+                                        [](const auto& p){ return p.boundary_override_enabled(); });
   const bool none_override = std::none_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
-                                          [](const auto& p){ return p.boundary_override; });
+                                          [](const auto& p){ return p.boundary_override_enabled(); });
   
   std::vector<double> species_fractions;
   {
@@ -334,11 +334,11 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
         std::vector<double> yj_values;
         yj_values.reserve(edge_config.edge_points.size());
         for (const auto& pt : edge_config.edge_points) {
-          if (!pt.mass_fraction_condition) {
+          if (!pt.mass_fraction_condition()) {
             return std::unexpected(BoundaryConditionError(
-              "Missing mass_fraction_condition in edge point with boundary_override = true"));
+              "Missing mass_fraction_condition in edge point with boundary_override enabled"));
           }
-          const auto& y = *pt.mass_fraction_condition;
+          const auto& y = *pt.mass_fraction_condition();
           if (y.size() != n_species) {
             return std::unexpected(BoundaryConditionError(
               std::format("mass_fraction_condition size mismatch (got {}, expected {})",

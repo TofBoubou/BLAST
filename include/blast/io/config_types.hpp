@@ -68,6 +68,11 @@ struct InitialGuessConfig {
 };
 
 struct OuterEdgeConfig {
+  struct BoundaryOverride {
+    bool enabled = false;
+    std::optional<std::vector<double>> mass_fraction_condition;
+  };
+
   struct EdgePoint {
     double x;
     double radius;
@@ -76,8 +81,13 @@ struct OuterEdgeConfig {
     double temperature;
     double pressure;
 
-    bool boundary_override = false;
-    std::optional<std::vector<double>> mass_fraction_condition;
+    BoundaryOverride boundary_override;
+    
+    // Legacy compatibility properties
+    [[nodiscard]] bool boundary_override_enabled() const { return boundary_override.enabled; }
+    [[nodiscard]] const std::optional<std::vector<double>>& mass_fraction_condition() const { 
+      return boundary_override.mass_fraction_condition; 
+    }
   };
 
   std::vector<EdgePoint> edge_points;

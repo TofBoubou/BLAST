@@ -30,8 +30,9 @@ outer_edge:
       velocity: 0
       temperature: 5905.5
       pressure: 7000
-      boundary_override: true
-      mass_fraction_condition: [0, 0.55, 0, 0.45, 0]  # CO2, CO, O2, O, C
+      boundary_override: 
+        enabled: true
+        mass_fraction_condition: [0, 0.55, 0, 0.45, 0]  # CO2, CO, O2, O, C
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429

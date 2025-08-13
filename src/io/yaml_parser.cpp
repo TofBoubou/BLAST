@@ -101,6 +101,21 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.simulation.catalytic_wall = true;
     }
 
+    // Force non-equilibrium chemistry when boundary override is used
+    bool has_boundary_override = false;
+    for (const auto& point : config.outer_edge.edge_points) {
+      if (point.boundary_override_enabled()) {
+        has_boundary_override = true;
+        break;
+      }
+    }
+    if (has_boundary_override) {
+      if (config.simulation.chemical_mode != SimulationConfig::ChemicalMode::NonEquilibrium) {
+        std::cout << "INFO: Forcing chemical_mode to 'non_equilibrium' because boundary_override is used" << std::endl;
+        config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
+      }
+    }
+
     auto cont_result = parse_continuation_config(root_["continuation"]);
     if (!cont_result) {
       return std::unexpected(cont_result.error());
@@ -315,29 +330,61 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
       point.pressure = pressure_result.value();
 
       if (point_node["boundary_override"]) {
-        point.boundary_override = point_node["boundary_override"].as<bool>();
+        auto boundary_override_node = point_node["boundary_override"];
         
-        if (point.boundary_override) {
-          if (!point_node["mass_fraction_condition"]) {
-            return std::unexpected(core::ConfigurationError(
-              "mass_fraction_condition is required when boundary_override is true"));
+        // Handle both old format (boolean) and new format (object)
+        if (boundary_override_node.IsScalar()) {
+          // Legacy format: boundary_override: true
+          point.boundary_override.enabled = boundary_override_node.as<bool>();
+          
+          // Look for mass_fraction_condition at the same level (legacy)
+          if (point_node["mass_fraction_condition"]) {
+            if (point.boundary_override.enabled) {
+              auto mass_fractions = point_node["mass_fraction_condition"].as<std::vector<double>>();
+              
+              double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
+              if (std::abs(sum - 1.0) > 1e-6) {
+                return std::unexpected(core::ConfigurationError(
+                  std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+              }
+              
+              if (std::any_of(mass_fractions.begin(), mass_fractions.end(), 
+                             [](double val) { return val < 0.0; })) {
+                return std::unexpected(core::ConfigurationError(
+                  "All mass fractions must be non-negative"));
+              }
+              
+              point.boundary_override.mass_fraction_condition = mass_fractions;
+            }
+          }
+        } else {
+          // New format: boundary_override: { enabled: true, mass_fraction_condition: [...] }
+          if (boundary_override_node["enabled"]) {
+            point.boundary_override.enabled = boundary_override_node["enabled"].as<bool>();
           }
           
-          auto mass_fractions = point_node["mass_fraction_condition"].as<std::vector<double>>();
-          
-          double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
-          if (std::abs(sum - 1.0) > 1e-6) {
-            return std::unexpected(core::ConfigurationError(
-              std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+          if (point.boundary_override.enabled) {
+            if (!boundary_override_node["mass_fraction_condition"]) {
+              return std::unexpected(core::ConfigurationError(
+                "mass_fraction_condition is required when boundary_override.enabled is true"));
+            }
+            
+            auto mass_fractions = boundary_override_node["mass_fraction_condition"].as<std::vector<double>>();
+            
+            double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
+            if (std::abs(sum - 1.0) > 1e-6) {
+              return std::unexpected(core::ConfigurationError(
+                std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+            }
+            
+            if (std::any_of(mass_fractions.begin(), mass_fractions.end(), 
+                           [](double val) { return val < 0.0; })) {
+              return std::unexpected(core::ConfigurationError(
+                "All mass fractions must be non-negative"));
+            }
+            
+            point.boundary_override.mass_fraction_condition = mass_fractions;
           }
-          
-          if (std::any_of(mass_fractions.begin(), mass_fractions.end(), 
-                         [](double val) { return val < 0.0; })) {
-            return std::unexpected(core::ConfigurationError(
-              "All mass fractions must be non-negative"));
-          }
-          
-          point.mass_fraction_condition = mass_fractions;
         }
       }
 
