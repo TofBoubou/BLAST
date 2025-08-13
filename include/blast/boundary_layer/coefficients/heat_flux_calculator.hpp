@@ -40,10 +40,9 @@ private:
   [[nodiscard]] auto compute_reference_flux(const conditions::BoundaryConditions& bc,
                                             const CoefficientSet& coeffs) const -> double;
 
-  [[nodiscard]] auto
-  compute_conductive_flux_profile(const std::vector<double>& dT_deta, const std::vector<double>& k_local,
-                                  const HeatFluxGeometryFactors& geo_factors) const
-      -> std::expected<std::vector<double>, HeatFluxError>;
+  [[nodiscard]] auto compute_conductive_flux_profile(
+      const std::vector<double>& dT_deta, const std::vector<double>& k_local,
+      const HeatFluxGeometryFactors& geo_factors) const -> std::expected<std::vector<double>, HeatFluxError>;
 
   [[nodiscard]] auto compute_diffusive_flux_profile(const CoefficientSet& coeffs) const
       -> std::pair<std::vector<double>, core::Matrix<double>>;

@@ -7,8 +7,8 @@
 #include <expected>
 #include <filesystem>
 #include <string>
-#include <vector>
 #include <variant>
+#include <vector>
 
 namespace blast::io::output {
 

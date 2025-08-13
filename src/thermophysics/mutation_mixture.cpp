@@ -8,11 +8,11 @@
 namespace blast::thermophysics {
 
 // Macro to eliminate repetitive try/catch blocks when calling Mutation++ library
-#define MUTATION_CALL(expression, error_message) \
-  try { \
-    return expression; \
-  } catch (const std::exception& e) { \
-    return std::unexpected(ThermophysicsError(std::format(error_message ": {}", e.what()))); \
+#define MUTATION_CALL(expression, error_message)                                                                       \
+  try {                                                                                                                \
+    return expression;                                                                                                 \
+  } catch (const std::exception& e) {                                                                                  \
+    return std::unexpected(ThermophysicsError(std::format(error_message ": {}", e.what())));                           \
   }
 
 namespace {
@@ -107,17 +107,14 @@ namespace {
 std::unique_ptr<Mutation::Mixture> create_mixture_or_throw(const io::MixtureConfig& config) {
   auto mixture_result = create_mutation_mixture(config);
   if (!mixture_result) {
-    throw ThermophysicsError(
-        std::format("Failed to create Mutation++ mixture: {}", mixture_result.error().what()));
+    throw ThermophysicsError(std::format("Failed to create Mutation++ mixture: {}", mixture_result.error().what()));
   }
   return std::move(mixture_result.value());
 }
 } // anonymous namespace
 
 MutationMixture::MutationMixture(const io::MixtureConfig& config)
-    : config_(config),
-      mixture_(create_mixture_or_throw(config)),
-      n_species_(mixture_->nSpecies()),
+    : config_(config), mixture_(create_mixture_or_throw(config)), n_species_(mixture_->nSpecies()),
       has_electrons_(mixture_->hasElectrons()) {
 
   try {
@@ -225,7 +222,7 @@ auto MutationMixture::set_state(std::span<const double> mass_fractions, double t
   try {
     // Convert span to vector for Mutation++ (C API requirement)
     std::vector<double> c_vec(mass_fractions.begin(), mass_fractions.end());
-    
+
     const auto n_modes = mixture_->nEnergyEqns();
     if (n_modes == 1) {
       // Modèle mono-température: {P, T}
@@ -241,7 +238,7 @@ auto MutationMixture::set_state(std::span<const double> mass_fractions, double t
       // Utiliser le var_set 2 (P-T set) pour les modèles multi-température
       mixture_->setState(c_vec.data(), vars.data(), 2);
     }
-    
+
     return {};
 
   } catch (const std::exception& e) {
@@ -506,8 +503,7 @@ auto MutationMixture::get_number_energy_modes() const noexcept -> std::size_t {
   return mixture_->nEnergyEqns();
 }
 
-auto MutationMixture::extract_modal_temperatures(std::span<const double> mass_fractions,
-                                                 double temperature_overall,
+auto MutationMixture::extract_modal_temperatures(std::span<const double> mass_fractions, double temperature_overall,
                                                  double pressure) const
     -> std::expected<std::vector<double>, ThermophysicsError> {
   if (auto state_result = set_state(mass_fractions, temperature_overall, pressure); !state_result) {
@@ -528,8 +524,7 @@ auto MutationMixture::extract_modal_temperatures(std::span<const double> mass_fr
     return modal_temps;
 
   } catch (const std::exception& e) {
-    return std::unexpected(
-        ThermophysicsError(std::format("Failed to extract modal temperatures: {}", e.what())));
+    return std::unexpected(ThermophysicsError(std::format("Failed to extract modal temperatures: {}", e.what())));
   }
 }
 
@@ -554,25 +549,25 @@ auto MutationMixture::reload_gsi() -> bool {
       std::cerr << "Failed to create new mixture for GSI reload" << std::endl;
       return false;
     }
-    
+
     // Replace old mixture with new one
     mixture_ = std::move(new_mixture_result.value());
-    
+
     // Verify species count hasn't changed
     if (mixture_->nSpecies() != n_species_) {
       std::cerr << "Error: Species count changed after GSI reload" << std::endl;
       return false;
     }
-    
+
     // Update cached properties if needed
     for (std::size_t i = 0; i < n_species_; ++i) {
       species_mw_[i] = mixture_->speciesMw(i);
       const double charge = mixture_->speciesCharge(i) * constants::N_Avogadro / species_mw_[i];
       species_charges_[i] = charge;
     }
-    
+
     return true;
-    
+
   } catch (const std::exception& e) {
     std::cerr << "Failed to reload GSI: " << e.what() << std::endl;
     return false;

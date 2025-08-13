@@ -49,8 +49,8 @@ public:
         }
       }
     }
-    return std::format("{} [{}:{}:{}]{}", message_, location_.file_name(), location_.line(),
-                       location_.function_name(), ctx);
+    return std::format("{} [{}:{}:{}]{}", message_, location_.file_name(), location_.line(), location_.function_name(),
+                       ctx);
   }
 };
 

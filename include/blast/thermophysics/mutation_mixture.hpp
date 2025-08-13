@@ -94,12 +94,11 @@ public:
   [[nodiscard]] auto surface_reaction_rates(std::span<const double> partial_densities, double wall_temperature) const
       -> std::expected<std::vector<double>, ThermophysicsError> override;
 
-[[nodiscard]] auto reload_gsi() -> bool override;
+  [[nodiscard]] auto reload_gsi() -> bool override;
 
-  [[nodiscard]] auto extract_modal_temperatures(std::span<const double> mass_fractions,
-                                                double temperature_overall,
-                                                double pressure) const
-      -> std::expected<std::vector<double>, ThermophysicsError> override;
+  [[nodiscard]] auto
+  extract_modal_temperatures(std::span<const double> mass_fractions, double temperature_overall,
+                             double pressure) const -> std::expected<std::vector<double>, ThermophysicsError> override;
 
   [[nodiscard]] auto get_number_energy_modes() const noexcept -> std::size_t override;
 };

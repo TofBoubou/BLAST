@@ -52,10 +52,8 @@ namespace detail {
 [[nodiscard]] auto compute_dufour_term(const coefficients::CoefficientInputs& inputs,
                                        const coefficients::CoefficientSet& coeffs,
                                        const conditions::BoundaryConditions& bc,
-                                       const thermophysics::MixtureInterface& mixture,
-                                       std::size_t eta_index,
-                                       PhysicalQuantity auto d_eta)
-    -> std::expected<double, EquationError>;
+                                       const thermophysics::MixtureInterface& mixture, std::size_t eta_index,
+                                       PhysicalQuantity auto d_eta) -> std::expected<double, EquationError>;
 
 auto build_energy_coefficients(std::span<const double> g_previous, const coefficients::CoefficientInputs& inputs,
                                const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
@@ -192,8 +190,7 @@ auto compute_species_enthalpy_terms(const coefficients::CoefficientInputs& input
 [[nodiscard]] auto compute_dufour_term(const coefficients::CoefficientInputs& inputs,
                                        const coefficients::CoefficientSet& coeffs,
                                        const conditions::BoundaryConditions& bc,
-                                       const thermophysics::MixtureInterface& mixture,
-                                       std::size_t eta_index,
+                                       const thermophysics::MixtureInterface& mixture, std::size_t eta_index,
                                        PhysicalQuantity auto d_eta) -> std::expected<double, EquationError> {
 
   const auto n_species = inputs.c.rows();
@@ -242,8 +239,7 @@ template auto solve_energy<double>(std::span<const double> g_previous, const coe
                                    const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                                    const coefficients::XiDerivatives& xi_der, const io::SimulationConfig& sim_config,
                                    std::span<const double> F_field, std::span<const double> dF_deta,
-                                   std::span<const double> V_field,
-                                   const thermophysics::MixtureInterface& mixture, int station,
-                                   double d_eta) -> std::expected<std::vector<double>, EquationError>;
+                                   std::span<const double> V_field, const thermophysics::MixtureInterface& mixture,
+                                   int station, double d_eta) -> std::expected<std::vector<double>, EquationError>;
 
 } // namespace blast::boundary_layer::equations

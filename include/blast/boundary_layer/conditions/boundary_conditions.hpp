@@ -24,7 +24,7 @@ struct EdgeConditions {
 
   // Derived quantities
   double body_radius;
-  
+
   // Boundary override flag - if true, species_fractions should not be modified
   bool boundary_override = false;
 };

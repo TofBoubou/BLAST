@@ -91,7 +91,8 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
       auto bc_result = conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters,
                                                                 config_.simulation, mixture_);
       if (!bc_result) {
-        return std::unexpected(BoundaryConditionError(std::format("Failed to create boundary conditions for station {}: {}", station, bc_result.error().message())));
+        return std::unexpected(BoundaryConditionError(std::format(
+            "Failed to create boundary conditions for station {}: {}", station, bc_result.error().message())));
       }
 
       // Get T_edge from configuration
@@ -111,7 +112,8 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     // Solve this station
     auto station_result = solve_station(station, xi, initial_guess);
     if (!station_result) {
-      return std::unexpected(NumericError(std::format("Failed to solve station {} (xi={}): {}", station, xi, station_result.error().message())));
+      return std::unexpected(NumericError(
+          std::format("Failed to solve station {} (xi={}): {}", station, xi, station_result.error().message())));
     }
 
     // Store results
@@ -130,7 +132,8 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     // Calculate heat flux for this converged station
     auto derivatives_result = compute_all_derivatives(result.stations.back());
     if (!derivatives_result) {
-      return std::unexpected(NumericError(std::format("Failed to compute derivatives for heat flux at station {}: {}", station, derivatives_result.error().message())));
+      return std::unexpected(NumericError(std::format("Failed to compute derivatives for heat flux at station {}: {}",
+                                                      station, derivatives_result.error().message())));
     }
     auto derivatives = derivatives_result.value();
 
@@ -149,28 +152,31 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
                                                           config_.wall_parameters, config_.simulation, mixture_);
 
     if (!bc_result) {
-      return std::unexpected(BoundaryConditionError(std::format("Failed to get boundary conditions for heat flux at station {}: {}", station, bc_result.error().message())));
+      return std::unexpected(BoundaryConditionError(std::format(
+          "Failed to get boundary conditions for heat flux at station {}: {}", station, bc_result.error().message())));
     }
     auto bc = bc_result.value();
 
     auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
     if (!coeffs_result) {
-      return std::unexpected(NumericError(std::format("Failed to compute coefficients for heat flux at station {}: {}", station, coeffs_result.error().message())));
+      return std::unexpected(NumericError(std::format("Failed to compute coefficients for heat flux at station {}: {}",
+                                                      station, coeffs_result.error().message())));
     }
     auto coeffs = coeffs_result.value();
 
     auto heat_flux_result =
         heat_flux_calculator_->calculate(final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
     if (!heat_flux_result) {
-      return std::unexpected(NumericError(std::format("Failed to compute heat flux at station {}: {}", station, heat_flux_result.error().message())));
+      return std::unexpected(NumericError(
+          std::format("Failed to compute heat flux at station {}: {}", station, heat_flux_result.error().message())));
     }
 
     result.heat_flux_data.push_back(std::move(heat_flux_result.value()));
 
     // Extract modal temperatures if multiple energy modes are present
     if (mixture_.get_number_energy_modes() > 1) {
-      auto extract_modal_temperatures_for_station = [&](const equations::SolutionState& sol)
-          -> std::expected<std::vector<std::vector<double>>, SolverError> {
+      auto extract_modal_temperatures_for_station =
+          [&](const equations::SolutionState& sol) -> std::expected<std::vector<std::vector<double>>, SolverError> {
         const auto n_eta = grid_->n_eta();
         const auto n_species = mixture_.n_species();
         const auto n_modes = mixture_.get_number_energy_modes();
@@ -184,7 +190,8 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 
           auto modal_result = mixture_.extract_modal_temperatures(local_composition, sol.T[i], bc.P_e());
           if (!modal_result) {
-            return std::unexpected(NumericError(std::format("Failed to extract modal temperatures at eta={}: {}", i, modal_result.error().message())));
+            return std::unexpected(NumericError(
+                std::format("Failed to extract modal temperatures at eta={}: {}", i, modal_result.error().message())));
           }
 
           const auto& temps = modal_result.value();
@@ -225,11 +232,13 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
 
   // Validate input parameters
   if (station < 0) {
-    return std::unexpected(InitializationError(std::format("Invalid station number: {} (must be non-negative)", station)));
+    return std::unexpected(
+        InitializationError(std::format("Invalid station number: {} (must be non-negative)", station)));
   }
 
   if (!std::isfinite(xi) || xi < 0.0) {
-    return std::unexpected(InitializationError(std::format("Invalid xi coordinate: {} (must be finite and non-negative)", xi)));
+    return std::unexpected(
+        InitializationError(std::format("Invalid xi coordinate: {} (must be finite and non-negative)", xi)));
   }
 
   // Validate initial guess dimensions
@@ -238,24 +247,28 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
 
   if (initial_guess.F.size() != expected_n_eta || initial_guess.T.size() != expected_n_eta ||
       initial_guess.g.size() != expected_n_eta) {
-    return std::unexpected(InitializationError(std::format("Initial guess field dimensions mismatch: expected {} eta points", expected_n_eta)));
+    return std::unexpected(InitializationError(
+        std::format("Initial guess field dimensions mismatch: expected {} eta points", expected_n_eta)));
   }
 
   if (initial_guess.c.rows() != expected_n_species || initial_guess.c.cols() != expected_n_eta) {
-    return std::unexpected(InitializationError(std::format("Initial guess species matrix dimensions mismatch: expected {}x{}", expected_n_species, expected_n_eta)));
+    return std::unexpected(InitializationError(std::format(
+        "Initial guess species matrix dimensions mismatch: expected {}x{}", expected_n_species, expected_n_eta)));
   }
 
   // Check consistency between station and xi coordinates
   if (station > 0) {
     const auto& xi_coords = grid_->xi_coordinates();
     if (station >= static_cast<int>(xi_coords.size())) {
-      return std::unexpected(InitializationError(std::format("Station {} exceeds available xi coordinates (max: {})", station, xi_coords.size() - 1)));
+      return std::unexpected(InitializationError(
+          std::format("Station {} exceeds available xi coordinates (max: {})", station, xi_coords.size() - 1)));
     }
 
     // Allow some tolerance for floating point comparison
     const double expected_xi = xi_coords[station];
     if (std::abs(xi - expected_xi) > 1e-10) {
-      return std::unexpected(InitializationError(std::format("Xi coordinate mismatch for station {}: provided {}, expected {}", station, xi, expected_xi)));
+      return std::unexpected(InitializationError(
+          std::format("Xi coordinate mismatch for station {}: provided {}, expected {}", station, xi, expected_xi)));
     }
   }
 
@@ -268,7 +281,8 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
                                                         config_.wall_parameters, config_.simulation, mixture_);
 
   if (!bc_result) {
-    return std::unexpected(BoundaryConditionError(std::format("Failed to get boundary conditions for station {}: {}", station, bc_result.error().message())));
+    return std::unexpected(BoundaryConditionError(
+        std::format("Failed to get boundary conditions for station {}: {}", station, bc_result.error().message())));
   }
 
   auto bc = bc_result.value();
@@ -288,7 +302,8 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
     auto bc_stable = conditions::create_stagnation_conditions(stable_config.outer_edge, stable_config.wall_parameters,
                                                               stable_config.simulation, mixture_);
     if (!bc_stable) {
-      return std::unexpected(BoundaryConditionError(std::format("Failed to create stable boundary conditions: {}", bc_stable.error().message())));
+      return std::unexpected(BoundaryConditionError(
+          std::format("Failed to create stable boundary conditions: {}", bc_stable.error().message())));
     }
     double T_edge_stable = stable_config.outer_edge.edge_points[0].temperature;
     return create_initial_guess(station, xi, bc_stable.value(), T_edge_stable);
@@ -327,17 +342,20 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
     if (in_continuation_) {
       // Check if it was a NaN failure
       if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
-/*         std::cout << "[DEBUG] CONTINUATION FAILED - NaN detected at station " << station 
-                  << " after " << conv_info.iterations << " iterations" << std::endl; */
-        return std::unexpected(ConvergenceError(std::format("NaN detected during continuation at station {} iteration {}", station, conv_info.iterations)));
+        /*         std::cout << "[DEBUG] CONTINUATION FAILED - NaN detected at station " << station
+                          << " after " << conv_info.iterations << " iterations" << std::endl; */
+        return std::unexpected(ConvergenceError(
+            std::format("NaN detected during continuation at station {} iteration {}", station, conv_info.iterations)));
       } else {
-/*         std::cout << "[DEBUG] CONTINUATION FAILED - No convergence at station " << station 
-                  << " after " << conv_info.iterations << " iterations (max_residual=" 
-                  << std::scientific << conv_info.max_residual() << ")" << std::endl; */
-        return std::unexpected(ConvergenceError(std::format("Station {} failed to converge during continuation after {} iterations (residual={})", station, conv_info.iterations, conv_info.max_residual())));
+        /*         std::cout << "[DEBUG] CONTINUATION FAILED - No convergence at station " << station
+                          << " after " << conv_info.iterations << " iterations (max_residual="
+                          << std::scientific << conv_info.max_residual() << ")" << std::endl; */
+        return std::unexpected(ConvergenceError(
+            std::format("Station {} failed to converge during continuation after {} iterations (residual={})", station,
+                        conv_info.iterations, conv_info.max_residual())));
       }
     }
-    
+
     // Try continuation if direct solution failed
     if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
       auto stable_guess = compute_stable_guess();
@@ -351,7 +369,9 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
       }
     }
 
-    return std::unexpected(ConvergenceError(std::format("Station {} failed to converge after {} iterations (residual={})", station, conv_info.iterations, conv_info.max_residual())));
+    return std::unexpected(
+        ConvergenceError(std::format("Station {} failed to converge after {} iterations (residual={})", station,
+                                     conv_info.iterations, conv_info.max_residual())));
   }
 
   return solution;
@@ -399,7 +419,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     // Execute pipeline
     auto pipeline_result = pipeline.execute_all(ctx);
     if (!pipeline_result) {
-      return std::unexpected(NumericError(std::format("Pipeline execution failed at station {} iteration {}: {}", station, iter, pipeline_result.error().what())));
+      return std::unexpected(NumericError(std::format("Pipeline execution failed at station {} iteration {}: {}",
+                                                      station, iter, pipeline_result.error().what())));
     }
 
     // Complete new solution construction
@@ -422,7 +443,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
         conv_info.iterations = iter + 1;
         return conv_info;
       } else {
-        return std::unexpected(NumericError(std::format("NaN detected in residuals at station {} iteration {}", station, iter)));
+        return std::unexpected(
+            NumericError(std::format("NaN detected in residuals at station {} iteration {}", station, iter)));
       }
     }
 
@@ -432,8 +454,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
       return std::unexpected<SolverError>(adaptive_factor_result.error());
     }
     double adaptive_factor = adaptive_factor_result.value();
-/*     std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor
-              << " (max residual: " << conv_info.max_residual() << ")" << std::endl; */
+    /*     std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor
+                  << " (max residual: " << conv_info.max_residual() << ")" << std::endl; */
 
     // Apply relaxation
     solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
@@ -443,17 +465,18 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
       // std::cout << "✓ Converged with adaptive factor: " << adaptive_factor << std::endl;
       break;
     }
-    
+
     // DEBUG: Print iteration info during continuation
-/*     if (in_continuation_ && (iter % 100 == 0 || iter < 10)) {
-      std::cout << "[DEBUG] ITER " << iter << " at station " << station 
-                << " - max_residual=" << std::scientific << conv_info.max_residual() 
-                << " adaptive_factor=" << adaptive_factor << std::endl;
-    } */
+    /*     if (in_continuation_ && (iter % 100 == 0 || iter < 10)) {
+          std::cout << "[DEBUG] ITER " << iter << " at station " << station
+                    << " - max_residual=" << std::scientific << conv_info.max_residual()
+                    << " adaptive_factor=" << adaptive_factor << std::endl;
+        } */
 
     // Divergence detection
     if (conv_info.max_residual() > 1e6) {
-      return std::unexpected(NumericError(std::format("Solution diverged at station {} iteration {} (residual={})", station, iter, conv_info.max_residual())));
+      return std::unexpected(NumericError(std::format("Solution diverged at station {} iteration {} (residual={})",
+                                                      station, iter, conv_info.max_residual())));
     }
   }
 
@@ -468,8 +491,7 @@ auto BoundaryLayerSolver::solve_momentum_equation(const equations::SolutionState
   auto result = equations::solve_momentum(solution.F, coeffs, bc, *xi_derivatives_, solution.V, xi, grid_->d_eta());
 
   if (!result) {
-    return std::unexpected(
-        NumericError(std::format("Momentum equation failed: {}", result.error().message())));
+    return std::unexpected(NumericError(std::format("Momentum equation failed: {}", result.error().message())));
   }
 
   return result.value();
@@ -485,7 +507,8 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
   // Get dF/deta from unified derivative calculation
   auto all_derivatives_result = compute_all_derivatives(solution);
   if (!all_derivatives_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute derivatives for energy equation: {}", all_derivatives_result.error().message())));
+    return std::unexpected(NumericError(std::format("Failed to compute derivatives for energy equation: {}",
+                                                    all_derivatives_result.error().message())));
   }
   const auto& dF_deta = all_derivatives_result.value().dF_deta;
 
@@ -493,8 +516,7 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
                                         solution.F, dF_deta, solution.V, mixture, station, grid_->d_eta());
 
   if (!result) {
-    return std::unexpected(
-        NumericError(std::format("Energy equation failed: {}", result.error().message())));
+    return std::unexpected(NumericError(std::format("Energy equation failed: {}", result.error().message())));
   }
 
   auto g_solution = result.value();
@@ -512,8 +534,7 @@ auto BoundaryLayerSolver::solve_species_equations(const equations::SolutionState
                                          solution.F, solution.V, station, grid_->d_eta());
 
   if (!result) {
-    return std::unexpected(
-        NumericError(std::format("Species equations failed: {}", result.error().message())));
+    return std::unexpected(NumericError(std::format("Species equations failed: {}", result.error().message())));
   }
 
   return result.value();
@@ -533,8 +554,7 @@ auto BoundaryLayerSolver::update_temperature_field(
 
   auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
   if (!result) {
-    return std::unexpected(
-        NumericError(std::format("Temperature solve failed: {}", result.error().message())));
+    return std::unexpected(NumericError(std::format("Temperature solve failed: {}", result.error().message())));
   }
 
   return result.value().temperatures;
@@ -576,11 +596,11 @@ auto BoundaryLayerSolver::check_convergence(const equations::SolutionState& old_
 
   // std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
   // DEBUG: Always print convergence info during continuation
-/*   if (in_continuation_) {
-    std::cout << "[DEBUG] CONVERGENCE CHECK - tol=" << std::scientific << tol 
-              << " | F_res=" << info.residual_F << " | g_res=" << info.residual_g 
-              << " | c_res=" << info.residual_c << " | converged=" << info.converged << std::endl;
-  } */
+  /*   if (in_continuation_) {
+      std::cout << "[DEBUG] CONVERGENCE CHECK - tol=" << std::scientific << tol
+                << " | F_res=" << info.residual_F << " | g_res=" << info.residual_g
+                << " | c_res=" << info.residual_c << " | converged=" << info.converged << std::endl;
+    } */
 
   return info;
 }
@@ -602,14 +622,16 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   // Compute equilibrium composition at the wall (Tw, P_e)
   auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
   if (!equilibrium_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute equilibrium composition at wall conditions: {}", equilibrium_result.error().message())));
+    return std::unexpected(NumericError(std::format("Failed to compute equilibrium composition at wall conditions: {}",
+                                                    equilibrium_result.error().message())));
   }
   auto c_wall_equilibrium = equilibrium_result.value();
 
   // Extract edge composition from input
   const auto& c_edge = bc.c_e();
   if (c_edge.size() != n_species) {
-    return std::unexpected(InitializationError(std::format("Edge composition size mismatch: expected {}, got {}", n_species, c_edge.size())));
+    return std::unexpected(InitializationError(
+        std::format("Edge composition size mismatch: expected {}, got {}", n_species, c_edge.size())));
   }
 
   // ===== STEP 1.5: COMPUTE WALL EQUILIBRIUM ENTHALPY =====
@@ -617,7 +639,8 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   // Calculate enthalpy of equilibrium mixture at wall conditions
   auto h_wall_eq_result = mixture_.mixture_enthalpy(c_wall_equilibrium, bc.Tw(), bc.P_e());
   if (!h_wall_eq_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute wall equilibrium enthalpy: {}", h_wall_eq_result.error().message())));
+    return std::unexpected(NumericError(
+        std::format("Failed to compute wall equilibrium enthalpy: {}", h_wall_eq_result.error().message())));
   }
   double h_wall_equilibrium = h_wall_eq_result.value();
 
@@ -665,7 +688,8 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
         guess.c(j, i) /= sum_interpolated;
       }
     } else {
-      return std::unexpected(InitializationError(std::format("Mass conservation violation: sum of species concentrations is too small ({})", sum_interpolated)));
+      return std::unexpected(InitializationError(std::format(
+          "Mass conservation violation: sum of species concentrations is too small ({})", sum_interpolated)));
     }
   }
 
@@ -711,8 +735,7 @@ auto BoundaryLayerSolver::compute_all_derivatives(const equations::SolutionState
 
   auto result = derivative_calculator_->compute_all_derivatives(solution);
   if (!result) {
-    return std::unexpected(
-        NumericError(std::format("Failed to compute derivatives: {}", result.error().message())));
+    return std::unexpected(NumericError(std::format("Failed to compute derivatives: {}", result.error().message())));
   }
   return result.value();
 }
@@ -774,7 +797,8 @@ auto BoundaryLayerSolver::update_edge_properties(
   // Calculate new edge density using equation of state
   auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
   if (!MW_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute edge molecular weight: {}", MW_result.error().message())));
+    return std::unexpected(
+        NumericError(std::format("Failed to compute edge molecular weight: {}", MW_result.error().message())));
   }
   const double MW_edge = MW_result.value();
   const double rho_e_new = P_edge * MW_edge / (T_edge * thermophysics::constants::R_universal);
@@ -782,21 +806,23 @@ auto BoundaryLayerSolver::update_edge_properties(
   // Calculate equilibrium composition at edge conditions
   auto eq_result = mixture_.equilibrium_composition(T_edge, P_edge);
   if (!eq_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute edge equilibrium composition: {}", eq_result.error().message())));
+    return std::unexpected(
+        NumericError(std::format("Failed to compute edge equilibrium composition: {}", eq_result.error().message())));
   }
   auto edge_composition_eq = eq_result.value();
 
   // Calculate new edge viscosity using equilibrium composition
   auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);
   if (!mu_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute edge viscosity: {}", mu_result.error().message())));
+    return std::unexpected(
+        NumericError(std::format("Failed to compute edge viscosity: {}", mu_result.error().message())));
   }
   const double mu_e_new = mu_result.value();
 
   // Update boundary conditions with new values
   bc.update_edge_density(rho_e_new);
   bc.update_edge_viscosity(mu_e_new);
-  
+
   // Only update species fractions if boundary_override is false
   if (!bc.edge.boundary_override) {
     bc.edge.species_fractions = edge_composition_eq;

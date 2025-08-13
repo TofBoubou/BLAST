@@ -25,8 +25,7 @@ public:
 
 class RelaxationError : public SolverError {
 public:
-  explicit RelaxationError(std::string_view message,
-                           std::source_location location = std::source_location::current())
+  explicit RelaxationError(std::string_view message, std::source_location location = std::source_location::current())
       : SolverError(std::format("Relaxation Error: {}", message), location) {}
   RelaxationError(std::string_view message, const SolverError& cause,
                   std::source_location location = std::source_location::current())
@@ -42,29 +41,27 @@ public:
 
 class ConvergenceError : public SolverError {
 public:
-  explicit ConvergenceError(std::string_view message, 
-                           std::source_location location = std::source_location::current())
+  explicit ConvergenceError(std::string_view message, std::source_location location = std::source_location::current())
       : SolverError(std::format("Convergence Error: {}", message), location) {}
 };
 
 class BoundaryConditionError : public SolverError {
 public:
   explicit BoundaryConditionError(std::string_view message,
-                                 std::source_location location = std::source_location::current())
+                                  std::source_location location = std::source_location::current())
       : SolverError(std::format("Boundary Condition Error: {}", message), location) {}
 };
 
 class GridError : public SolverError {
 public:
-  explicit GridError(std::string_view message,
-                    std::source_location location = std::source_location::current())
+  explicit GridError(std::string_view message, std::source_location location = std::source_location::current())
       : SolverError(std::format("Grid Error: {}", message), location) {}
 };
 
 class InitializationError : public SolverError {
 public:
   explicit InitializationError(std::string_view message,
-                              std::source_location location = std::source_location::current())
+                               std::source_location location = std::source_location::current())
       : SolverError(std::format("Initialization Error: {}", message), location) {}
 };
 

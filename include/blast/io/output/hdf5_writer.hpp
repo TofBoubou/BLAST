@@ -21,8 +21,7 @@ struct HDF5Config {
 // Specialized error for HDF5 operations
 class HDF5Error : public OutputError {
 public:
-  explicit HDF5Error(std::string_view message,
-                     std::source_location location = std::source_location::current())
+  explicit HDF5Error(std::string_view message, std::source_location location = std::source_location::current())
       : OutputError(std::format("HDF5 Error: {}", message), location) {}
 };
 

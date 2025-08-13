@@ -7,7 +7,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <vector>
 
 namespace blast::io::output {
 

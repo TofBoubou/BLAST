@@ -107,18 +107,16 @@ public:
       config_.wall_parameters.wall_temperatures.push_back(Tw);
     }
   }
-  
+
   [[nodiscard]] auto get_wall_temperature() const -> double {
     if (!config_.wall_parameters.wall_temperatures.empty()) {
       return config_.wall_parameters.wall_temperatures[0];
     }
     return 300.0; // Default
   }
-  
-  [[nodiscard]] auto get_config() -> io::Configuration& {
-    return config_;
-  }
-  
+
+  [[nodiscard]] auto get_config() -> io::Configuration& { return config_; }
+
   [[nodiscard]] auto get_mixture() -> thermophysics::MixtureInterface& {
     return const_cast<thermophysics::MixtureInterface&>(mixture_);
   }

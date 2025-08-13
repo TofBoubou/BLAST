@@ -203,8 +203,7 @@ auto HeatFluxCalculator::compute_reference_flux(const conditions::BoundaryCondit
 
 auto HeatFluxCalculator::compute_conductive_flux_profile(
     const std::vector<double>& dT_deta, const std::vector<double>& k_local,
-    const HeatFluxGeometryFactors& geo_factors) const
-    -> std::expected<std::vector<double>, HeatFluxError> {
+    const HeatFluxGeometryFactors& geo_factors) const -> std::expected<std::vector<double>, HeatFluxError> {
 
   const auto n_eta = dT_deta.size();
   if (n_eta != k_local.size()) {
@@ -216,8 +215,8 @@ auto HeatFluxCalculator::compute_conductive_flux_profile(
 
   std::vector<double> q_conductive(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
-      const double dT_dy = dT_deta[i] / geo_factors.dy_deta_factor;
-      q_conductive[i] = -k_local[i] * dT_dy;
+    const double dT_dy = dT_deta[i] / geo_factors.dy_deta_factor;
+    q_conductive[i] = -k_local[i] * dT_dy;
   }
 
   return q_conductive;
@@ -235,8 +234,8 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& co
   for (std::size_t i = 0; i < n_eta; ++i) {
     for (std::size_t j = 0; j < n_species; ++j) {
       const double q_species_j = coeffs.diffusion.J(j, i) * coeffs.h_species(j, i);
-      q_diffusive_species(j, i) = q_species_j; 
-      q_diffusive_total[i] += q_species_j;     
+      q_diffusive_species(j, i) = q_species_j;
+      q_diffusive_total[i] += q_species_j;
     }
   }
 

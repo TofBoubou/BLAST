@@ -82,11 +82,11 @@ struct OuterEdgeConfig {
     double pressure;
 
     BoundaryOverride boundary_override;
-    
+
     // Legacy compatibility properties
     [[nodiscard]] bool boundary_override_enabled() const { return boundary_override.enabled; }
-    [[nodiscard]] const std::optional<std::vector<double>>& mass_fraction_condition() const { 
-      return boundary_override.mass_fraction_condition; 
+    [[nodiscard]] const std::optional<std::vector<double>>& mass_fraction_condition() const {
+      return boundary_override.mass_fraction_condition;
     }
   };
 

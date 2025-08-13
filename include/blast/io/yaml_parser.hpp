@@ -45,8 +45,8 @@ private:
   [[nodiscard]] auto parse_wall_parameters_config(const YAML::Node& node) const
       -> std::expected<WallParametersConfig, core::ConfigurationError>;
 
-  [[nodiscard]] auto parse_abaque_config(const YAML::Node& node) const
-    -> std::expected<AbaqueConfig, core::ConfigurationError>;
+  [[nodiscard]] auto
+  parse_abaque_config(const YAML::Node& node) const -> std::expected<AbaqueConfig, core::ConfigurationError>;
 
   [[nodiscard]] auto parse_continuation_config(const YAML::Node& node) const
       -> std::expected<ContinuationConfig, core::ConfigurationError>;

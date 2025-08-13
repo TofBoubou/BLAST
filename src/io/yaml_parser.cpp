@@ -262,21 +262,21 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
   OutputConfig config;
 
   try {
-  auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
-  if (!x_stations_result)
-    return std::unexpected(x_stations_result.error());
-  config.x_stations = x_stations_result.value();
-  if (config.x_stations.empty()) {
-    return std::unexpected(core::ConfigurationError("x_stations cannot be empty"));
-  }
-  if (std::any_of(config.x_stations.begin(), config.x_stations.end(), [](double x) { return x < 0; })) {
-    return std::unexpected(core::ConfigurationError("x_stations must be non-negative"));
-  }
-  for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
-    if (config.x_stations[i] <= config.x_stations[i - 1]) {
-      return std::unexpected(core::ConfigurationError("x_stations must be in strictly increasing order"));
+    auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
+    if (!x_stations_result)
+      return std::unexpected(x_stations_result.error());
+    config.x_stations = x_stations_result.value();
+    if (config.x_stations.empty()) {
+      return std::unexpected(core::ConfigurationError("x_stations cannot be empty"));
     }
-  }
+    if (std::any_of(config.x_stations.begin(), config.x_stations.end(), [](double x) { return x < 0; })) {
+      return std::unexpected(core::ConfigurationError("x_stations must be non-negative"));
+    }
+    for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
+      if (config.x_stations[i] <= config.x_stations[i - 1]) {
+        return std::unexpected(core::ConfigurationError("x_stations must be in strictly increasing order"));
+      }
+    }
 
     auto output_dir_result = extract_value<std::string>(node, "output_directory");
     if (!output_dir_result)
@@ -331,29 +331,27 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
 
       if (point_node["boundary_override"]) {
         auto boundary_override_node = point_node["boundary_override"];
-        
+
         // Handle both old format (boolean) and new format (object)
         if (boundary_override_node.IsScalar()) {
           // Legacy format: boundary_override: true
           point.boundary_override.enabled = boundary_override_node.as<bool>();
-          
+
           // Look for mass_fraction_condition at the same level (legacy)
           if (point_node["mass_fraction_condition"]) {
             if (point.boundary_override.enabled) {
               auto mass_fractions = point_node["mass_fraction_condition"].as<std::vector<double>>();
-              
+
               double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
               if (std::abs(sum - 1.0) > 1e-6) {
                 return std::unexpected(core::ConfigurationError(
-                  std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+                    std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
               }
-              
-              if (std::any_of(mass_fractions.begin(), mass_fractions.end(), 
-                             [](double val) { return val < 0.0; })) {
-                return std::unexpected(core::ConfigurationError(
-                  "All mass fractions must be non-negative"));
+
+              if (std::any_of(mass_fractions.begin(), mass_fractions.end(), [](double val) { return val < 0.0; })) {
+                return std::unexpected(core::ConfigurationError("All mass fractions must be non-negative"));
               }
-              
+
               point.boundary_override.mass_fraction_condition = mass_fractions;
             }
           }
@@ -362,27 +360,25 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
           if (boundary_override_node["enabled"]) {
             point.boundary_override.enabled = boundary_override_node["enabled"].as<bool>();
           }
-          
+
           if (point.boundary_override.enabled) {
             if (!boundary_override_node["mass_fraction_condition"]) {
               return std::unexpected(core::ConfigurationError(
-                "mass_fraction_condition is required when boundary_override.enabled is true"));
+                  "mass_fraction_condition is required when boundary_override.enabled is true"));
             }
-            
+
             auto mass_fractions = boundary_override_node["mass_fraction_condition"].as<std::vector<double>>();
-            
+
             double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
             if (std::abs(sum - 1.0) > 1e-6) {
               return std::unexpected(core::ConfigurationError(
-                std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+                  std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
             }
-            
-            if (std::any_of(mass_fractions.begin(), mass_fractions.end(), 
-                           [](double val) { return val < 0.0; })) {
-              return std::unexpected(core::ConfigurationError(
-                "All mass fractions must be non-negative"));
+
+            if (std::any_of(mass_fractions.begin(), mass_fractions.end(), [](double val) { return val < 0.0; })) {
+              return std::unexpected(core::ConfigurationError("All mass fractions must be non-negative"));
             }
-            
+
             point.boundary_override.mass_fraction_condition = mass_fractions;
           }
         }
@@ -438,32 +434,33 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
 
 auto YamlParser::parse_abaque_config(const YAML::Node& node) const
     -> std::expected<AbaqueConfig, core::ConfigurationError> {
-  
+
   AbaqueConfig config;
-  
+
   // If no abaque section, return default (disabled)
   if (!node) {
     return config;
   }
-  
+
   try {
     // Parse enabled flag
     if (node["enabled"]) {
       config.enabled = node["enabled"].as<bool>();
     }
-    
+
     // Only parse other fields if enabled
     if (config.enabled) {
       // Parse catalyticity values
       if (!node["catalyticity_values"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'catalyticity_values' when abaque is enabled"));
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'catalyticity_values' when abaque is enabled"));
       }
       config.catalyticity_values = node["catalyticity_values"].as<std::vector<double>>();
-      
+
       if (config.catalyticity_values.empty()) {
         return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty"));
       }
-      
+
       // Parse temperature range
       if (node["temperature_range"]) {
         auto range = node["temperature_range"].as<std::vector<double>>();
@@ -472,12 +469,12 @@ auto YamlParser::parse_abaque_config(const YAML::Node& node) const
         }
         config.temperature_min = range[0];
         config.temperature_max = range[1];
-        
+
         if (config.temperature_min >= config.temperature_max) {
           return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
         }
       }
-      
+
       // Parse temperature points
       if (node["temperature_points"]) {
         config.temperature_points = node["temperature_points"].as<int>();
@@ -486,9 +483,9 @@ auto YamlParser::parse_abaque_config(const YAML::Node& node) const
         }
       }
     }
-    
+
     return config;
-    
+
   } catch (const YAML::Exception& e) {
     return std::unexpected(core::ConfigurationError(std::format("In 'abaque' section: {}", e.what())));
   }

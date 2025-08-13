@@ -2,8 +2,8 @@
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 namespace blast::boundary_layer::solver {
 
@@ -45,23 +45,23 @@ auto ContinuationMethod::solve_with_continuation(
       // Check if the failure was due to NaN detection
       const std::string error_msg = result.error().message();
       bool is_nan_error = error_msg.find("NaN detected") != std::string::npos;
-      
+
       if (is_nan_error) {
-        std::cout << "[CONTINUATION] NaN detected at lambda=" << std::scientific << std::setprecision(3) << lambda_try 
-                  << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step 
-                  << " to " << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
+        std::cout << "[CONTINUATION] NaN detected at lambda=" << std::scientific << std::setprecision(3) << lambda_try
+                  << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step << " to "
+                  << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
       } else {
-        std::cout << "[CONTINUATION] Step failed at lambda=" << std::scientific << std::setprecision(3) << lambda_try 
-                  << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step 
-                  << " to " << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
+        std::cout << "[CONTINUATION] Step failed at lambda=" << std::scientific << std::setprecision(3) << lambda_try
+                  << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step << " to "
+                  << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
       }
-      
+
       // Decrease step after failure (including NaN errors)
       lambda_step *= STEP_DECREASE_FACTOR;
 
       if (lambda_step < LAMBDA_STEP_MIN) {
-        std::cout << "[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step 
-                  << " < " << std::scientific << std::setprecision(3) << LAMBDA_STEP_MIN 
+        std::cout << "[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
+                  << " < " << std::scientific << std::setprecision(3) << LAMBDA_STEP_MIN
                   << "), giving up at lambda=" << std::scientific << std::setprecision(3) << lambda << std::endl;
         return ContinuationResult{.solution = current_solution, .success = false, .final_lambda = lambda};
       }
@@ -79,8 +79,7 @@ auto ContinuationMethod::interpolate_config(const io::Configuration& target, dou
   if (!config.wall_parameters.wall_temperatures.empty()) {
     double Twall_target = target.wall_parameters.wall_temperatures[0];
     double Twall_stable = target.continuation.wall_temperature_stable;
-    config.wall_parameters.wall_temperatures[0] =
-        Twall_stable + lambda * (Twall_target - Twall_stable);
+    config.wall_parameters.wall_temperatures[0] = Twall_stable + lambda * (Twall_target - Twall_stable);
   }
 
   // Interpolate edge conditions
