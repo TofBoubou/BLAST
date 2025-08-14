@@ -192,9 +192,10 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
   return thermo;
 }
 
-auto CoefficientCalculator::calculate_transport_coefficients(
-    const CoefficientInputs& inputs, const ThermodynamicCoefficients& thermo,
-    const conditions::BoundaryConditions& bc) const -> std::expected<TransportCoefficients, CoefficientError> {
+auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientInputs& inputs,
+                                                             const ThermodynamicCoefficients& thermo,
+                                                             const conditions::BoundaryConditions& bc) const
+    -> std::expected<TransportCoefficients, CoefficientError> {
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
@@ -267,14 +268,26 @@ auto CoefficientCalculator::calculate_transport_coefficients(
   return transport;
 }
 
-auto CoefficientCalculator::calculate_diffusion_coefficients(
-    const CoefficientInputs& inputs, const conditions::BoundaryConditions& bc,
-    const XiDerivatives& xi_der) const -> std::expected<DiffusionCoefficients, CoefficientError> {
+auto CoefficientCalculator::calculate_diffusion_coefficients(const CoefficientInputs& inputs,
+                                                             const conditions::BoundaryConditions& bc,
+                                                             const XiDerivatives& xi_der) const
+    -> std::expected<DiffusionCoefficients, CoefficientError> {
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
 
   DiffusionCoefficients diff;
+
+  if (n_species == 1) {
+    diff.Dij_bin = core::Matrix<double>(n_eta, 1);
+    diff.Dij_bin.setZero();
+    diff.J = core::Matrix<double>(1, n_eta);
+    diff.J.setZero();
+    diff.dJ_deta = core::Matrix<double>(1, n_eta);
+    diff.dJ_deta.setZero();
+    return diff;
+  }
+
   diff.Dij_bin = core::Matrix<double>(n_eta * n_species, n_species);
 
   // Use edge pressure consistently
@@ -309,9 +322,10 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(
   return diff;
 }
 
-auto CoefficientCalculator::calculate_chemical_coefficients(
-    const CoefficientInputs& inputs, const ThermodynamicCoefficients& thermo,
-    const conditions::BoundaryConditions& bc) const -> std::expected<ChemicalCoefficients, CoefficientError> {
+auto CoefficientCalculator::calculate_chemical_coefficients(const CoefficientInputs& inputs,
+                                                            const ThermodynamicCoefficients& thermo,
+                                                            const conditions::BoundaryConditions& bc) const
+    -> std::expected<ChemicalCoefficients, CoefficientError> {
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
@@ -520,9 +534,10 @@ auto CoefficientCalculator::compute_temperature_derivatives(const std::vector<do
   return dwi_dT;
 }
 
-auto CoefficientCalculator::calculate_thermal_diffusion(
-    const CoefficientInputs& inputs, const ThermodynamicCoefficients& thermo,
-    const conditions::BoundaryConditions& bc) const -> std::expected<ThermalDiffusionCoefficients, CoefficientError> {
+auto CoefficientCalculator::calculate_thermal_diffusion(const CoefficientInputs& inputs,
+                                                        const ThermodynamicCoefficients& thermo,
+                                                        const conditions::BoundaryConditions& bc) const
+    -> std::expected<ThermalDiffusionCoefficients, CoefficientError> {
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
@@ -627,9 +642,11 @@ auto CoefficientCalculator::calculate_species_enthalpies(const CoefficientInputs
   return std::make_pair(std::move(h_species), std::move(dh_species_deta));
 }
 
-auto CoefficientCalculator::calculate_wall_properties(
-    const CoefficientInputs& inputs, const conditions::BoundaryConditions& bc, const TransportCoefficients& transport,
-    const ThermodynamicCoefficients& thermo) const -> std::expected<WallProperties, CoefficientError> {
+auto CoefficientCalculator::calculate_wall_properties(const CoefficientInputs& inputs,
+                                                      const conditions::BoundaryConditions& bc,
+                                                      const TransportCoefficients& transport,
+                                                      const ThermodynamicCoefficients& thermo) const
+    -> std::expected<WallProperties, CoefficientError> {
 
   const auto n_species = inputs.c.rows();
 
@@ -727,8 +744,8 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::
 }
 
 template <std::ranges::sized_range Range>
-auto compute_eta_second_derivative(Range&& values,
-                                   double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
+auto compute_eta_second_derivative(Range&& values, double d_eta)
+    -> std::expected<std::vector<double>, CoefficientError> {
   const auto n = std::ranges::size(values);
   std::vector<double> second_derivatives(n);
 
@@ -782,8 +799,8 @@ auto compute_eta_second_derivative(Range&& values,
 }
 
 template <typename Matrix>
-auto compute_matrix_eta_second_derivative(const Matrix& values,
-                                          double d_eta) -> std::expected<Matrix, CoefficientError> {
+auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta)
+    -> std::expected<Matrix, CoefficientError> {
   const auto n_rows = values.rows();
   const auto n_cols = values.cols();
   Matrix result(n_rows, n_cols);
@@ -811,14 +828,14 @@ auto compute_matrix_eta_second_derivative(const Matrix& values,
 }
 
 // Explicit instantiations
-template auto compute_eta_derivative(std::span<const double>&&,
-                                     double) -> std::expected<std::vector<double>, CoefficientError>;
-template auto compute_eta_derivative(const std::vector<double>&,
-                                     double) -> std::expected<std::vector<double>, CoefficientError>;
-template auto compute_eta_derivative(std::vector<double>&&,
-                                     double) -> std::expected<std::vector<double>, CoefficientError>;
-template auto compute_eta_derivative(std::span<double>&&,
-                                     double) -> std::expected<std::vector<double>, CoefficientError>;
+template auto compute_eta_derivative(std::span<const double>&&, double)
+    -> std::expected<std::vector<double>, CoefficientError>;
+template auto compute_eta_derivative(const std::vector<double>&, double)
+    -> std::expected<std::vector<double>, CoefficientError>;
+template auto compute_eta_derivative(std::vector<double>&&, double)
+    -> std::expected<std::vector<double>, CoefficientError>;
+template auto compute_eta_derivative(std::span<double>&&, double)
+    -> std::expected<std::vector<double>, CoefficientError>;
 
 } // namespace derivatives
 

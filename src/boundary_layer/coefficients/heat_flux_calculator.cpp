@@ -105,9 +105,10 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
   return heat_flux;
 }
 
-auto HeatFluxCalculator::compute_heat_flux_geometry_factors(
-    int station, double xi, const conditions::BoundaryConditions& bc,
-    const WallProperties& wall_props) const -> std::expected<HeatFluxGeometryFactors, HeatFluxError> {
+auto HeatFluxCalculator::compute_heat_flux_geometry_factors(int station, double xi,
+                                                            const conditions::BoundaryConditions& bc,
+                                                            const WallProperties& wall_props) const
+    -> std::expected<HeatFluxGeometryFactors, HeatFluxError> {
 
   HeatFluxGeometryFactors factors;
   factors.valid_geometry = true;
@@ -201,9 +202,10 @@ auto HeatFluxCalculator::compute_reference_flux(const conditions::BoundaryCondit
   return q_ref;
 }
 
-auto HeatFluxCalculator::compute_conductive_flux_profile(
-    const std::vector<double>& dT_deta, const std::vector<double>& k_local,
-    const HeatFluxGeometryFactors& geo_factors) const -> std::expected<std::vector<double>, HeatFluxError> {
+auto HeatFluxCalculator::compute_conductive_flux_profile(const std::vector<double>& dT_deta,
+                                                         const std::vector<double>& k_local,
+                                                         const HeatFluxGeometryFactors& geo_factors) const
+    -> std::expected<std::vector<double>, HeatFluxError> {
 
   const auto n_eta = dT_deta.size();
   if (n_eta != k_local.size()) {
@@ -228,6 +230,13 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& co
   const auto n_eta = coeffs.diffusion.J.cols();
   const auto n_species = coeffs.diffusion.J.rows();
 
+  if (n_species == 1) {
+    std::vector<double> q_diffusive_total(n_eta, 0.0);
+    core::Matrix<double> q_diffusive_species(1, n_eta);
+    q_diffusive_species.setZero();
+    return {std::move(q_diffusive_total), std::move(q_diffusive_species)};
+  }
+
   std::vector<double> q_diffusive_total(n_eta, 0.0);
   core::Matrix<double> q_diffusive_species(n_species, n_eta);
 
@@ -242,9 +251,10 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& co
   return {std::move(q_diffusive_total), std::move(q_diffusive_species)};
 }
 
-auto HeatFluxCalculator::compute_wall_heat_fluxes(
-    const CoefficientInputs& inputs, const CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
-    int station, double xi) const -> std::expected<std::tuple<double, double, double>, HeatFluxError> {
+auto HeatFluxCalculator::compute_wall_heat_fluxes(const CoefficientInputs& inputs, const CoefficientSet& coeffs,
+                                                  const conditions::BoundaryConditions& bc, int station,
+                                                  double xi) const
+    -> std::expected<std::tuple<double, double, double>, HeatFluxError> {
 
   auto geo_factors_result = compute_heat_flux_geometry_factors(station, xi, bc, coeffs.wall);
   if (!geo_factors_result) {

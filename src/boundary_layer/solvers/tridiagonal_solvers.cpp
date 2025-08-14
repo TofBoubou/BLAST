@@ -14,8 +14,8 @@ struct CollocationCoeffs {
 };
 
 // Compute collocation coefficients for a given eta point
-[[nodiscard]] auto compute_collocation_coeffs(double a, double b, double c,
-                                              double t) -> std::expected<CollocationCoeffs, SolverError> {
+[[nodiscard]] auto compute_collocation_coeffs(double a, double b, double c, double t)
+    -> std::expected<CollocationCoeffs, SolverError> {
   CollocationCoeffs coeffs;
 
   if (t == -1.0) {
@@ -153,6 +153,12 @@ auto solve_species_block_tridiagonal(const core::Matrix<double>& prev_solution, 
 
   const auto n_eta = prev_solution.cols();
   const auto n_species = prev_solution.rows();
+
+  if (n_species == 1) {
+    core::Matrix<double> result(1, n_eta);
+    result.setOnes();
+    return result;
+  }
 
   if (n_eta < 3) {
     return std::unexpected(SolverError("Need at least 3 eta points"));

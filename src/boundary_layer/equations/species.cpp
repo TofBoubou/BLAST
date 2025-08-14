@@ -14,14 +14,20 @@ auto solve_species(const core::Matrix<double>& c_previous, const coefficients::C
                    const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
                    const coefficients::XiDerivatives& xi_der, const thermophysics::MixtureInterface& mixture,
                    const io::SimulationConfig& sim_config, std::span<const double> F_field,
-                   std::span<const double> V_field, int station,
-                   PhysicalQuantity auto d_eta) -> std::expected<core::Matrix<double>, EquationError> {
+                   std::span<const double> V_field, int station, PhysicalQuantity auto d_eta)
+    -> std::expected<core::Matrix<double>, EquationError> {
 
   const auto n_eta = c_previous.cols();
   const auto n_species = c_previous.rows();
 
   if (n_species != mixture.n_species()) {
     return std::unexpected(EquationError("Species: mixture species count mismatch"));
+  }
+
+  if (n_species == 1) {
+    core::Matrix<double> result(1, n_eta);
+    result.setOnes();
+    return result;
   }
 
   if (sim_config.chemical_mode == io::SimulationConfig::ChemicalMode::Equilibrium) {
@@ -89,8 +95,8 @@ auto compute_equilibrium_composition(std::span<const double> temperature_field, 
   return c_equilibrium;
 }
 
-auto apply_charge_neutrality(core::Matrix<double>& species_matrix,
-                             const thermophysics::MixtureInterface& mixture) -> void {
+auto apply_charge_neutrality(core::Matrix<double>& species_matrix, const thermophysics::MixtureInterface& mixture)
+    -> void {
 
   if (!mixture.has_electrons())
     return;
@@ -348,8 +354,8 @@ auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coeffi
   return std::make_pair(std::move(J_fake), std::move(dJ_fake_deta));
 }
 
-auto fix_concentration_derivatives(const core::Matrix<double>& c_matrix,
-                                   const core::Matrix<double>& dc_deta) -> core::Matrix<double> {
+auto fix_concentration_derivatives(const core::Matrix<double>& c_matrix, const core::Matrix<double>& dc_deta)
+    -> core::Matrix<double> {
 
   const auto n_species = c_matrix.rows();
   const auto n_eta = c_matrix.cols();
@@ -460,13 +466,12 @@ auto build_catalytic_boundary_conditions(const core::Matrix<double>& c_wall, con
 } // namespace detail
 
 // Explicit instantiations for common use cases
-template auto solve_species<double>(const core::Matrix<double>& c_previous,
-                                    const coefficients::CoefficientInputs& inputs,
-                                    const coefficients::CoefficientSet& coeffs,
-                                    const conditions::BoundaryConditions& bc, const coefficients::XiDerivatives& xi_der,
-                                    const thermophysics::MixtureInterface& mixture,
-                                    const io::SimulationConfig& sim_config, std::span<const double> F_field,
-                                    std::span<const double> V_field, int station,
-                                    double d_eta) -> std::expected<core::Matrix<double>, EquationError>;
+template auto
+solve_species<double>(const core::Matrix<double>& c_previous, const coefficients::CoefficientInputs& inputs,
+                      const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
+                      const coefficients::XiDerivatives& xi_der, const thermophysics::MixtureInterface& mixture,
+                      const io::SimulationConfig& sim_config, std::span<const double> F_field,
+                      std::span<const double> V_field, int station, double d_eta)
+    -> std::expected<core::Matrix<double>, EquationError>;
 
 } // namespace blast::boundary_layer::equations
