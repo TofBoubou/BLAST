@@ -8,13 +8,13 @@ simulation:
   catalytic_wall: false
 
 numerical:
-  n_eta: 200                       
+  n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9    
   max_iterations: 100000
 
 mixture:
-  name: CO2_single
+  name: N2_1
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
   thermal_conductivity_algorithm: chapman_enskog_ldlt
@@ -29,8 +29,8 @@ outer_edge:
     - x: 0.0
       radius: 1
       velocity: 0
-      temperature: 5905.5
-      pressure: 7000
+      temperature: 3000
+      pressure: 10000
       boundary_override: 
         enabled: false
         mass_fraction_condition: [0, 0.55, 0, 0.45, 0]
@@ -40,7 +40,7 @@ outer_edge:
   freestream_velocity: 500000
 
 wall_parameters:
-  temperatures: [2100]
+  temperatures: [300]
 
 abaque:
   enabled: false
@@ -49,6 +49,6 @@ abaque:
   temperature_points: 20
 
 continuation:
-  wall_temperature_stable: 3000.0
-  edge_temperature_stable: 5905.5
-  pressure_stable: 7000.0
+  wall_temperature_stable: 300.0
+  edge_temperature_stable: 300.0
+  pressure_stable: 10000
