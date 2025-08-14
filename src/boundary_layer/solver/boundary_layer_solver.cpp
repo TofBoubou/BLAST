@@ -621,7 +621,7 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   std::fill(guess.V.begin(), guess.V.end(), 0.0);
 
   if (n_species == 1) {
-    guess.c.setOnes();
+    guess.c.eigen().setOnes();
 
     std::array<double, 1> c_wall{{1.0}};
     auto h_wall_eq_result = mixture_.mixture_enthalpy(c_wall, bc.Tw(), bc.P_e());

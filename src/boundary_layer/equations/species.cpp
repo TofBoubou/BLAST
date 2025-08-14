@@ -26,7 +26,7 @@ auto solve_species(const core::Matrix<double>& c_previous, const coefficients::C
 
   if (n_species == 1) {
     core::Matrix<double> result(1, n_eta);
-    result.setOnes();
+    result.eigen().setOnes();
     return result;
   }
 

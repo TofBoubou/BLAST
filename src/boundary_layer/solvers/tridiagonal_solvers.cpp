@@ -156,7 +156,7 @@ auto solve_species_block_tridiagonal(const core::Matrix<double>& prev_solution, 
 
   if (n_species == 1) {
     core::Matrix<double> result(1, n_eta);
-    result.setOnes();
+    result.eigen().setOnes();
     return result;
   }
 
