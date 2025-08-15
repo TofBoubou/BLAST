@@ -265,6 +265,15 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
   }
   transport.dl3_deta = dl3_deta_result.value();
 
+  // Calculate finite thickness coefficients if enabled
+  auto finite_thickness_result = calculate_finite_thickness_coefficients(inputs, thermo, bc);
+  if (!finite_thickness_result) {
+    return std::unexpected(finite_thickness_result.error());
+  }
+  auto [K_bl, coeff_finite_thickness] = finite_thickness_result.value();
+  transport.K_bl = K_bl;
+  transport.coeff_finite_thickness = coeff_finite_thickness;
+
   return transport;
 }
 
@@ -838,5 +847,56 @@ template auto compute_eta_derivative(std::span<double>&&, double)
     -> std::expected<std::vector<double>, CoefficientError>;
 
 } // namespace derivatives
+
+auto CoefficientCalculator::calculate_finite_thickness_coefficients(const CoefficientInputs& inputs,
+                                                                   const ThermodynamicCoefficients& thermo,
+                                                                   const conditions::BoundaryConditions& bc) const
+    -> std::expected<std::pair<double, double>, CoefficientError> {
+  
+  // If finite thickness is not enabled, return default values
+  if (!sim_config_.finite_thickness) {
+    return std::make_pair(1.0, 0.0);
+  }
+
+  // Get finite thickness parameters from configuration
+  const auto& ft_params = outer_edge_config_.finite_thickness_params;
+  const double v_e = ft_params.v_edge;
+  const double d2_ue_dxdy = ft_params.d2_ue_dxdy;
+  const double delta_bl = ft_params.delta_bl;
+
+  // Edge properties
+  const auto n_eta = inputs.T.size();
+  const double rho_e = thermo.rho[n_eta - 1];
+  const double d_ue_dx = bc.d_ue_dx();
+
+  // Get edge viscosity
+  std::vector<double> c_edge(inputs.c.rows());
+  for (std::size_t j = 0; j < inputs.c.rows(); ++j) {
+    c_edge[j] = inputs.c(j, n_eta - 1);
+  }
+  
+  auto mu_e_result = mixture_.viscosity(c_edge, inputs.T[n_eta - 1], bc.P_e());
+  if (!mu_e_result) {
+    return std::unexpected(CoefficientError("Failed to compute edge viscosity for finite thickness"));
+  }
+  const double mu_e = mu_e_result.value();
+
+  // Compute finite thickness coefficient
+  const double coeff_finite_thickness = v_e * d2_ue_dxdy / (d_ue_dx * d_ue_dx);
+
+  // Compute K_bl coefficient
+  // Integrate 1/rho over the boundary layer
+  double integral = 0.0;
+  const double d_eta = num_config_.eta_max / static_cast<double>(num_config_.n_eta - 1);
+  
+  // Simple trapezoidal integration
+  for (std::size_t i = 0; i < n_eta - 1; ++i) {
+    integral += 0.5 * d_eta * (1.0 / thermo.rho[i] + 1.0 / thermo.rho[i + 1]);
+  }
+  
+  const double K_bl = std::sqrt(rho_e * mu_e / (2.0 * d_ue_dx)) * integral / delta_bl;
+
+  return std::make_pair(K_bl, coeff_finite_thickness);
+}
 
 } // namespace blast::boundary_layer::coefficients

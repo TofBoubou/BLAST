@@ -106,13 +106,14 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
 
     // ----- Coefficient a[i] -----
     double l3_i = coeffs.transport.l3[i];
-    double a_i = l3_i / d_eta_sq;
+    const double K_bl_sq = coeffs.transport.K_bl * coeffs.transport.K_bl;
+    double a_i = l3_i * K_bl_sq / d_eta_sq;
     energy_coeffs.a.push_back(a_i);
 
     // ----- Coefficient b[i] -----
     double dl3_deta_i = coeffs.transport.dl3_deta[i];
     double V_i = V_field[i];
-    double b_i = (dl3_deta_i - V_i) / d_eta;
+    double b_i = (dl3_deta_i * K_bl_sq - V_i) / d_eta;
     energy_coeffs.b.push_back(b_i);
 
     // ----- Coefficient c[i] -----
@@ -134,9 +135,9 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
 
     // ----- Coefficient d[i] -----
     const double d_term = -bc.ue() * bc.ue() / bc.he() *
-                              (coeffs.transport.l0[i] * dF_deta[i] * dF_deta[i] -
+                              (coeffs.transport.l0[i] * dF_deta[i] * dF_deta[i] * K_bl_sq -
                                bc.beta * bc.rho_e() / coeffs.thermodynamic.rho[i] * F_field[i]) +
-                          2.0 * xi * F_field[i] * g_derivatives[i] + tmp1 + tmp2;
+                          2.0 * xi * F_field[i] * g_derivatives[i] + tmp1 * K_bl_sq + tmp2 * coeffs.transport.K_bl;
 
     energy_coeffs.d.push_back(d_term);
   }

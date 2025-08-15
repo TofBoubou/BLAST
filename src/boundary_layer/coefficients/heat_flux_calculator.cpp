@@ -26,6 +26,9 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
     return std::unexpected(geo_factors_result.error());
   }
   auto geo_factors = geo_factors_result.value();
+  
+  // Apply K_bl factor to der_fact (finite thickness correction)
+  geo_factors.der_fact *= coeffs.transport.K_bl;
 
   if (!geo_factors.valid_geometry) {
     heat_flux.q_conductive_dimensional.resize(n_eta, 0.0);
@@ -261,6 +264,9 @@ auto HeatFluxCalculator::compute_wall_heat_fluxes(const CoefficientInputs& input
     return std::unexpected(geo_factors_result.error());
   }
   auto geo_factors = geo_factors_result.value();
+  
+  // Apply K_bl factor to der_fact (finite thickness correction)
+  geo_factors.der_fact *= coeffs.transport.K_bl;
 
   if (!geo_factors.valid_geometry) {
     return std::make_tuple(0.0, 0.0, 0.0);

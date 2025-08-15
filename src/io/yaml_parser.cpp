@@ -150,6 +150,15 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.only_stagnation_point = only_stag_result.value();
 
+    // Parse finite thickness - optional parameter, defaults to false
+    if (node["finite_thickness"]) {
+      auto finite_thickness_result = extract_value<bool>(node, "finite_thickness");
+      if (!finite_thickness_result) {
+        return std::unexpected(finite_thickness_result.error());
+      }
+      config.finite_thickness = finite_thickness_result.value();
+    }
+
     auto diffusion_result = extract_enum(node, "diffusion_type", enum_mappings::diffusion_types);
     if (!diffusion_result) {
       return std::unexpected(diffusion_result.error());
@@ -409,6 +418,26 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
     if (!freestream_vel_result)
       return std::unexpected(freestream_vel_result.error());
     config.freestream_velocity = freestream_vel_result.value();
+
+    // Parse finite thickness parameters if present
+    if (node["finite_thickness_params"]) {
+      auto ft_node = node["finite_thickness_params"];
+      
+      auto v_edge_result = extract_value<double>(ft_node, "v_edge");
+      if (!v_edge_result)
+        return std::unexpected(v_edge_result.error());
+      config.finite_thickness_params.v_edge = v_edge_result.value();
+      
+      auto d2_ue_dxdy_result = extract_value<double>(ft_node, "d2_ue_dxdy");
+      if (!d2_ue_dxdy_result)
+        return std::unexpected(d2_ue_dxdy_result.error());
+      config.finite_thickness_params.d2_ue_dxdy = d2_ue_dxdy_result.value();
+      
+      auto delta_bl_result = extract_value<double>(ft_node, "delta_bl");
+      if (!delta_bl_result)
+        return std::unexpected(delta_bl_result.error());
+      config.finite_thickness_params.delta_bl = delta_bl_result.value();
+    }
 
     return config;
 

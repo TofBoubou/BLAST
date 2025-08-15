@@ -38,7 +38,7 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
 
   // Create coefficient calculator
   coeff_calculator_ =
-      std::make_unique<coefficients::CoefficientCalculator>(mixture_, config_.simulation, config_.numerical);
+      std::make_unique<coefficients::CoefficientCalculator>(mixture_, config_.simulation, config_.numerical, config_.outer_edge);
 
   heat_flux_calculator_ =
       std::make_unique<coefficients::HeatFluxCalculator>(mixture_, config_.simulation, config_.numerical);

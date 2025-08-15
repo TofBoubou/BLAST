@@ -82,9 +82,10 @@ auto build_momentum_coefficients(std::span<const double> F_previous, const coeff
     coeffs_out.c.push_back(-2.0 * xi * lambda0 * F_previous[i]);
 
     // ----- Coefficient d[i] -----
-    // d[i] = -beta*(rho_e/rho[i] - F[i]^2) + 2*xi*F[i]*F_der[i]
+    // d[i] = -beta*(rho_e/rho[i] - F[i]^2) + 2*xi*F[i]*F_der[i] - coeff_finite_thickness*0.5*rho_e/rho[i]
     const double d_term = -bc.beta * (rho_e_actual / coeffs.thermodynamic.rho[i] - F_previous[i] * F_previous[i]) +
-                          2.0 * xi * F_previous[i] * F_derivatives[i];
+                          2.0 * xi * F_previous[i] * F_derivatives[i] - 
+                          coeffs.transport.coeff_finite_thickness * 0.5 * rho_e_actual / coeffs.thermodynamic.rho[i];
     coeffs_out.d.push_back(d_term);
 
     const double d_term_si_linearisation =

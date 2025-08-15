@@ -258,19 +258,19 @@ auto build_species_coefficients(const core::Matrix<double>& c_previous, const co
     for (std::size_t j = 0; j < n_species; ++j) {
 
       // ----- Coefficient a[i] -----
-      // a[i][j] = -l0[i]*Le/Pr / d_eta²
-      species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr / d_eta_sq;
+      // a[i][j] = -l0[i]*Le/Pr*K_bl*K_bl / d_eta²
+      const double K_bl_sq = coeffs.transport.K_bl * coeffs.transport.K_bl;
+      species_coeffs.a(i, j) = -coeffs.transport.l0[i] * Le / Pr * K_bl_sq / d_eta_sq;
 
       // ----- Coefficient b[i] -----
-      species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i]) / d_eta;
+      species_coeffs.b(i, j) = (V_field[i] - Le / Pr * coeffs.transport.dl0_deta[i] * K_bl_sq) / d_eta;
 
       // ----- Coefficient [i] -----
       species_coeffs.c(i, j) = 2.0 * xi * F_field[i] * lambda0;
 
       // ----- Coefficient d[i] -----
-      // d[i][j] = -dJ_fake_deta[j][i] - dJ_deta[j][i]*J_fact -
-      // 2*xi*c_der[j][i]*F[i]
-      const double d_term = -dJ_fake_deta(j, i) - coeffs.diffusion.dJ_deta(j, i) * factors.J_fact -
+      // d[i][j] = -dJ_fake_deta[j][i]*K_bl*K_bl - dJ_deta[j][i]*J_fact*K_bl - 2*xi*c_der[j][i]*F[i]
+      const double d_term = -dJ_fake_deta(j, i) * K_bl_sq - coeffs.diffusion.dJ_deta(j, i) * factors.J_fact * coeffs.transport.K_bl -
                             2.0 * xi * c_derivatives(j, i) * F_field[i];
 
       const double wi_term = coeffs.chemical.wi(i, j) * factors.W_fact / coeffs.thermodynamic.rho[i];
@@ -438,7 +438,7 @@ auto build_catalytic_boundary_conditions(const core::Matrix<double>& c_wall, con
   // Heavy species: catalytic boundary conditions
   for (std::size_t i = start_idx; i < n_species; ++i) {
     // Robin boundary condition: f_bc * dc/dη + g_bc * c = h_bc
-    boundary_conds.f_bc[i] = -coeffs.transport.l0[0] * Le / Pr / d_eta;
+    boundary_conds.f_bc[i] = -coeffs.transport.l0[0] * Le / Pr * coeffs.transport.K_bl / d_eta;
     boundary_conds.g_bc[i] = 0.0; // No concentration term
 
     // J_reel

@@ -12,6 +12,10 @@ struct TransportCoefficients {
   std::vector<double> l3;
   std::vector<double> dl0_deta; // Derivative of l0
   std::vector<double> dl3_deta; // Derivative of l3
+  
+  // Finite thickness corrections
+  double K_bl = 1.0;                    // Boundary layer correction factor
+  double coeff_finite_thickness = 0.0;  // Finite thickness coefficient for momentum equation
 };
 
 // Thermodynamic properties

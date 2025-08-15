@@ -21,6 +21,7 @@ struct SimulationConfig {
 
   BodyType body_type = BodyType::Axisymmetric;
   bool only_stagnation_point = true;
+  bool finite_thickness = false; // Enable finite thickness correction for stagnation point
   DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
   bool consider_thermal_diffusion = false;
   bool consider_dufour_effect = false;
@@ -93,10 +94,17 @@ struct OuterEdgeConfig {
     }
   };
 
+  struct FiniteThicknessParams {
+    double v_edge = 0.0;           // Edge velocity normal to surface
+    double d2_ue_dxdy = 0.0;       // Second derivative of edge velocity
+    double delta_bl = 0.0;         // Boundary layer thickness
+  };
+
   std::vector<EdgePoint> edge_points;
   double velocity_gradient_stagnation;
   double freestream_density;
   double freestream_velocity;
+  FiniteThicknessParams finite_thickness_params;
 };
 
 struct WallParametersConfig {

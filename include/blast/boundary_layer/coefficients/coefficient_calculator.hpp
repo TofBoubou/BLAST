@@ -33,6 +33,7 @@ private:
   const thermophysics::MixtureInterface& mixture_;
   const io::SimulationConfig& sim_config_;
   const io::NumericalConfig& num_config_;
+  const io::OuterEdgeConfig& outer_edge_config_;
   double d_eta_;
 
   [[nodiscard]] auto calculate_transport_coefficients(
@@ -42,6 +43,11 @@ private:
   [[nodiscard]] auto calculate_thermodynamic_coefficients(const CoefficientInputs& inputs,
                                                           const conditions::BoundaryConditions& bc) const
       -> std::expected<ThermodynamicCoefficients, CoefficientError>;
+
+  [[nodiscard]] auto calculate_finite_thickness_coefficients(const CoefficientInputs& inputs,
+                                                            const ThermodynamicCoefficients& thermo,
+                                                            const conditions::BoundaryConditions& bc) const
+      -> std::expected<std::pair<double, double>, CoefficientError>;
 
   [[nodiscard]] auto calculate_diffusion_coefficients(
       const CoefficientInputs& inputs, const conditions::BoundaryConditions& bc,
@@ -87,8 +93,8 @@ private:
 
 public:
   CoefficientCalculator(const thermophysics::MixtureInterface& mixture, const io::SimulationConfig& sim_config,
-                        const io::NumericalConfig& num_config)
-      : mixture_(mixture), sim_config_(sim_config), num_config_(num_config),
+                        const io::NumericalConfig& num_config, const io::OuterEdgeConfig& outer_edge_config)
+      : mixture_(mixture), sim_config_(sim_config), num_config_(num_config), outer_edge_config_(outer_edge_config),
         d_eta_(num_config.eta_max / static_cast<double>(num_config.n_eta - 1)) {}
 
   // Main calculation interface

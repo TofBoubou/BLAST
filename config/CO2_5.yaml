@@ -1,6 +1,7 @@
 simulation:
   body_type: axisymmetric
   only_stagnation_point: true
+  finite_thickness: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
   consider_dufour_effect: false
@@ -10,7 +11,7 @@ simulation:
 numerical:
   n_eta: 200                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-9    
+  convergence_tolerance: 1.0e-9 
   max_iterations: 100000
 
 mixture:
@@ -32,12 +33,17 @@ outer_edge:
       temperature: 5905.5
       pressure: 7000
       boundary_override: 
-        enabled: true
+        enabled: false
         mass_fraction_condition: [0, 0.55, 0, 0.45, 0]  # CO2, CO, O2, O, C
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429
   freestream_velocity: 500000
+  
+  finite_thickness_params:
+    v_edge: -111.31796000
+    d2_ue_dxdy: -290979.9698604651
+    delta_bl: 0.0105250000
 
 wall_parameters:
   temperatures: [2100]

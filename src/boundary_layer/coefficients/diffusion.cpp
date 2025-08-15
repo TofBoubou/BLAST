@@ -161,7 +161,7 @@ auto compute_stefan_maxwell_fluxes(const CoefficientInputs& inputs,
 
   // Get station and compute derivative factor
   const int station = xi_der.station();
-  const double der_fact = compute_derivative_factor(station, inputs.xi, bc, sim_config);
+  const double der_fact = compute_derivative_factor(station, inputs.xi, bc, sim_config) * coeffs.transport.K_bl;
 
   // Pre-allocate work arrays
   std::vector<double> c_local(n_species);
