@@ -5,12 +5,12 @@ simulation:
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
   consider_dufour_effect: false
-  chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
+  chemical_mode: "equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: false
-  thermal_bc: "imposed_temperature"
+  thermal_bc: "adiabatic"
 
 numerical:
-  n_eta: 50                       
+  n_eta: 100                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9 
   max_iterations: 100000
@@ -34,7 +34,7 @@ outer_edge:
       temperature: 5905.5
       pressure: 7000
       boundary_override: 
-        enabled: false
+        enabled: true
         mass_fraction_condition: [0, 0.55, 0, 0.45, 0]  # CO2, CO, O2, O, C
   
   velocity_gradient_stagnation: 4027.1213622326
@@ -47,7 +47,7 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [4000]
+  temperatures: [2100]
 
 abaque:
   enabled: false

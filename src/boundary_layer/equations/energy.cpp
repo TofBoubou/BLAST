@@ -146,8 +146,9 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
 }
 
 [[nodiscard]] auto
-build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
-                                 const io::SimulationConfig& sim_config, const thermophysics::MixtureInterface& mixture,
+build_energy_boundary_conditions(const coefficients::CoefficientInputs& inputs,
+                                 const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
+                                 const io::SimulationConfig& sim_config, int station,
                                  PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions {
   
   EnergyBoundaryConditions boundary_conds;
