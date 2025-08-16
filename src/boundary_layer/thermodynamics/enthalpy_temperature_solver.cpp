@@ -106,7 +106,7 @@ auto EnthalpyTemperatureSolver::solve(std::span<const double> enthalpy_field, co
   result.temperatures.resize(n_points);
   
   // Déterminer si on est en mode adiabatique
-  bool is_adiabatic = (bc.simulation_config().thermal_bc == io::SimulationConfig::ThermalBC::Adiabatic);
+  bool is_adiabatic = bc.simulation_config().adiabatic;
   
   int start_index;
   if (is_adiabatic) {

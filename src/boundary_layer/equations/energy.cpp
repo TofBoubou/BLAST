@@ -156,7 +156,7 @@ build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs,
   
   EnergyBoundaryConditions boundary_conds;
   
-  if (sim_config.thermal_bc == io::SimulationConfig::ThermalBC::ImposedTemperature) {
+  if (!sim_config.adiabatic) {
     // Given temperature at the wall
     boundary_conds.f_bc = 0.0;
     boundary_conds.g_bc = 1.0;

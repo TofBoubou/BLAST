@@ -159,9 +159,6 @@ inline const std::unordered_map<std::string, SimulationConfig::ChemicalMode> che
     {"non_equilibrium", SimulationConfig::ChemicalMode::NonEquilibrium},
     {"nonequilibrium", SimulationConfig::ChemicalMode::NonEquilibrium}};
 
-inline const std::unordered_map<std::string, SimulationConfig::ThermalBC> thermal_bc_types = {
-    {"imposed_temperature", SimulationConfig::ThermalBC::ImposedTemperature},
-    {"adiabatic", SimulationConfig::ThermalBC::Adiabatic}};
 
 } // namespace enum_mappings
 

@@ -7,7 +7,7 @@ simulation:
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: false
-  thermal_bc: "adiabatic"
+  adiabatic: false
 
 numerical:
   n_eta: 20                       
@@ -34,7 +34,7 @@ outer_edge:
       temperature: 5905.5
       pressure: 7000
       boundary_override: 
-        enabled: false
+        enabled: true
         mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]  # CO2, CO, O2, O, C
   
   velocity_gradient_stagnation: 4027.1213622326
