@@ -18,15 +18,17 @@ struct SimulationConfig {
   enum class BodyType { Axisymmetric, Cone, TwoD, FlatPlate };
   enum class DiffusionType { Ramshaw, StefanMaxwell, MPP };
   enum class ChemicalMode { Equilibrium, Frozen, NonEquilibrium };
+  enum class ThermalBC { ImposedTemperature, Adiabatic };
 
   BodyType body_type = BodyType::Axisymmetric;
   bool only_stagnation_point = true;
-  bool finite_thickness = false; // Enable finite thickness correction for stagnation point
+  bool finite_thickness = false;
   DiffusionType diffusion_type = DiffusionType::StefanMaxwell;
   bool consider_thermal_diffusion = false;
   bool consider_dufour_effect = false;
   ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
-  bool catalytic_wall = false; // Enable surface catalysis
+  bool catalytic_wall = false;
+  ThermalBC thermal_bc = ThermalBC::ImposedTemperature;
 };
 
 struct NumericalConfig {

@@ -145,12 +145,31 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
   return energy_coeffs;
 }
 
-auto build_energy_boundary_conditions(const coefficients::CoefficientInputs& inputs,
-                                      const coefficients::CoefficientSet& coeffs,
-                                      const conditions::BoundaryConditions& bc, const io::SimulationConfig& sim_config,
-                                      int station, PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions {
-
-  return EnergyBoundaryConditions{.f_bc = 0.0, .g_bc = 1.0, .h_bc = coeffs.thermodynamic.h_wall / bc.he()};
+[[nodiscard]] auto
+build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
+                                 const io::SimulationConfig& sim_config, const thermophysics::MixtureInterface& mixture,
+                                 PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions {
+  
+  EnergyBoundaryConditions boundary_conds;
+  
+  if (sim_config.thermal_bc == io::SimulationConfig::ThermalBC::ImposedTemperature) {
+    // Given temperature at the wall
+    boundary_conds.f_bc = 0.0;
+    boundary_conds.g_bc = 1.0;
+    boundary_conds.h_bc = coeffs.thermodynamic.h_wall / bc.he();
+  } else {
+    // Adiabatic wall
+    boundary_conds.f_bc = 1.0 / d_eta;
+    boundary_conds.g_bc = 0.0;
+    boundary_conds.h_bc = 0.0;
+    
+    // Pour l'instant, on laisse h_bc = 0 pour simplifier
+    // Les termes de flux diffusifs seront ajoutés plus tard quand on aura
+    // accès aux gradients de concentration et aux flux diffusifs
+    // TODO: Ajouter les termes diffusifs comme dans l'ancien code
+  }
+  
+  return boundary_conds;
 }
 
 auto compute_species_enthalpy_terms(const coefficients::CoefficientInputs& inputs,

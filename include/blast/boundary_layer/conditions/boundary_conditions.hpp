@@ -30,7 +30,7 @@ struct EdgeConditions {
 };
 
 struct WallConditions {
-  double temperature;
+  mutable double temperature; 
 };
 
 struct BoundaryConditions {
@@ -39,6 +39,7 @@ struct BoundaryConditions {
   double beta;
   int station;
   double xi;
+  const io::SimulationConfig* sim_config = nullptr; 
 
   [[nodiscard]] constexpr auto P_e() const noexcept { return edge.pressure; }
   [[nodiscard]] constexpr auto mu_e() const noexcept { return edge.viscosity; }
@@ -53,6 +54,8 @@ struct BoundaryConditions {
   [[nodiscard]] constexpr auto d_he_dxi() const noexcept { return edge.d_he_dxi; }
 
   [[nodiscard]] auto c_e() const noexcept -> const std::vector<double>& { return edge.species_fractions; }
+  
+  [[nodiscard]] const io::SimulationConfig& simulation_config() const { return *sim_config; }
 
   // Dynamic update methods for thermodynamic consistency
   void update_edge_density(double new_density) noexcept { edge.density = new_density; }

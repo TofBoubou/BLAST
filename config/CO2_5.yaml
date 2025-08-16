@@ -7,9 +7,10 @@ simulation:
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: false
+  thermal_bc: "imposed_temperature"
 
 numerical:
-  n_eta: 100                       
+  n_eta: 50                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9 
   max_iterations: 100000
@@ -46,7 +47,7 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [2100]
+  temperatures: [4000]
 
 abaque:
   enabled: false

@@ -214,7 +214,12 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
 
   WallConditions wall{.temperature = wall_config.wall_temperatures[0]};
 
-  return BoundaryConditions{.edge = edge, .wall = wall, .beta = 0.0, .station = 0, .xi = 0.0};
+  return BoundaryConditions{.edge = edge, 
+                           .wall = wall, 
+                           .beta = 0.0, 
+                           .station = 0, 
+                           .xi = 0.0,
+                           .sim_config = &sim_config};
 }
 
 [[nodiscard]] auto interpolate_boundary_conditions(
@@ -449,7 +454,8 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
                             .wall = std::move(wall),
                             .beta = compute_beta(station, xi, sim_config, /*u_e=*/velocity_result.value(), d_ue_dxi),
                             .station = station,
-                            .xi = xi};
+                            .xi = xi,
+                            .sim_config = &sim_config};
 }
 
 } // namespace blast::boundary_layer::conditions

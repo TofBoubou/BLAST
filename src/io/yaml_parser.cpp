@@ -189,6 +189,13 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.catalytic_wall = catalytic_result.value();
 
+    if (node["thermal_bc"]) {
+      auto thermal_bc_result = extract_enum(node, "thermal_bc", enum_mappings::thermal_bc_types);
+      if (thermal_bc_result) {
+        config.thermal_bc = thermal_bc_result.value();
+      }
+    }
+
     return config;
 
   } catch (const core::ConfigurationError& e) {
