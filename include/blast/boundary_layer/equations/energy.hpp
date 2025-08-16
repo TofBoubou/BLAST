@@ -45,11 +45,14 @@ build_energy_coefficients(std::span<const double> g_previous, const coefficients
                           std::span<const double> V_field, const thermophysics::MixtureInterface& mixture, int station,
                           PhysicalQuantity auto d_eta) -> std::expected<EnergyCoefficients, EquationError>;
 
-[[nodiscard]] auto build_energy_boundary_conditions(const coefficients::CoefficientInputs& inputs,
-                                                    const coefficients::CoefficientSet& coeffs,
-                                                    const conditions::BoundaryConditions& bc,
-                                                    const io::SimulationConfig& sim_config, int station,
-                                                    PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions;
+[[nodiscard]] auto
+build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs,
+                                const conditions::BoundaryConditions& bc,
+                                const io::SimulationConfig& sim_config,
+                                const thermophysics::MixtureInterface& mixture,
+                                const coefficients::CoefficientInputs& inputs,
+                                int station,
+                                PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions;
 
 // Helper to compute species enthalpy terms
 [[nodiscard]] auto compute_species_enthalpy_terms(const coefficients::CoefficientInputs& inputs,

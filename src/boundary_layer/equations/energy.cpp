@@ -32,7 +32,7 @@ auto solve_energy(std::span<const double> g_previous, const coefficients::Coeffi
   auto energy_coeffs = energy_coeffs_result.value();
 
   // Build boundary conditions
-  auto boundary_conds = detail::build_energy_boundary_conditions(inputs, coeffs, bc, sim_config, station, d_eta);
+  auto boundary_conds = detail::build_energy_boundary_conditions(coeffs, bc, sim_config, mixture, inputs, station, d_eta);
 
   // Solve tridiagonal system
   auto solution_result = solvers::solve_momentum_energy_tridiagonal(
@@ -146,9 +146,12 @@ auto build_energy_coefficients(std::span<const double> g_previous, const coeffic
 }
 
 [[nodiscard]] auto
-build_energy_boundary_conditions(const coefficients::CoefficientInputs& inputs,
-                                 const coefficients::CoefficientSet& coeffs, const conditions::BoundaryConditions& bc,
-                                 const io::SimulationConfig& sim_config, int station,
+build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs, 
+                                 const conditions::BoundaryConditions& bc,
+                                 const io::SimulationConfig& sim_config, 
+                                 const thermophysics::MixtureInterface& mixture,
+                                 const coefficients::CoefficientInputs& inputs,
+                                 int station,
                                  PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions {
   
   EnergyBoundaryConditions boundary_conds;
@@ -164,10 +167,41 @@ build_energy_boundary_conditions(const coefficients::CoefficientInputs& inputs,
     boundary_conds.g_bc = 0.0;
     boundary_conds.h_bc = 0.0;
     
-    // Pour l'instant, on laisse h_bc = 0 pour simplifier
-    // Les termes de flux diffusifs seront ajoutés plus tard quand on aura
-    // accès aux gradients de concentration et aux flux diffusifs
-    // TODO: Ajouter les termes diffusifs comme dans l'ancien code
+    const auto n_species = mixture.n_species();
+    const double Pr_wall = coeffs.wall.Pr_wall;
+    const double l0_wall = coeffs.transport.l0[0];
+    
+    // Calculer J_fact en utilisant la fonction existante
+    auto j_fact_result = compute_energy_j_factor(station, bc.xi, bc, sim_config);
+    if (!j_fact_result) {
+      // En cas d'erreur, utiliser 1.0 comme valeur par défaut
+      std::cerr << "Warning: Failed to compute J_fact, using 1.0" << std::endl;
+    }
+    const double J_fact = j_fact_result.value_or(1.0);
+    
+    // Calcul des termes de flux diffusifs pour la condition adiabatique
+    for (std::size_t i = 0; i < n_species; ++i) {
+      // Terme 1: Gradient de concentration au mur
+      const double dc_deta_wall = inputs.dc_deta(i, 0);
+      const double h_sp_wall = coeffs.h_species(i, 0);
+      boundary_conds.h_bc += dc_deta_wall * h_sp_wall / bc.he();
+      
+      // Terme 2: Flux diffusif au mur (avec J_fact)
+      const double J_wall = coeffs.diffusion.J(i, 0);
+      boundary_conds.h_bc += Pr_wall / l0_wall * h_sp_wall / bc.he() * J_fact * J_wall;
+      
+      // Terme 3: Effet Dufour si activé
+      if (sim_config.consider_dufour_effect && coeffs.thermal_diffusion.tdr.rows() > 0) {
+        const double c_wall = inputs.c(i, 0);
+        const double tdr_wall = coeffs.thermal_diffusion.tdr(i, 0);
+        const double rho_wall = coeffs.wall.rho_wall;
+        
+        if (std::abs(c_wall) > 1e-15 && std::abs(rho_wall) > 1e-15) {
+          boundary_conds.h_bc += bc.P_e() / bc.he() * Pr_wall / l0_wall * 
+                                tdr_wall * J_fact * J_wall / (c_wall * rho_wall);
+        }
+      }
+    }
   }
   
   return boundary_conds;
