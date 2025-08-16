@@ -1,5 +1,6 @@
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include "blast/boundary_layer/coefficients/diffusion.hpp"
+#include "blast/boundary_layer/grid/coordinate_transform.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -884,15 +885,17 @@ auto CoefficientCalculator::calculate_finite_thickness_coefficients(const Coeffi
   // Compute finite thickness coefficient
   const double coeff_finite_thickness = v_e * d2_ue_dxdy / (d_ue_dx * d_ue_dx);
 
-  // Compute K_bl coefficient
-  // Integrate 1/rho over the boundary layer
-  double integral = 0.0;
+  std::vector<double> integrand(n_eta);
+  for (std::size_t i = 0; i < n_eta; ++i) {
+    integrand[i] = 1.0 / thermo.rho[i];
+  }
+  
   const double d_eta = num_config_.eta_max / static_cast<double>(num_config_.n_eta - 1);
   
-  // Simple trapezoidal integration
-  for (std::size_t i = 0; i < n_eta - 1; ++i) {
-    integral += 0.5 * d_eta * (1.0 / thermo.rho[i] + 1.0 / thermo.rho[i + 1]);
-  }
+  auto integrated_values = grid::coordinate_transform::simpson_integrate(integrand, d_eta, 0.0);
+  
+  // Get the final integrated value (integral from 0 to eta_max)
+  const double integral = integrated_values.back();
   
   const double K_bl = std::sqrt(rho_e * mu_e / (2.0 * d_ue_dx)) * integral / delta_bl;
 

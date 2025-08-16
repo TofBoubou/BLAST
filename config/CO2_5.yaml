@@ -1,7 +1,7 @@
 simulation:
   body_type: axisymmetric
   only_stagnation_point: true
-  finite_thickness: true
+  finite_thickness: false
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
   consider_dufour_effect: false
@@ -9,7 +9,7 @@ simulation:
   catalytic_wall: false
 
 numerical:
-  n_eta: 200                       
+  n_eta: 100                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9 
   max_iterations: 100000
