@@ -125,7 +125,8 @@ auto EnthalpyTemperatureSolver::solve(std::span<const double> enthalpy_field, co
       c_temp[j] = composition(j, i);
     }
     
-    double h = enthalpy_field[i] * h_e;  // Dénormaliser l'enthalpie
+    // double h = enthalpy_field[i] * h_e;  // Dénormaliser l'enthalpie
+    double h = enthalpy_field[i];
     
     auto temp_result = solve_single_point(c_temp, h, P, initial_temperatures[i]);
     if (!temp_result) {
