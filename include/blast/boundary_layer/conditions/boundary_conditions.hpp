@@ -30,7 +30,9 @@ struct EdgeConditions {
 };
 
 struct WallConditions {
-  mutable double temperature; 
+  mutable double temperature;
+  double emissivity = 0.0;
+  double environment_temperature = 0.0;
 };
 
 struct BoundaryConditions {
@@ -39,7 +41,7 @@ struct BoundaryConditions {
   double beta;
   int station;
   double xi;
-  const io::SimulationConfig* sim_config = nullptr; 
+  const io::SimulationConfig *sim_config = nullptr;
 
   [[nodiscard]] constexpr auto P_e() const noexcept { return edge.pressure; }
   [[nodiscard]] constexpr auto mu_e() const noexcept { return edge.viscosity; }
@@ -47,27 +49,41 @@ struct BoundaryConditions {
   [[nodiscard]] constexpr auto he() const noexcept { return edge.enthalpy; }
   [[nodiscard]] constexpr auto rho_e() const noexcept { return edge.density; }
   [[nodiscard]] constexpr auto Tw() const noexcept { return wall.temperature; }
-  [[nodiscard]] constexpr auto r_body() const noexcept { return edge.body_radius; }
+  [[nodiscard]] constexpr auto r_body() const noexcept {
+    return edge.body_radius;
+  }
   [[nodiscard]] constexpr auto d_xi_dx() const noexcept { return edge.d_xi_dx; }
   [[nodiscard]] constexpr auto d_ue_dx() const noexcept { return edge.d_ue_dx; }
   [[nodiscard]] constexpr auto d_he_dx() const noexcept { return edge.d_he_dx; }
-  [[nodiscard]] constexpr auto d_he_dxi() const noexcept { return edge.d_he_dxi; }
+  [[nodiscard]] constexpr auto d_he_dxi() const noexcept {
+    return edge.d_he_dxi;
+  }
 
-  [[nodiscard]] auto c_e() const noexcept -> const std::vector<double>& { return edge.species_fractions; }
-  
-  [[nodiscard]] const io::SimulationConfig& simulation_config() const { return *sim_config; }
+  [[nodiscard]] auto c_e() const noexcept -> const std::vector<double> & {
+    return edge.species_fractions;
+  }
+
+  [[nodiscard]] const io::SimulationConfig &simulation_config() const {
+    return *sim_config;
+  }
 
   // Dynamic update methods for thermodynamic consistency
-  void update_edge_density(double new_density) noexcept { edge.density = new_density; }
+  void update_edge_density(double new_density) noexcept {
+    edge.density = new_density;
+  }
 
-  void update_edge_viscosity(double new_viscosity) noexcept { edge.viscosity = new_viscosity; }
+  void update_edge_viscosity(double new_viscosity) noexcept {
+    edge.viscosity = new_viscosity;
+  }
 };
 
 class BoundaryConditionError : public core::BlastException {
 public:
-  explicit BoundaryConditionError(std::string_view message,
-                                  std::source_location location = std::source_location::current())
-      : BlastException(std::format("Boundary Condition Error: {}", message), location) {}
+  explicit BoundaryConditionError(
+      std::string_view message,
+      std::source_location location = std::source_location::current())
+      : BlastException(std::format("Boundary Condition Error: {}", message),
+                       location) {}
 };
 
 } // namespace blast::boundary_layer::conditions

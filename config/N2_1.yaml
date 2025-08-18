@@ -6,6 +6,7 @@ simulation:
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: false
+  radiation: false
 
 numerical:
   n_eta: 20                       
@@ -41,6 +42,8 @@ outer_edge:
 
 wall_parameters:
   temperatures: [300]
+  emissivity: 0.0
+  environment_temperature: 300
 
 abaque:
   enabled: false

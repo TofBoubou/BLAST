@@ -5,8 +5,9 @@
 
 namespace blast::boundary_layer::thermodynamics {
 
-auto EnthalpyTemperatureSolver::solve_single_point(std::span<const double> composition, double target_enthalpy,
-                                                   double pressure, double initial_temperature) const
+auto EnthalpyTemperatureSolver::solve_single_point(
+    std::span<const double> composition, double target_enthalpy,
+    double pressure, double initial_temperature) const
     -> std::expected<double, ThermodynamicSolverError> {
 
   bool mflag = true;
@@ -92,58 +93,61 @@ auto EnthalpyTemperatureSolver::solve_single_point(std::span<const double> compo
   return b;
 }
 
-auto EnthalpyTemperatureSolver::solve(std::span<const double> enthalpy_field, const core::Matrix<double>& composition,
-                                      const conditions::BoundaryConditions& bc,
-                                      std::span<const double> initial_temperatures) const
+auto EnthalpyTemperatureSolver::solve(
+    std::span<const double> enthalpy_field,
+    const core::Matrix<double> &composition,
+    const conditions::BoundaryConditions &bc,
+    std::span<const double> initial_temperatures) const
     -> std::expected<TemperatureField, ThermodynamicSolverError> {
 
   const auto n_points = enthalpy_field.size();
-  
+
   double P = bc.P_e();
   double h_e = bc.he();
-  
+
   TemperatureField result;
   result.temperatures.resize(n_points);
-  
-  // Déterminer si on est en mode adiabatique
-  bool is_adiabatic = bc.simulation_config().adiabatic;
-  
+
+  // Wall temperature is unknown for adiabatic or radiative conditions
+  bool variable_wall_temp =
+      bc.simulation_config().adiabatic || bc.simulation_config().radiation;
+
   int start_index;
-  if (is_adiabatic) {
-    // Mode adiabatique : on doit calculer T[0]
+  if (variable_wall_temp) {
     start_index = 0;
   } else {
-    // Mode température imposée : T[0] = Tw fixe
     result.temperatures[0] = bc.Tw();
     start_index = 1;
   }
-  
+
   // Calcul des températures
   for (int i = start_index; i < static_cast<int>(n_points); i++) {
     std::vector<double> c_temp(mixture_.n_species());
     for (std::size_t j = 0; j < mixture_.n_species(); j++) {
       c_temp[j] = composition(j, i);
     }
-    
+
     // double h = enthalpy_field[i] * h_e;  // Dénormaliser l'enthalpie
     double h = enthalpy_field[i];
-    
-    auto temp_result = solve_single_point(c_temp, h, P, initial_temperatures[i]);
+
+    auto temp_result =
+        solve_single_point(c_temp, h, P, initial_temperatures[i]);
     if (!temp_result) {
       return std::unexpected(ThermodynamicSolverError(
-          std::format("Failed to solve temperature at point {}: {}", i, temp_result.error().message())));
+          std::format("Failed to solve temperature at point {}: {}", i,
+                      temp_result.error().message())));
     }
-    
+
     result.temperatures[i] = *temp_result;
   }
-  
-  // Si adiabatique, mettre à jour la température du mur
-  if (is_adiabatic) {
-    bc.wall.temperature = result.temperatures[0];  // LA LIGNE CLÉ !
+
+  // Update wall temperature if it was solved
+  if (variable_wall_temp) {
+    bc.wall.temperature = result.temperatures[0];
     result.adiabatic_wall_updated = true;
     result.updated_wall_temperature = result.temperatures[0];
   }
-  
+
   return result;
 }
 

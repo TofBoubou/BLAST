@@ -12,7 +12,8 @@
 namespace blast::io {
 
 using ConfigValue =
-    std::variant<bool, int, double, std::string, std::vector<double>, std::vector<int>, std::vector<std::string>>;
+    std::variant<bool, int, double, std::string, std::vector<double>,
+                 std::vector<int>, std::vector<std::string>>;
 
 struct SimulationConfig {
   enum class BodyType { Axisymmetric, Cone, TwoD, FlatPlate };
@@ -27,6 +28,7 @@ struct SimulationConfig {
   ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
   bool catalytic_wall = false;
   bool adiabatic = false;
+  bool radiation = false;
 };
 
 struct NumericalConfig {
@@ -48,11 +50,21 @@ struct MixtureConfig {
   enum class Database { RRHO, NASA7, NASA9 };
   Database thermodynamic_database = Database::NASA9;
 
-  enum class ViscosityAlgorithm { chapmanEnskog_CG, GuptaYos, chapmanEnskog_LDLT, Wilke };
+  enum class ViscosityAlgorithm {
+    chapmanEnskog_CG,
+    GuptaYos,
+    chapmanEnskog_LDLT,
+    Wilke
+  };
   ViscosityAlgorithm viscosity_algorithm = ViscosityAlgorithm::chapmanEnskog_CG;
 
-  enum class ThermalConductivityAlgorithm { chapmanEnskog_CG, chapmanEnskog_LDLT, Wilke };
-  ThermalConductivityAlgorithm thermal_conductivity_algorithm = ThermalConductivityAlgorithm::chapmanEnskog_CG;
+  enum class ThermalConductivityAlgorithm {
+    chapmanEnskog_CG,
+    chapmanEnskog_LDLT,
+    Wilke
+  };
+  ThermalConductivityAlgorithm thermal_conductivity_algorithm =
+      ThermalConductivityAlgorithm::chapmanEnskog_CG;
 
   // State model controlling energy mode treatment
   enum class StateModel { ChemNonEq1T, ChemNonEqTTv };
@@ -88,16 +100,19 @@ struct OuterEdgeConfig {
     BoundaryOverride boundary_override;
 
     // Legacy compatibility properties
-    [[nodiscard]] bool boundary_override_enabled() const { return boundary_override.enabled; }
-    [[nodiscard]] const std::optional<std::vector<double>>& mass_fraction_condition() const {
+    [[nodiscard]] bool boundary_override_enabled() const {
+      return boundary_override.enabled;
+    }
+    [[nodiscard]] const std::optional<std::vector<double>> &
+    mass_fraction_condition() const {
       return boundary_override.mass_fraction_condition;
     }
   };
 
   struct FiniteThicknessParams {
-    double v_edge = 0.0;           // Edge velocity normal to surface
-    double d2_ue_dxdy = 0.0;       // Second derivative of edge velocity
-    double delta_bl = 0.0;         // Boundary layer thickness
+    double v_edge = 0.0;     // Edge velocity normal to surface
+    double d2_ue_dxdy = 0.0; // Second derivative of edge velocity
+    double delta_bl = 0.0;   // Boundary layer thickness
   };
 
   std::vector<EdgePoint> edge_points;
@@ -110,6 +125,8 @@ struct OuterEdgeConfig {
 struct WallParametersConfig {
   std::vector<double> wall_temperatures;
   bool catalytic_wall = false;
+  double emissivity = 0.0;
+  double environment_temperature = 0.0;
 };
 
 struct AbaqueConfig {
@@ -139,7 +156,7 @@ struct Configuration {
 };
 
 template <typename T>
-concept DefaultApplicable = requires(T& t) {
+concept DefaultApplicable = requires(T &t) {
   { t.apply_defaults() } -> std::same_as<void>;
 };
 
