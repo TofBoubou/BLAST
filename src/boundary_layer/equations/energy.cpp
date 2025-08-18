@@ -200,8 +200,8 @@ build_energy_boundary_conditions(const coefficients::CoefficientSet &coeffs,
     // Calculer J_fact en utilisant la fonction existante
     auto j_fact_result =
         compute_energy_j_factor(station, bc.xi, bc, sim_config);
+    
     if (!j_fact_result) {
-      // En cas d'erreur, utiliser 1.0 comme valeur par défaut
       std::cerr << "Warning: Failed to compute J_fact, using 1.0" << std::endl;
     }
     const double J_fact = j_fact_result.value_or(1.0);
