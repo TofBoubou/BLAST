@@ -9,6 +9,7 @@
 #include <H5Spublic.h>
 #include <cstdlib>
 #include <fstream>
+#include <format>
 #include <iostream>
 #include <regex>
 #include <sstream>
@@ -22,8 +23,9 @@ AbaqueGenerator::AbaqueGenerator(boundary_layer::solver::BoundaryLayerSolver& so
   gsi_file_path_ = construct_gsi_path();
 
   // Backup GSI file on construction
-  if (!backup_gsi_file()) {
-    std::cerr << "Warning: Failed to backup GSI file" << std::endl;
+  auto backup_result = backup_gsi_file();
+  if (!backup_result) {
+    std::cerr << "Warning: Failed to backup GSI file: " << backup_result.error() << std::endl;
   }
 }
 
@@ -67,14 +69,16 @@ auto AbaqueGenerator::generate() -> Result {
     std::cout << "\nProcessing gamma = " << gamma << " (" << (gamma_idx + 1) << "/" << n_gammas << ")" << std::endl;
 
     // Update GSI file with new gamma
-    if (!update_gsi_catalyticity(gamma)) {
-      std::cerr << "Failed to update GSI catalyticity for gamma = " << gamma << std::endl;
+    auto update_result = update_gsi_catalyticity(gamma);
+    if (!update_result) {
+      std::cerr << "Failed to update GSI catalyticity for gamma = " << gamma << ": " << update_result.error() << std::endl;
       return result;
     }
 
     // Reload mixture with updated GSI
-    if (!mixture_.reload_gsi()) {
-      std::cerr << "Failed to reload mixture after GSI update" << std::endl;
+    auto reload_result = mixture_.reload_gsi();
+    if (!reload_result) {
+      std::cerr << "Failed to reload mixture after GSI update: " << reload_result.error() << std::endl;
       return result;
     }
 
@@ -118,15 +122,14 @@ auto AbaqueGenerator::solve_for_temperature(double wall_temperature) -> double {
   return solution_result.value().heat_flux_data[0].q_wall_total_dim;
 }
 
-auto AbaqueGenerator::backup_gsi_file() -> bool {
+auto AbaqueGenerator::backup_gsi_file() -> std::expected<void, std::string> {
   if (!std::filesystem::exists(gsi_file_path_)) {
-    std::cerr << "GSI file not found: " << gsi_file_path_ << std::endl;
-    return false;
+    return std::unexpected(std::format("GSI file not found: {}", gsi_file_path_.string()));
   }
 
   std::ifstream file(gsi_file_path_);
   if (!file.is_open()) {
-    return false;
+    return std::unexpected(std::format("Failed to open GSI file: {}", gsi_file_path_.string()));
   }
 
   std::stringstream buffer;
@@ -135,7 +138,7 @@ auto AbaqueGenerator::backup_gsi_file() -> bool {
   file.close();
 
   gsi_backed_up_ = true;
-  return true;
+  return {};
 }
 
 auto AbaqueGenerator::restore_gsi_file() -> void {
@@ -150,9 +153,9 @@ auto AbaqueGenerator::restore_gsi_file() -> void {
   }
 }
 
-auto AbaqueGenerator::update_gsi_catalyticity(double gamma) -> bool {
+auto AbaqueGenerator::update_gsi_catalyticity(double gamma) -> std::expected<void, std::string> {
   if (!gsi_backed_up_) {
-    return false;
+    return std::unexpected("GSI file not backed up");
   }
 
   std::string content = original_gsi_content_;
@@ -202,13 +205,13 @@ auto AbaqueGenerator::update_gsi_catalyticity(double gamma) -> bool {
   // Write updated content to file
   std::ofstream file(gsi_file_path_);
   if (!file.is_open()) {
-    return false;
+    return std::unexpected(std::format("Failed to open GSI file for writing: {}", gsi_file_path_.string()));
   }
 
   file << result_content;
   file.close();
 
-  return true;
+  return {};
 }
 
 auto AbaqueGenerator::construct_gsi_path() const -> std::filesystem::path {

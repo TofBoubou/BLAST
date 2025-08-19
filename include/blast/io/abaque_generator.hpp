@@ -2,6 +2,7 @@
 
 #include "../core/containers.hpp"
 #include "config_types.hpp"
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -50,13 +51,13 @@ private:
   bool gsi_backed_up_ = false;
 
   // Backup original GSI file content
-  [[nodiscard]] auto backup_gsi_file() -> bool;
+  [[nodiscard]] auto backup_gsi_file() -> std::expected<void, std::string>;
 
   // Restore original GSI file
   auto restore_gsi_file() -> void;
 
   // Update GSI file with new gamma value
-  [[nodiscard]] auto update_gsi_catalyticity(double gamma) -> bool;
+  [[nodiscard]] auto update_gsi_catalyticity(double gamma) -> std::expected<void, std::string>;
 
   // Solve for a single temperature
   [[nodiscard]] auto solve_for_temperature(double wall_temperature) -> double;

@@ -539,13 +539,12 @@ auto create_mixture(const io::MixtureConfig& config)
   }
 }
 
-auto MutationMixture::reload_gsi() -> bool {
+auto MutationMixture::reload_gsi() -> std::expected<void, std::string> {
   try {
     // Recreate mixture with same config to reload GSI file
     auto new_mixture_result = create_mutation_mixture(config_);
     if (!new_mixture_result) {
-      std::cerr << "Failed to create new mixture for GSI reload" << std::endl;
-      return false;
+      return std::unexpected("Failed to create new mixture for GSI reload");
     }
 
     // Replace old mixture with new one
@@ -553,8 +552,7 @@ auto MutationMixture::reload_gsi() -> bool {
 
     // Verify species count hasn't changed
     if (mixture_->nSpecies() != n_species_) {
-      std::cerr << "Error: Species count changed after GSI reload" << std::endl;
-      return false;
+      return std::unexpected("Error: Species count changed after GSI reload");
     }
 
     // Update cached properties if needed
@@ -564,11 +562,10 @@ auto MutationMixture::reload_gsi() -> bool {
       species_charges_[i] = charge;
     }
 
-    return true;
+    return {};
 
   } catch (const std::exception& e) {
-    std::cerr << "Failed to reload GSI: " << e.what() << std::endl;
-    return false;
+    return std::unexpected(std::string("Failed to reload GSI: ") + e.what());
   }
 }
 
