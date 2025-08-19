@@ -470,6 +470,29 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
     if (config.wall_temperatures.empty()) {
       return std::unexpected(core::ConfigurationError("Wall temperatures cannot be empty"));
     }
+    
+    if (node["emissivity"]) {
+      auto emiss_result = extract_value<double>(node, "emissivity");
+      if (!emiss_result)
+        return std::unexpected(emiss_result.error());
+      config.emissivity = emiss_result.value();
+      
+      if (config.emissivity < 0.0 || config.emissivity > 1.0) {
+        return std::unexpected(core::ConfigurationError("emissivity must be between 0.0 and 1.0"));
+      }
+    }
+
+    if (node["environment_temperature"]) {
+      auto env_temp_result = extract_value<double>(node, "environment_temperature");
+      if (!env_temp_result)
+        return std::unexpected(env_temp_result.error());
+      config.environment_temperature = env_temp_result.value();
+      
+      if (config.environment_temperature <= 0.0) {
+        return std::unexpected(core::ConfigurationError("environment_temperature must be positive"));
+      }
+    }
+    
     return config;
 
   } catch (const core::ConfigurationError& e) {

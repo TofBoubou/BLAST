@@ -110,6 +110,9 @@ struct OuterEdgeConfig {
 struct WallParametersConfig {
   std::vector<double> wall_temperatures;
   bool catalytic_wall = false;
+
+  double emissivity = 0.0;                   
+  double environment_temperature = 300.0;     
 };
 
 struct AbaqueConfig {
