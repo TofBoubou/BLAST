@@ -201,7 +201,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     }
     
     // DEBUG: Print wall temperature used for final heat flux calculation
-    std::cout << std::format("[FINAL_BC] Station {}: T_wall={:.1f} K (updated for radiative equilibrium)", station, bc.wall.temperature) << std::endl;
+    /* std::cout << std::format("[FINAL_BC] Station {}: T_wall={:.1f} K (updated for radiative equilibrium)", station, bc.wall.temperature) << std::endl; */
 
     auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
     if (!coeffs_result) {
@@ -211,8 +211,8 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     auto coeffs = coeffs_result.value();
 
     // DEBUG: Print temperatures being used for profile calculation
-    std::cout << std::format("[PROFILE_CALC] Station {}: T_wall_in_inputs={:.1f} K, T_wall_in_bc={:.1f} K", 
-                             station, final_inputs.T[0], bc.wall.temperature) << std::endl;
+/*     std::cout << std::format("[PROFILE_CALC] Station {}: T_wall_in_inputs={:.1f} K, T_wall_in_bc={:.1f} K", 
+                             station, final_inputs.T[0], bc.wall.temperature) << std::endl; */
     
     auto heat_flux_result =
         heat_flux_calculator_->calculate(final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
@@ -223,8 +223,8 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     
     // DEBUG: Print heat flux calculated for final output
     auto heat_flux_final = heat_flux_result.value();
-    std::cout << std::format("[FINAL_CALC] Station {}: q_cond={:.2e} W/m², q_diff={:.2e} W/m², q_total={:.2e} W/m²", 
-                             station, heat_flux_final.q_wall_conductive_dim, heat_flux_final.q_wall_diffusive_dim, heat_flux_final.q_wall_total_dim) << std::endl;
+/*     std::cout << std::format("[FINAL_CALC] Station {}: q_cond={:.2e} W/m², q_diff={:.2e} W/m², q_total={:.2e} W/m²", 
+                             station, heat_flux_final.q_wall_conductive_dim, heat_flux_final.q_wall_diffusive_dim, heat_flux_final.q_wall_total_dim) << std::endl; */
 
     result.heat_flux_data.push_back(std::move(heat_flux_result.value()));
 
@@ -483,9 +483,9 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
                                 (std::pow(T_wall_current, 4) - std::pow(T_inf, 4));
             
             // Print convergence info
-            std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
+/*             std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
                                    "q_wall-q_rad={:.2e} W/m², T_wall={:.1f} K", 
-                                   station, iter, q_wall, q_rad, q_wall - q_rad, T_wall_current) << std::endl;
+                                   station, iter, q_wall, q_rad, q_wall - q_rad, T_wall_current) << std::endl; */
             
           auto T_wall_result = solve_radiative_equilibrium(
             q_wall, 
@@ -620,14 +620,14 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
           const double q_rad_final = config_.wall_parameters.emissivity * STEFAN_BOLTZMANN * 
                                     (std::pow(T_wall_final, 4) - std::pow(T_inf, 4));
           
-          std::cout << std::format("\n=== FINAL HEAT FLUX SUMMARY - Station {} ===", station) << std::endl;
+/*           std::cout << std::format("\n=== FINAL HEAT FLUX SUMMARY - Station {} ===", station) << std::endl;
           std::cout << std::format("  Wall Temperature: {:.1f} K", T_wall_final) << std::endl;
           std::cout << std::format("  Conductive flux:  {:.2e} W/m²", final_heat_flux.q_wall_conductive_dim) << std::endl;
           std::cout << std::format("  Diffusive flux:   {:.2e} W/m²", final_heat_flux.q_wall_diffusive_dim) << std::endl;
           std::cout << std::format("  TOTAL flux:       {:.2e} W/m²", final_heat_flux.q_wall_total_dim) << std::endl;
           std::cout << std::format("  Radiative flux:   {:.2e} W/m²", q_rad_final) << std::endl;
           std::cout << std::format("  Balance (q-qrad): {:.2e} W/m²", final_heat_flux.q_wall_total_dim - q_rad_final) << std::endl;
-          std::cout << "============================================\n" << std::endl;
+          std::cout << "============================================\n" << std::endl; */
         }
       }
     }

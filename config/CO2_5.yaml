@@ -10,7 +10,7 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 30                       
+  n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9 
   max_iterations: 100000
@@ -48,14 +48,14 @@ outer_edge:
 
 wall_parameters:
   temperatures: [5000]
-  emissivity: 0.8
+  emissivity: 0.1
   environment_temperature: 300
 
 abaque:
   enabled: false
-  catalyticity_values: [0.0, 0.01]
-  temperature_range: [3500, 5500]
-  temperature_points: 20
+  catalyticity_values: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+  temperature_range: [3000, 5000]
+  temperature_points: 30
 
 continuation:
   wall_temperature_stable: 3000.0

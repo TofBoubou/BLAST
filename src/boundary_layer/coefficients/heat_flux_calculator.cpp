@@ -51,8 +51,8 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
   // std::cout << "QREF = " << heat_flux.q_ref << std::endl;
 
   // DEBUG: Print temperature being used for profile calculation
-  std::cout << std::format("[PROFILE_DEBUG] T_wall_input={:.1f} K, T_wall_bc={:.1f} K", 
-                           inputs.T[0], bc.wall.temperature) << std::endl;
+/*   std::cout << std::format("[PROFILE_DEBUG] T_wall_input={:.1f} K, T_wall_bc={:.1f} K", 
+                           inputs.T[0], bc.wall.temperature) << std::endl; */
 
   auto k_local_result = compute_local_conductivities(inputs, bc);
   if (!k_local_result) {
@@ -67,8 +67,8 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
   heat_flux.q_conductive_dimensional = std::move(conductive_result.value());
   
   // DEBUG: Print first few conductive flux values
-  std::cout << std::format("[PROFILE_DEBUG] q_cond[0]={:.2e}, q_cond[1]={:.2e} W/m²", 
-                           heat_flux.q_conductive_dimensional[0], heat_flux.q_conductive_dimensional[1]) << std::endl;
+/*   std::cout << std::format("[PROFILE_DEBUG] q_cond[0]={:.2e}, q_cond[1]={:.2e} W/m²", 
+                           heat_flux.q_conductive_dimensional[0], heat_flux.q_conductive_dimensional[1]) << std::endl; */
 
   auto [q_diffusive_total, q_diffusive_species] = compute_diffusive_flux_profile(coeffs);
   heat_flux.q_diffusive_dimensional = std::move(q_diffusive_total);

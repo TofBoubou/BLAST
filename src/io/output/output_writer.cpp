@@ -165,9 +165,9 @@ auto OutputWriter::convert_solution(
     station_data.species_concentrations = station_solution.c;
 
     // Heat flux data
-    std::cout << std::format("[H5_DEBUG] Station {}: heat_flux_data.size()={}, condition: {}", 
+/*     std::cout << std::format("[H5_DEBUG] Station {}: heat_flux_data.size()={}, condition: {}", 
                              station_idx, solution.heat_flux_data.size(), 
-                             station_idx < solution.heat_flux_data.size() ? "TRUE" : "FALSE") << std::endl;
+                             station_idx < solution.heat_flux_data.size() ? "TRUE" : "FALSE") << std::endl; */
     
     if (station_idx < solution.heat_flux_data.size()) {
       const auto& heat_flux = solution.heat_flux_data[station_idx];
