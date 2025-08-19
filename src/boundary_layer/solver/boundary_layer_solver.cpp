@@ -194,8 +194,14 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     }
     auto bc = bc_result.value();
     
+    // Update wall temperature if radiative equilibrium was used
+    if (config_.wall_parameters.emissivity > 0.0) {
+      // Get the final temperature from the converged solution
+      bc.wall.temperature = result.stations.back().T[0];  // T at wall (eta=0)
+    }
+    
     // DEBUG: Print wall temperature used for final heat flux calculation
-    std::cout << std::format("[FINAL_BC] Station {}: T_wall={:.1f} K (from boundary conditions)", station, bc.wall.temperature) << std::endl;
+    std::cout << std::format("[FINAL_BC] Station {}: T_wall={:.1f} K (updated for radiative equilibrium)", station, bc.wall.temperature) << std::endl;
 
     auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
     if (!coeffs_result) {
@@ -204,6 +210,10 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     }
     auto coeffs = coeffs_result.value();
 
+    // DEBUG: Print temperatures being used for profile calculation
+    std::cout << std::format("[PROFILE_CALC] Station {}: T_wall_in_inputs={:.1f} K, T_wall_in_bc={:.1f} K", 
+                             station, final_inputs.T[0], bc.wall.temperature) << std::endl;
+    
     auto heat_flux_result =
         heat_flux_calculator_->calculate(final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
     if (!heat_flux_result) {
