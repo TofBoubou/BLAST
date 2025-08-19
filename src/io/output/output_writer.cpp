@@ -188,8 +188,8 @@ auto OutputWriter::convert_solution(
       station_data.q_wall_total_dim = heat_flux.q_wall_total_dim;
       
       // DEBUG: Print heat flux values being saved to H5
-      std::cout << std::format("[H5_SAVE] Station {}: q_cond={:.2e} W/m², q_diff={:.2e} W/m², q_total={:.2e} W/m²", 
-                               station_idx, heat_flux.q_wall_conductive_dim, heat_flux.q_wall_diffusive_dim, heat_flux.q_wall_total_dim) << std::endl;
+/*       std::cout << std::format("[H5_SAVE] Station {}: q_cond={:.2e} W/m², q_diff={:.2e} W/m², q_total={:.2e} W/m²", 
+                               station_idx, heat_flux.q_wall_conductive_dim, heat_flux.q_wall_diffusive_dim, heat_flux.q_wall_total_dim) << std::endl; */
 
       station_data.q_wall_conductive_nondim = heat_flux.q_wall_conductive_nondim;
       station_data.q_wall_diffusive_nondim = heat_flux.q_wall_diffusive_nondim;
