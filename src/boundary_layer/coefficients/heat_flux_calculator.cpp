@@ -50,6 +50,10 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
   heat_flux.q_ref = compute_reference_flux(bc, coeffs);
   // std::cout << "QREF = " << heat_flux.q_ref << std::endl;
 
+  // DEBUG: Print temperature being used for profile calculation
+  std::cout << std::format("[PROFILE_DEBUG] T_wall_input={:.1f} K, T_wall_bc={:.1f} K", 
+                           inputs.T[0], bc.wall.temperature) << std::endl;
+
   auto k_local_result = compute_local_conductivities(inputs, bc);
   if (!k_local_result) {
     return std::unexpected(k_local_result.error());
@@ -61,6 +65,10 @@ auto HeatFluxCalculator::calculate(const CoefficientInputs& inputs, const Coeffi
     return std::unexpected(conductive_result.error());
   }
   heat_flux.q_conductive_dimensional = std::move(conductive_result.value());
+  
+  // DEBUG: Print first few conductive flux values
+  std::cout << std::format("[PROFILE_DEBUG] q_cond[0]={:.2e}, q_cond[1]={:.2e} W/m²", 
+                           heat_flux.q_conductive_dimensional[0], heat_flux.q_conductive_dimensional[1]) << std::endl;
 
   auto [q_diffusive_total, q_diffusive_species] = compute_diffusive_flux_profile(coeffs);
   heat_flux.q_diffusive_dimensional = std::move(q_diffusive_total);
@@ -220,8 +228,10 @@ auto HeatFluxCalculator::compute_conductive_flux_profile(const std::vector<doubl
 
   std::vector<double> q_conductive(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
-    const double dT_dy = dT_deta[i] / geo_factors.dy_deta_factor;
-    q_conductive[i] = -k_local[i] * dT_dy;
+    // Use the same formula as compute_wall_heat_fluxes for consistency
+    q_conductive[i] = -k_local[i] * dT_deta[i] * geo_factors.der_fact;
+    // To the wall (matching old code convention, same as compute_wall_heat_fluxes)
+    q_conductive[i] = -q_conductive[i];
   }
 
   return q_conductive;
@@ -248,6 +258,15 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& co
       const double q_species_j = coeffs.diffusion.J(j, i) * coeffs.h_species(j, i);
       q_diffusive_species(j, i) = q_species_j;
       q_diffusive_total[i] += q_species_j;
+    }
+    // To the wall (matching old code convention, same as compute_wall_heat_fluxes)
+    q_diffusive_total[i] = -q_diffusive_total[i];
+  }
+
+  // Apply same sign correction to species matrix
+  for (std::size_t j = 0; j < n_species; ++j) {
+    for (std::size_t i = 0; i < n_eta; ++i) {
+      q_diffusive_species(j, i) = -q_diffusive_species(j, i);
     }
   }
 
