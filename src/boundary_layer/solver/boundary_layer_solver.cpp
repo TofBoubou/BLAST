@@ -193,6 +193,9 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
           "Failed to get boundary conditions for heat flux at station {}: {}", station, bc_result.error().message())));
     }
     auto bc = bc_result.value();
+    
+    // DEBUG: Print wall temperature used for final heat flux calculation
+    std::cout << std::format("[FINAL_BC] Station {}: T_wall={:.1f} K (from boundary conditions)", station, bc.wall.temperature) << std::endl;
 
     auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
     if (!coeffs_result) {
@@ -207,6 +210,11 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
       return std::unexpected(NumericError(
           std::format("Failed to compute heat flux at station {}: {}", station, heat_flux_result.error().message())));
     }
+    
+    // DEBUG: Print heat flux calculated for final output
+    auto heat_flux_final = heat_flux_result.value();
+    std::cout << std::format("[FINAL_CALC] Station {}: q_cond={:.2e} W/m², q_diff={:.2e} W/m², q_total={:.2e} W/m²", 
+                             station, heat_flux_final.q_wall_conductive_dim, heat_flux_final.q_wall_diffusive_dim, heat_flux_final.q_wall_total_dim) << std::endl;
 
     result.heat_flux_data.push_back(std::move(heat_flux_result.value()));
 
