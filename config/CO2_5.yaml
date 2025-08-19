@@ -47,8 +47,8 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [3000]
-  emissivity: 1
+  temperatures: [5000]
+  emissivity: 0.8
   environment_temperature: 300
 
 abaque:

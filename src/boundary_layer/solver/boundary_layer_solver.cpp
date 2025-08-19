@@ -431,6 +431,60 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     // std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
     const auto solution_old = solution;
 
+    // Update wall temperature for radiative equilibrium (if emissivity > 0 and iter > 0)
+    if (config_.wall_parameters.emissivity > 0.0 && iter > 0) {
+      
+      auto derivatives_result = compute_all_derivatives(solution_old);
+      if (derivatives_result) {
+        auto derivatives = derivatives_result.value();
+        
+        auto final_inputs = coefficients::CoefficientInputs{
+          .xi = xi,
+          .F = solution_old.F,
+          .c = solution_old.c,
+          .dc_deta = derivatives.dc_deta,
+          .dc_deta2 = derivatives.dc_deta2,
+          .T = solution_old.T
+        };
+        
+        auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc_dynamic, *xi_derivatives_);
+        if (coeffs_result) {
+          auto coeffs = coeffs_result.value();
+          
+          auto heat_flux_result = heat_flux_calculator_->calculate(
+            final_inputs, coeffs, bc_dynamic, derivatives.dT_deta, station, xi);
+          
+          if (heat_flux_result) {
+            double q_wall = heat_flux_result.value().q_wall_total_dim;
+            
+            // Calculate radiative flux: q_rad = ε*σ*(T_wall^4 - T_∞^4)
+            const double STEFAN_BOLTZMANN = 5.670374419e-8;
+            const double T_wall_current = bc_dynamic.wall.temperature;
+            const double T_inf = config_.wall_parameters.environment_temperature;
+            const double q_rad = config_.wall_parameters.emissivity * STEFAN_BOLTZMANN * 
+                                (std::pow(T_wall_current, 4) - std::pow(T_inf, 4));
+            
+            // Print convergence info
+            std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
+                                   "q_wall-q_rad={:.2e} W/m², T_wall={:.1f} K", 
+                                   station, iter, q_wall, q_rad, q_wall - q_rad, T_wall_current) << std::endl;
+            
+          auto T_wall_result = solve_radiative_equilibrium(
+            q_wall, 
+            config_.wall_parameters.emissivity,
+            config_.wall_parameters.environment_temperature
+          );
+
+          if (!T_wall_result) {
+            return std::unexpected(NumericError(std::format("Radiative equilibrium failed: {}", T_wall_result.error())));
+          }
+
+          bc_dynamic.wall.temperature = T_wall_result.value();
+          }
+        }
+      }
+    }
+
     // Initialize coefficients and inputs
     coefficients::CoefficientSet coeffs;
     coefficients::CoefficientInputs inputs{.xi = xi,
@@ -497,47 +551,6 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     // Apply relaxation
     solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
 
-    if (config_.wall_parameters.emissivity > 0.0 && station == 0) {
-      
-      auto derivatives_result = compute_all_derivatives(solution);
-      if (derivatives_result) {
-        auto derivatives = derivatives_result.value();
-        
-        auto final_inputs = coefficients::CoefficientInputs{
-          .xi = xi,
-          .F = solution.F,
-          .c = solution.c,
-          .dc_deta = derivatives.dc_deta,
-          .dc_deta2 = derivatives.dc_deta2,
-          .T = solution.T
-        };
-        
-        auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
-        if (coeffs_result) {
-          auto coeffs = coeffs_result.value();
-          
-          auto heat_flux_result = heat_flux_calculator_->calculate(
-            final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
-          
-          if (heat_flux_result) {
-            double q_wall = heat_flux_result.value().q_wall_total_dim;
-            
-          auto T_wall_result = solve_radiative_equilibrium(
-            q_wall, 
-            config_.wall_parameters.emissivity,
-            config_.wall_parameters.environment_temperature
-          );
-
-          if (!T_wall_result) {
-            return std::unexpected(NumericError(std::format("Radiative equilibrium failed: {}", T_wall_result.error())));
-          }
-
-          bc.wall.temperature = T_wall_result.value();
-          }
-        }
-      }
-    }
-
     // Check convergence
     if (conv_info.converged) {
       break;
@@ -554,6 +567,51 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     if (conv_info.max_residual() > 1e6) {
       return std::unexpected(NumericError(std::format("Solution diverged at station {} iteration {} (residual={})",
                                                       station, iter, conv_info.max_residual())));
+    }
+  }
+
+  // Print final heat flux summary if radiative equilibrium was used
+  if (config_.wall_parameters.emissivity > 0.0) {
+    auto final_derivatives_result = compute_all_derivatives(solution);
+    if (final_derivatives_result) {
+      auto final_derivatives = final_derivatives_result.value();
+      
+      auto final_inputs = coefficients::CoefficientInputs{
+        .xi = xi,
+        .F = solution.F,
+        .c = solution.c,
+        .dc_deta = final_derivatives.dc_deta,
+        .dc_deta2 = final_derivatives.dc_deta2,
+        .T = solution.T
+      };
+      
+      auto final_coeffs_result = coeff_calculator_->calculate(final_inputs, bc_dynamic, *xi_derivatives_);
+      if (final_coeffs_result) {
+        auto final_coeffs = final_coeffs_result.value();
+        
+        auto final_heat_flux_result = heat_flux_calculator_->calculate(
+          final_inputs, final_coeffs, bc_dynamic, final_derivatives.dT_deta, station, xi);
+        
+        if (final_heat_flux_result) {
+          auto final_heat_flux = final_heat_flux_result.value();
+          
+          // Calculate final radiative flux
+          const double STEFAN_BOLTZMANN = 5.670374419e-8;
+          const double T_wall_final = bc_dynamic.wall.temperature;
+          const double T_inf = config_.wall_parameters.environment_temperature;
+          const double q_rad_final = config_.wall_parameters.emissivity * STEFAN_BOLTZMANN * 
+                                    (std::pow(T_wall_final, 4) - std::pow(T_inf, 4));
+          
+          std::cout << std::format("\n=== FINAL HEAT FLUX SUMMARY - Station {} ===", station) << std::endl;
+          std::cout << std::format("  Wall Temperature: {:.1f} K", T_wall_final) << std::endl;
+          std::cout << std::format("  Conductive flux:  {:.2e} W/m²", final_heat_flux.q_wall_conductive_dim) << std::endl;
+          std::cout << std::format("  Diffusive flux:   {:.2e} W/m²", final_heat_flux.q_wall_diffusive_dim) << std::endl;
+          std::cout << std::format("  TOTAL flux:       {:.2e} W/m²", final_heat_flux.q_wall_total_dim) << std::endl;
+          std::cout << std::format("  Radiative flux:   {:.2e} W/m²", q_rad_final) << std::endl;
+          std::cout << std::format("  Balance (q-qrad): {:.2e} W/m²", final_heat_flux.q_wall_total_dim - q_rad_final) << std::endl;
+          std::cout << "============================================\n" << std::endl;
+        }
+      }
     }
   }
 
