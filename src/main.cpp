@@ -1,4 +1,5 @@
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
+#include "blast/core/constants.hpp"
 #include "blast/io/abaque_generator.hpp"
 #include "blast/io/config_manager.hpp"
 #include "blast/io/output/hdf5_writer.hpp"
@@ -13,19 +14,20 @@
 #include <vector>
 
 int main(int argc, char* argv[]) {
-  if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <config_file.yaml> [output_name]\n";
-    return 1;
+  constexpr int min_required_args = 2;
+  if (argc < min_required_args) {
+    std::cerr << "Usage: " << argv[blast::constants::indexing::first] << " <config_file.yaml> [output_name]\n";
+    return blast::constants::indexing::second;
   }
 
   try {
-    std::filesystem::path exe_path = std::filesystem::canonical(argv[0]).parent_path();
+    std::filesystem::path exe_path = std::filesystem::canonical(argv[blast::constants::indexing::first]).parent_path();
 
     std::filesystem::path mpp_data_path = exe_path / "libs" / "mutationpp" / "data";
 
     if (std::filesystem::exists(mpp_data_path)) {
       std::string mpp_data_str = std::filesystem::canonical(mpp_data_path).string();
-      setenv("MPP_DATA_DIRECTORY", mpp_data_str.c_str(), 1);
+      setenv("MPP_DATA_DIRECTORY", mpp_data_str.c_str(), blast::constants::indexing::second);
       std::cout << "MPP_DATA_DIRECTORY auto-set to: " << mpp_data_str << std::endl;
     } else {
       std::cerr << "Warning: Mutation++ data directory not found at: " << mpp_data_path << std::endl;
@@ -41,14 +43,14 @@ int main(int argc, char* argv[]) {
   }
 
   std::cout << "=== BLAST Boundary Layer Solver ===" << std::endl;
-  std::cout << "Loading configuration from: " << argv[1] << std::endl;
+  std::cout << "Loading configuration from: " << argv[blast::constants::indexing::second] << std::endl;
 
   // Load configuration
   blast::io::ConfigurationManager config_manager;
-  auto config_result = config_manager.load(argv[1]);
+  auto config_result = config_manager.load(argv[blast::constants::indexing::second]);
   if (!config_result) {
     std::cerr << "Failed to load config: " << config_result.error().message() << "\n";
-    return 1;
+    return blast::constants::indexing::second;
   }
   auto config = std::move(config_result.value());
   std::cout << "✓ Configuration loaded successfully" << std::endl;
@@ -58,14 +60,14 @@ int main(int argc, char* argv[]) {
   auto mixture_result = blast::thermophysics::create_mixture(config.mixture);
   if (!mixture_result) {
     std::cerr << "Failed to create mixture: " << mixture_result.error().message() << "\n";
-    return 1;
+    return blast::constants::indexing::second;
   }
   auto& mixture = *mixture_result.value();
   std::cout << "✓ Mixture created (" << mixture.n_species() << " species)" << std::endl;
 
   // Print mixture information
   std::cout << "\nMixture species:" << std::endl;
-  for (std::size_t i = 0; i < mixture.n_species(); ++i) {
+  for (std::size_t i = blast::constants::indexing::first; i < mixture.n_species(); ++i) {
     std::cout << std::format("  [{:2}] {:>8} (MW: {:8.3f} kg/kmol)", i, mixture.species_name(i),
                              mixture.species_molecular_weight(i))
               << std::endl;
@@ -98,12 +100,12 @@ int main(int argc, char* argv[]) {
 
   // Print edge conditions
   if (!config.outer_edge.edge_points.empty()) {
-    auto edge = config.outer_edge.edge_points[0];
+    auto edge = config.outer_edge.edge_points[blast::constants::indexing::first];
     std::cout << "\nEdge conditions:" << std::endl;
     std::cout << "  Pressure: " << edge.pressure << " Pa" << std::endl;
     std::cout << "  Temperature: " << edge.temperature << " K" << std::endl;
     if (!config.wall_parameters.wall_temperatures.empty()) {
-      std::cout << "  Wall temp: " << config.wall_parameters.wall_temperatures[0] << " K" << std::endl;
+      std::cout << "  Wall temp: " << config.wall_parameters.wall_temperatures[blast::constants::indexing::first] << " K" << std::endl;
     } else {
       std::cout << "  Wall temp: NOT SET" << std::endl;
     }
@@ -138,13 +140,14 @@ int main(int argc, char* argv[]) {
   // Validate output configuration
   if (auto validation = output_writer.validate_config(); !validation) {
     std::cerr << "Output configuration error: " << validation.error().message() << std::endl;
-    return 1;
+    return blast::constants::indexing::second;
   }
 
   std::cout << "✓ Output system configured" << std::endl;
 
   // Show planned output files
-  std::string case_name = (argc > 2) ? argv[2] : "simulation";
+  constexpr int output_name_arg_index = 3;
+  std::string case_name = (argc > min_required_args) ? argv[output_name_arg_index - blast::constants::indexing::second] : "simulation";
   auto output_info = output_writer.get_output_info(case_name);
   std::cout << "\nPlanned output files:" << std::endl;
   for (const auto& [format, path] : output_info) {
@@ -174,8 +177,8 @@ int main(int argc, char* argv[]) {
               << " K" << std::endl;
     std::cout << "Temperature points: " << config.abaque.temperature_points << std::endl;
     std::cout << "Catalyticity values: ";
-    for (size_t i = 0; i < config.abaque.catalyticity_values.size(); ++i) {
-      if (i > 0)
+    for (size_t i = blast::constants::indexing::first; i < config.abaque.catalyticity_values.size(); ++i) {
+      if (i > blast::constants::indexing::first)
         std::cout << ", ";
       std::cout << config.abaque.catalyticity_values[i];
     }
@@ -199,15 +202,15 @@ int main(int argc, char* argv[]) {
         std::cout << "  Generation time: " << abaque_duration.count() << " ms" << std::endl;
 
         auto abaque_file_size = std::filesystem::file_size(abaque_path);
-        std::cout << "  Abaque file: " << abaque_path.filename().string() << " (" << std::setprecision(2) << std::fixed
-                  << (abaque_file_size / 1024.0) << " KB)" << std::endl;
+        std::cout << "  Abaque file: " << abaque_path.filename().string() << " (" << std::setprecision(blast::constants::string_processing::float_precision_2) << std::fixed
+                  << (abaque_file_size / blast::constants::io::bytes_to_kb) << " KB)" << std::endl;
       } else {
         std::cerr << "Failed to save abaque results to: " << abaque_path << std::endl;
-        return 1;
+        return blast::constants::indexing::second;
       }
     } else {
       std::cerr << "Failed to generate abaque" << std::endl;
-      return 1;
+      return blast::constants::indexing::second;
     }
   } else {
     // Normal simulation mode
@@ -217,7 +220,7 @@ int main(int argc, char* argv[]) {
     auto solution_result = solver.solve();
     if (!solution_result) {
       std::cerr << "Solver failed: " << solution_result.error().message() << "\n";
-      return 1;
+      return blast::constants::indexing::second;
     }
 
     auto solution = std::move(solution_result.value());
@@ -240,32 +243,32 @@ int main(int argc, char* argv[]) {
       std::cout << "\nFinal station results:" << std::endl;
       std::cout << "  ξ = " << solution.xi_solved.back() << std::endl;
       std::cout << "  F at edge: " << final_station.F.back() << std::endl;
-      std::cout << "  g at wall: " << final_station.g[0] << std::endl;
+      std::cout << "  g at wall: " << final_station.g[blast::constants::indexing::first] << std::endl;
       std::cout << "  g at edge: " << final_station.g.back() << std::endl;
 
       // Print species concentrations at wall and edge
       std::cout << "\nSpecies concentrations:" << std::endl;
       std::cout << "  Wall → Edge" << std::endl;
-      for (std::size_t i = 0; i < mixture.n_species(); ++i) {
-        std::cout << "  " << std::setw(8) << mixture.species_name(i) << ": " << std::setw(8) << std::fixed
-                  << std::setprecision(4) << final_station.c(i, 0) << " → " << std::setw(8)
-                  << final_station.c(i, n_eta - 1) << std::endl;
+      for (std::size_t i = blast::constants::indexing::first; i < mixture.n_species(); ++i) {
+        std::cout << "  " << std::setw(blast::constants::string_processing::medium_field_width) << mixture.species_name(i) << ": " << std::setw(blast::constants::string_processing::medium_field_width) << std::fixed
+                  << std::setprecision(blast::constants::string_processing::float_precision_4) << final_station.c(i, blast::constants::indexing::first) << " → " << std::setw(blast::constants::string_processing::medium_field_width)
+                  << final_station.c(i, n_eta - blast::constants::indexing::second) << std::endl;
       }
 
       // Print some profiles
       std::cout << "\nBoundary layer profiles (selected points):" << std::endl;
-      std::cout << std::setw(6) << "η/η_max" << std::setw(10) << "F" << std::setw(10) << "g" << std::setw(10) << "V"
+      std::cout << std::setw(blast::constants::string_processing::narrow_field_width) << "η/η_max" << std::setw(blast::constants::string_processing::wide_field_width) << "F" << std::setw(blast::constants::string_processing::wide_field_width) << "g" << std::setw(blast::constants::string_processing::wide_field_width) << "V"
                 << std::endl;
-      std::cout << std::string(36, '-') << std::endl;
+      std::cout << std::string(blast::constants::string_processing::separator_width, '-') << std::endl;
 
-      const std::size_t n_print = std::min(static_cast<std::size_t>(11), n_eta);
-      for (std::size_t i = 0; i < n_print; ++i) {
-        const std::size_t idx = (i * (n_eta - 1)) / (n_print - 1);
-        const double eta_norm = static_cast<double>(idx) / (n_eta - 1);
+      const std::size_t n_print = std::min(static_cast<std::size_t>(blast::constants::indexing::max_profile_print_points), n_eta);
+      for (std::size_t i = blast::constants::indexing::first; i < n_print; ++i) {
+        const std::size_t idx = (i * (n_eta - blast::constants::indexing::second)) / (n_print - blast::constants::indexing::second);
+        const double eta_norm = static_cast<double>(idx) / (n_eta - blast::constants::indexing::second);
 
-        std::cout << std::setw(6) << std::fixed << std::setprecision(2) << eta_norm << std::setw(10) << std::fixed
-                  << std::setprecision(4) << final_station.F[idx] << std::setw(10) << std::fixed << std::setprecision(4)
-                  << final_station.g[idx] << std::setw(10) << std::fixed << std::setprecision(4) << final_station.V[idx]
+        std::cout << std::setw(blast::constants::string_processing::narrow_field_width) << std::fixed << std::setprecision(blast::constants::string_processing::float_precision_2) << eta_norm << std::setw(blast::constants::string_processing::wide_field_width) << std::fixed
+                  << std::setprecision(blast::constants::string_processing::float_precision_4) << final_station.F[idx] << std::setw(blast::constants::string_processing::wide_field_width) << std::fixed << std::setprecision(blast::constants::string_processing::float_precision_4)
+                  << final_station.g[idx] << std::setw(blast::constants::string_processing::wide_field_width) << std::fixed << std::setprecision(blast::constants::string_processing::float_precision_4) << final_station.V[idx]
                   << std::endl;
       }
     }
@@ -275,8 +278,8 @@ int main(int argc, char* argv[]) {
 
     // Progress callback for output writing
     auto progress_callback = [](double progress, const std::string& stage) {
-      std::cout << "\r" << std::setw(60) << std::left
-                << ("  " + stage + " [" + std::to_string(static_cast<int>(progress * 100.0)) + "%]") << std::flush;
+      std::cout << "\r" << std::setw(blast::constants::string_processing::separator_width + 24) << std::left
+                << ("  " + stage + " [" + std::to_string(static_cast<int>(progress * blast::constants::conversion::to_percentage)) + "%]") << std::flush;
     };
 
     auto output_start = std::chrono::high_resolution_clock::now();
@@ -288,7 +291,7 @@ int main(int argc, char* argv[]) {
 
     if (!output_result) {
       std::cerr << "Failed to write output: " << output_result.error().message() << std::endl;
-      return 1;
+      return blast::constants::indexing::second;
     }
 
     const auto& output_files = std::move(output_result.value());
@@ -297,8 +300,8 @@ int main(int argc, char* argv[]) {
     std::cout << "\nGenerated files:" << std::endl;
     for (const auto& file_path : output_files) {
       auto file_size = std::filesystem::file_size(file_path);
-      std::cout << "  " << file_path.filename().string() << " (" << std::setprecision(2) << std::fixed
-                << (file_size / 1024.0) << " KB)" << std::endl;
+      std::cout << "  " << file_path.filename().string() << " (" << std::setprecision(blast::constants::string_processing::float_precision_2) << std::fixed
+                << (file_size / blast::constants::io::bytes_to_kb) << " KB)" << std::endl;
     }
   }
 
@@ -316,5 +319,5 @@ int main(int argc, char* argv[]) {
 
   // Cleanup HDF5 before exit
   blast::io::output::hdf5::finalize();
-  return 0;
+  return blast::constants::indexing::first;
 }

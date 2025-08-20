@@ -1,5 +1,6 @@
 #include "blast/boundary_layer/conditions/boundary_interpolator.hpp"
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
+#include "blast/core/constants.hpp"
 #include <algorithm>
 #include <expected>
 #include <format>
@@ -187,7 +188,7 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
     return std::unexpected(BoundaryConditionError("Failed to compute mixture MW"));
   }
   auto MW = mw_result.value();
-  auto density = edge_point.pressure * MW / (edge_point.temperature * thermophysics::constants::R_universal);
+  auto density = edge_point.pressure * MW / (edge_point.temperature * constants::physical::universal_gas_constant);
 
   auto visc_result = mixture.viscosity(species_fractions, edge_point.temperature, edge_point.pressure);
   if (!visc_result) {
@@ -382,7 +383,7 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
     return std::unexpected(BoundaryConditionError("Failed to compute MW"));
   }
   const double density_interp =
-      pressure_interp * mw_result.value() / (temperature_interp * thermophysics::constants::R_universal);
+      pressure_interp * mw_result.value() / (temperature_interp * constants::physical::universal_gas_constant);
 
   auto visc_result = mixture.viscosity(species_fractions, temperature_interp, pressure_interp);
   if (!visc_result) {

@@ -1,6 +1,7 @@
 ﻿
 #include "blast/boundary_layer/grid/grid.hpp"
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
+#include "blast/core/constants.hpp"
 #include <algorithm>
 #include <numeric>
 #include <ranges>
@@ -126,7 +127,7 @@ auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge
     if (!mw_result) {
       return std::unexpected(GridError("Failed to compute MW for grid generation"));
     }
-    auto density = point.pressure * mw_result.value() / (point.temperature * thermophysics::constants::R_universal);
+    auto density = point.pressure * mw_result.value() / (point.temperature * blast::constants::physical::universal_gas_constant);
     rho_edge.push_back(density);
 
     auto visc_result = mixture.viscosity(species_fractions, point.temperature, point.pressure);

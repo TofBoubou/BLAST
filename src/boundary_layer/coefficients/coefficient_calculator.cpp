@@ -1,6 +1,7 @@
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include "blast/boundary_layer/coefficients/diffusion.hpp"
 #include "blast/boundary_layer/grid/coordinate_transform.hpp"
+#include "blast/core/constants.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -145,7 +146,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
     }
     thermo.MW.push_back(mw_result.value());
 
-    thermo.rho.push_back(bc.P_e() * thermo.MW[i] / (inputs.T[i] * thermophysics::constants::R_universal));
+    thermo.rho.push_back(bc.P_e() * thermo.MW[i] / (inputs.T[i] * constants::physical::universal_gas_constant));
   }
 
   // Compute molecular weight derivative
@@ -220,7 +221,7 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
     const double P_edge = bc.P_e();
 
     const double rho_e_calculated =
-        bc.P_e() * thermo.MW[n_eta - 1] / (inputs.T[n_eta - 1] * thermophysics::constants::R_universal);
+        bc.P_e() * thermo.MW[n_eta - 1] / (inputs.T[n_eta - 1] * constants::physical::universal_gas_constant);
 
     // Get transport properties
     auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_edge);

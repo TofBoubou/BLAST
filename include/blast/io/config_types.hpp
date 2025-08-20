@@ -1,5 +1,6 @@
 #pragma once
 #include "../core/exceptions.hpp"
+#include "../core/constants.hpp"
 #include <concepts>
 #include <expected>
 #include <optional>
@@ -30,16 +31,16 @@ struct SimulationConfig {
 };
 
 struct NumericalConfig {
-  int n_eta = 101;
-  double eta_max = 8.0;
-  double convergence_tolerance = 1e-6;
-  int max_iterations = 1000;
+  int n_eta = constants::grid::default_n_eta;
+  double eta_max = constants::grid::default_eta_max;
+  double convergence_tolerance = constants::tolerance::standard;
+  int max_iterations = constants::iteration_limits::boundary_layer_max;
 
   struct Solvers {
-    double h2t_tolerance = 1.0e-12;
-    int h2t_max_iterations = 50000;
-    double stefan_tolerance = 1.0e-12;
-    int stefan_max_iterations = 50000;
+    double h2t_tolerance = constants::tolerance::high_precision;
+    int h2t_max_iterations = constants::iteration_limits::enthalpy_temperature_max;
+    double stefan_tolerance = constants::tolerance::high_precision;
+    int stefan_max_iterations = constants::iteration_limits::stefan_max;
   } solvers{};
 };
 
@@ -95,9 +96,9 @@ struct OuterEdgeConfig {
   };
 
   struct FiniteThicknessParams {
-    double v_edge = 0.0;           // Edge velocity normal to surface
-    double d2_ue_dxdy = 0.0;       // Second derivative of edge velocity
-    double delta_bl = 0.0;         // Boundary layer thickness
+    double v_edge = constants::defaults::default_emissivity;           // Edge velocity normal to surface
+    double d2_ue_dxdy = constants::defaults::default_emissivity;       // Second derivative of edge velocity
+    double delta_bl = constants::defaults::default_emissivity;         // Boundary layer thickness
   };
 
   std::vector<EdgePoint> edge_points;
@@ -111,22 +112,22 @@ struct WallParametersConfig {
   std::vector<double> wall_temperatures;
   bool catalytic_wall = false;
 
-  double emissivity = 0.0;                   
-  double environment_temperature = 300.0;     
+  double emissivity = constants::defaults::default_emissivity;                   
+  double environment_temperature = constants::defaults::ambient_temperature;     
 };
 
 struct AbaqueConfig {
   bool enabled = false;
   std::vector<double> catalyticity_values;
-  double temperature_min = 300.0;
-  double temperature_max = 2000.0;
-  int temperature_points = 100;
+  double temperature_min = constants::defaults::abaque::temperature_min;
+  double temperature_max = constants::defaults::abaque::temperature_max;
+  int temperature_points = constants::grid::default_temperature_points;
 };
 
 struct ContinuationConfig {
-  double wall_temperature_stable = 3100.0;
-  double edge_temperature_stable = 3100.0;
-  double pressure_stable = 7000.0;
+  double wall_temperature_stable = constants::defaults::stable_wall_temperature;
+  double edge_temperature_stable = constants::defaults::stable_edge_temperature;
+  double pressure_stable = constants::defaults::stable_pressure;
 };
 
 struct Configuration {

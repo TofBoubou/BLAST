@@ -2,6 +2,7 @@
 #include "blast/boundary_layer/solver/heat_flux_computer.hpp"
 #include "blast/boundary_layer/solver/initial_guess_factory.hpp"
 #include "blast/boundary_layer/solver/expected_utils.hpp"
+#include "blast/core/constants.hpp"
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
 #include "blast/boundary_layer/equations/continuity.hpp"
@@ -372,7 +373,7 @@ auto BoundaryLayerSolver::update_edge_properties(conditions::BoundaryConditions&
         NumericError(std::format("Failed to compute edge molecular weight: {}", MW_result.error().message())));
   }
   const double MW_edge = MW_result.value();
-  const double rho_e_new = P_edge * MW_edge / (T_edge * thermophysics::constants::R_universal);
+  const double rho_e_new = P_edge * MW_edge / (T_edge * constants::physical::universal_gas_constant);
 
   // Calculate equilibrium composition at edge conditions
   auto eq_result = mixture_.equilibrium_composition(T_edge, P_edge);

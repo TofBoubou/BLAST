@@ -1,5 +1,6 @@
 #pragma once
 #include "output_writer.hpp"
+#include "../../core/constants.hpp"
 #include <hdf5.h>
 #include <map>
 #include <memory>
@@ -10,11 +11,11 @@ namespace blast::io::output {
 
 // HDF5-specific configuration
 struct HDF5Config {
-  int compression_level = 6;      // 0-9, higher = better compression
+  int compression_level = constants::io::default_hdf5_compression;      // 0-9, higher = better compression
   bool use_chunking = true;       // Enable chunked layout
   bool use_shuffle_filter = true; // Reorder bytes for better compression
   bool use_fletcher32 = false;    // Checksum filter
-  std::size_t chunk_size = 1024;  // Chunk size for datasets
+  std::size_t chunk_size = constants::io::default_hdf5_chunk_size;  // Chunk size for datasets
   bool store_as_double = true;    // Use double precision by default
 };
 
@@ -32,27 +33,27 @@ private:
 
 public:
   explicit HDF5Handle(HandleType handle) : handle_(handle) {
-    if (handle_ < 0) {
+    if (handle_ < constants::io::invalid_hdf5_handle) {
       throw HDF5Error("Invalid HDF5 handle");
     }
   }
 
   ~HDF5Handle() {
-    if (handle_ >= 0) {
+    if (handle_ >= constants::indexing::first) {
       CloseFunc(handle_);
     }
   }
 
   // Move semantics only
-  HDF5Handle(HDF5Handle&& other) noexcept : handle_(other.handle_) { other.handle_ = -1; }
+  HDF5Handle(HDF5Handle&& other) noexcept : handle_(other.handle_) { other.handle_ = constants::io::invalid_hdf5_handle; }
 
   HDF5Handle& operator=(HDF5Handle&& other) noexcept {
     if (this != &other) {
-      if (handle_ >= 0) {
+      if (handle_ >= constants::indexing::first) {
         CloseFunc(handle_);
       }
       handle_ = other.handle_;
-      other.handle_ = -1;
+      other.handle_ = constants::io::invalid_hdf5_handle;
     }
     return *this;
   }
@@ -62,7 +63,7 @@ public:
   HDF5Handle& operator=(const HDF5Handle&) = delete;
 
   [[nodiscard]] auto get() const noexcept -> HandleType { return handle_; }
-  [[nodiscard]] auto valid() const noexcept -> bool { return handle_ >= 0; }
+  [[nodiscard]] auto valid() const noexcept -> bool { return handle_ >= constants::indexing::first; }
 
   // Implicit conversion for C API
   operator HandleType() const noexcept { return handle_; }

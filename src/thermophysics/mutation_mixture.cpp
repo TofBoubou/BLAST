@@ -1,4 +1,5 @@
 #include "blast/thermophysics/mutation_mixture.hpp"
+#include "blast/core/constants.hpp"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -125,7 +126,7 @@ MutationMixture::MutationMixture(const io::MixtureConfig& config)
       species_mw_.push_back(mixture_->speciesMw(i));
 
       // Charge in C/kg: q_i = z_i * N_A / M_i
-      const double charge = mixture_->speciesCharge(i) * constants::N_Avogadro / species_mw_[i];
+      const double charge = mixture_->speciesCharge(i) * constants::physical::avogadro_number / species_mw_[i];
       species_charges_.push_back(charge);
 
       species_names_.emplace_back(mixture_->speciesName(i));
@@ -144,11 +145,11 @@ auto MutationMixture::validate_composition(std::span<const double> fractions) co
         ThermophysicsError(std::format("Invalid composition size: {} (expected {})", fractions.size(), n_species_)));
   }
 
-  const double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
-  constexpr double tolerance = 1e-6;
+  const double sum = std::accumulate(fractions.begin(), fractions.end(), constants::defaults::default_emissivity);
+  constexpr double tolerance = constants::tolerance::mass_fraction_sum;
 
-  if (std::abs(sum - 1.0) > tolerance) {
-    return std::unexpected(ThermophysicsError(std::format("Mass fractions sum to {} (should be 1.0)", sum)));
+  if (std::abs(sum - constants::hermite::basis_functions::h00_constant) > tolerance) {
+    return std::unexpected(ThermophysicsError(std::format("Mass fractions sum to {} (should be {})", sum, constants::hermite::basis_functions::h00_constant)));
   }
 
   return {};
@@ -162,16 +163,16 @@ auto MutationMixture::mixture_molecular_weight(std::span<const double> mass_frac
   }
 
   // MW = 1 / Σ(Y_i / M_i)
-  double sum = 0.0;
-  for (std::size_t i = 0; i < n_species_; ++i) {
+  double sum = constants::defaults::default_emissivity;
+  for (std::size_t i = constants::indexing::first; i < n_species_; ++i) {
     sum += mass_fractions[i] / species_mw_[i];
   }
 
-  if (sum <= 0.0 || !std::isfinite(sum)) {
+  if (sum <= constants::defaults::default_emissivity || !std::isfinite(sum)) {
     return std::unexpected(ThermophysicsError("Invalid molecular weight calculation"));
   }
 
-  return 1.0 / sum;
+  return constants::hermite::basis_functions::h00_constant / sum;
 }
 
 auto MutationMixture::species_molecular_weight(std::size_t species_index) const noexcept -> double {
@@ -213,7 +214,7 @@ auto MutationMixture::set_state(std::span<const double> mass_fractions, double t
     return std::unexpected(validation.error());
   }
 
-  if (temperature <= 0.0 || pressure <= 0.0) {
+  if (temperature <= constants::defaults::default_emissivity || pressure <= constants::defaults::default_emissivity) {
     return std::unexpected(ThermophysicsError(std::format("Invalid state: T={}, P={}", temperature, pressure)));
   }
 
@@ -222,16 +223,16 @@ auto MutationMixture::set_state(std::span<const double> mass_fractions, double t
     std::vector<double> c_vec(mass_fractions.begin(), mass_fractions.end());
 
     const auto n_modes = mixture_->nEnergyEqns();
-    if (n_modes == 1) {
-      double vars[2] = {pressure, temperature};
-      mixture_->setState(c_vec.data(), vars, 2);
+    if (n_modes == constants::indexing::second) {
+      double vars[constants::indexing::single_temp_vars] = {pressure, temperature};
+      mixture_->setState(c_vec.data(), vars, constants::indexing::single_temp_vars);
     } else {
-      std::vector<double> vars(1 + n_modes);
-      vars[0] = pressure;
-      for (std::size_t i = 1; i <= n_modes; ++i) {
+      std::vector<double> vars(constants::indexing::second + n_modes);
+      vars[constants::indexing::first] = pressure;
+      for (std::size_t i = constants::indexing::second; i <= n_modes; ++i) {
         vars[i] = temperature;
       }
-      mixture_->setState(c_vec.data(), vars.data(), 2);
+      mixture_->setState(c_vec.data(), vars.data(), constants::indexing::single_temp_vars);
     }
 
     return {};
@@ -263,7 +264,7 @@ auto MutationMixture::species_enthalpies(double temperature) const
     mixture_->speciesHOverRT(temperature, h_over_RT.data());
 
     // Convert from h/RT to J/kg
-    const double RT = constants::R_universal * temperature;
+    const double RT = constants::physical::universal_gas_constant * temperature;
     for (std::size_t i = 0; i < n_species_; ++i) {
       h_over_RT[i] = h_over_RT[i] * RT / species_mw_[i];
     }
@@ -347,7 +348,7 @@ auto MutationMixture::binary_diffusion_coefficients(double temperature, double p
     }
 
     // Convert from n*D to D by dividing by number density
-    const double n = pressure / (constants::k_Boltzmann * temperature);
+    const double n = pressure / (constants::physical::boltzmann_constant * temperature);
     for (std::size_t i = 0; i < n_species_; ++i) {
       for (std::size_t j = 0; j < n_species_; ++j) {
         dij(i, j) /= n;
@@ -554,7 +555,7 @@ auto MutationMixture::reload_gsi() -> std::expected<void, std::string> {
     // Update cached properties if needed
     for (std::size_t i = 0; i < n_species_; ++i) {
       species_mw_[i] = mixture_->speciesMw(i);
-      const double charge = mixture_->speciesCharge(i) * constants::N_Avogadro / species_mw_[i];
+      const double charge = mixture_->speciesCharge(i) * constants::physical::avogadro_number / species_mw_[i];
       species_charges_[i] = charge;
     }
 

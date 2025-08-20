@@ -294,8 +294,7 @@ auto HeatFluxCalculator::compute_wall_heat_fluxes(const CoefficientInputs& input
   }
   const double dT_deta_wall = (inputs.T[1] - inputs.T[0]) / d_eta_;
 
-  double q_wall_conductive = -coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact;
-  q_wall_conductive = -q_wall_conductive;
+  double q_wall_conductive = coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact;
 
   double q_wall_diffusive = 0.0;
   const auto n_species = coeffs.diffusion.J.rows();

@@ -1,6 +1,7 @@
 #pragma once
 #include "../core/containers.hpp"
 #include "../core/exceptions.hpp"
+#include "../core/constants.hpp"
 #include "../io/config_types.hpp"
 #include <expected>
 #include <memory>
@@ -10,12 +11,8 @@
 
 namespace blast::thermophysics {
 
-namespace constants {
-inline constexpr double R_universal = 8.31446261815324;
-inline constexpr double k_Boltzmann = 1.380649e-23;
-inline constexpr double N_Avogadro = 6.02214076e23;
-inline constexpr double Pi = 3.14159265358979323846;
-} // namespace constants
+// Constants are now available from ../core/constants.hpp
+// Access via constants::physical::universal_gas_constant, etc.
 
 // Error type for thermophysics operations
 class ThermophysicsError : public core::BlastException {

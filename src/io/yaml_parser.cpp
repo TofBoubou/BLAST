@@ -1,5 +1,6 @@
 #include "blast/io/yaml_parser.hpp"
 #include "blast/core/exceptions.hpp"
+#include "blast/core/constants.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -367,13 +368,13 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
             if (point.boundary_override.enabled) {
               auto mass_fractions = point_node["mass_fraction_condition"].as<std::vector<double>>();
 
-              double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
-              if (std::abs(sum - 1.0) > 1e-6) {
+              double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), constants::defaults::default_emissivity);
+              if (std::abs(sum - constants::hermite::basis_functions::h00_constant) > constants::tolerance::mass_fraction_sum) {
                 return std::unexpected(core::ConfigurationError(
-                    std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+                    std::format("mass_fraction_condition must sum to {} (current sum: {})", constants::hermite::basis_functions::h00_constant, sum)));
               }
 
-              if (std::any_of(mass_fractions.begin(), mass_fractions.end(), [](double val) { return val < 0.0; })) {
+              if (std::any_of(mass_fractions.begin(), mass_fractions.end(), [](double val) { return val < constants::defaults::default_emissivity; })) {
                 return std::unexpected(core::ConfigurationError("All mass fractions must be non-negative"));
               }
 
@@ -394,13 +395,13 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
 
             auto mass_fractions = boundary_override_node["mass_fraction_condition"].as<std::vector<double>>();
 
-            double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), 0.0);
-            if (std::abs(sum - 1.0) > 1e-6) {
+            double sum = std::accumulate(mass_fractions.begin(), mass_fractions.end(), constants::defaults::default_emissivity);
+            if (std::abs(sum - constants::hermite::basis_functions::h00_constant) > constants::tolerance::mass_fraction_sum) {
               return std::unexpected(core::ConfigurationError(
-                  std::format("mass_fraction_condition must sum to 1.0 (current sum: {})", sum)));
+                  std::format("mass_fraction_condition must sum to {} (current sum: {})", constants::hermite::basis_functions::h00_constant, sum)));
             }
 
-            if (std::any_of(mass_fractions.begin(), mass_fractions.end(), [](double val) { return val < 0.0; })) {
+            if (std::any_of(mass_fractions.begin(), mass_fractions.end(), [](double val) { return val < constants::defaults::default_emissivity; })) {
               return std::unexpected(core::ConfigurationError("All mass fractions must be non-negative"));
             }
 
@@ -477,8 +478,8 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
         return std::unexpected(emiss_result.error());
       config.emissivity = emiss_result.value();
       
-      if (config.emissivity < 0.0 || config.emissivity > 1.0) {
-        return std::unexpected(core::ConfigurationError("emissivity must be between 0.0 and 1.0"));
+      if (config.emissivity < constants::defaults::default_emissivity || config.emissivity > constants::defaults::max_emissivity) {
+        return std::unexpected(core::ConfigurationError(std::format("emissivity must be between {} and {}", constants::defaults::default_emissivity, constants::defaults::max_emissivity)));
       }
     }
 
@@ -488,7 +489,7 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
         return std::unexpected(env_temp_result.error());
       config.environment_temperature = env_temp_result.value();
       
-      if (config.environment_temperature <= 0.0) {
+      if (config.environment_temperature <= constants::defaults::default_emissivity) {
         return std::unexpected(core::ConfigurationError("environment_temperature must be positive"));
       }
     }
@@ -532,11 +533,11 @@ auto YamlParser::parse_abaque_config(const YAML::Node& node) const
       // Parse temperature range
       if (node["temperature_range"]) {
         auto range = node["temperature_range"].as<std::vector<double>>();
-        if (range.size() != 2) {
-          return std::unexpected(core::ConfigurationError("temperature_range must have exactly 2 values"));
+        if (range.size() != constants::indexing::min_range_size) {
+          return std::unexpected(core::ConfigurationError(std::format("temperature_range must have exactly {} values", constants::indexing::min_range_size)));
         }
-        config.temperature_min = range[0];
-        config.temperature_max = range[1];
+        config.temperature_min = range[constants::indexing::first];
+        config.temperature_max = range[constants::indexing::second];
 
         if (config.temperature_min >= config.temperature_max) {
           return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
@@ -546,8 +547,8 @@ auto YamlParser::parse_abaque_config(const YAML::Node& node) const
       // Parse temperature points
       if (node["temperature_points"]) {
         config.temperature_points = node["temperature_points"].as<int>();
-        if (config.temperature_points < 2) {
-          return std::unexpected(core::ConfigurationError("temperature_points must be at least 2"));
+        if (config.temperature_points < constants::indexing::min_range_size) {
+          return std::unexpected(core::ConfigurationError(std::format("temperature_points must be at least {}", constants::indexing::min_range_size)));
         }
       }
     }
