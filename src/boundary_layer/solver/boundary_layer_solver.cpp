@@ -113,9 +113,12 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
   core::Matrix<double> prev_c;
 
   // Solve each xi station
+  std::cout << "[DEBUG] %%%%% MAIN LOOP: xi_stations.size() = " << xi_stations.size() << " %%%%%" << std::endl;
   for (std::size_t station_idx = 0; station_idx < xi_stations.size(); ++station_idx) {
     const int station = static_cast<int>(station_idx);
     const double xi = xi_stations[station_idx];
+    std::cout << "[DEBUG] %%%%% MAIN LOOP: Processing station_idx=" << station_idx 
+              << ", station=" << station << ", xi=" << xi << " %%%%%" << std::endl;
 
     // CRITICAL: Update xi derivatives BEFORE solving (except for station 0)
     if (station_idx > 0) {
@@ -147,6 +150,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     }
 
     // Solve this station
+    std::cout << "[DEBUG] ***** CALLING solve_station from main solver loop *****" << std::endl;
     auto station_result = solve_station(station, xi, initial_guess);
     if (!station_result) {
       return std::unexpected(NumericError(
@@ -285,6 +289,9 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 auto BoundaryLayerSolver::solve_station(int station, double xi, const equations::SolutionState& initial_guess)
     -> std::expected<equations::SolutionState, SolverError> {
 
+  std::cout << "[DEBUG] @@@@@ ENTERING solve_station for station " << station << " @@@@@" << std::endl;
+  std::cout << "[DEBUG] ■■■ STARTING DIRECT RESOLUTION ATTEMPT (no continuation yet) ■■■" << std::endl;
+
   // Validate input parameters
   if (station < 0) {
     return std::unexpected(
@@ -373,11 +380,16 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   }
 
   auto convergence_result = iterate_station_adaptive(station, xi, bc, solution);
+  std::cout << "[DEBUG] @@@@@ iterate_station_adaptive RETURNED @@@@@" << std::endl;
 
   if (!convergence_result) {
+    std::cout << "[DEBUG] @@@@@ iterate_station_adaptive FAILED - TRYING CONTINUATION @@@@@" << std::endl;
+    std::cout << "[DEBUG] ■■■ CONTINUATION TRIGGER #1: After iterate_station_adaptive FAILURE ■■■" << std::endl;
     if (continuation_ && !in_continuation_) {
+      std::cout << "[DEBUG] ■■■ CONTINUATION CONDITIONS MET - LAUNCHING CONTINUATION ■■■" << std::endl;
       auto stable_guess = compute_stable_guess();
       if (stable_guess) {
+        std::cout << "[DEBUG] ■■■ STABLE GUESS COMPUTED - CALLING solve_with_continuation ■■■" << std::endl;
         auto cont_result =
             continuation_->solve_with_continuation(*this, station, xi, original_config_, stable_guess.value());
 
@@ -393,8 +405,10 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
   const auto& conv_info = convergence_result.value();
 
   if (!conv_info.converged) {
+    std::cout << "[DEBUG] @@@@@ NOT CONVERGED - CHECKING CONTINUATION @@@@@" << std::endl;
     // If we're in continuation mode, return failure immediately so continuation can handle it
     if (in_continuation_) {
+      std::cout << "[DEBUG] @@@@@ IN CONTINUATION MODE - RETURNING FAILURE @@@@@" << std::endl;
       // Check if it was a NaN failure
       if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
         /*         std::cout << "[DEBUG] CONTINUATION FAILED - NaN detected at station " << station
@@ -412,29 +426,40 @@ auto BoundaryLayerSolver::solve_station(int station, double xi, const equations:
     }
 
     // Try continuation if direct solution failed
+    std::cout << "[DEBUG] @@@@@ TRYING CONTINUATION FALLBACK @@@@@" << std::endl;
+    std::cout << "[DEBUG] ■■■ CONTINUATION TRIGGER #2: Fallback after non-convergence ■■■" << std::endl;
     if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
+      std::cout << "[DEBUG] ■■■ CONTINUATION CONDITIONS MET - LAUNCHING CONTINUATION ■■■" << std::endl;
       auto stable_guess = compute_stable_guess();
       if (stable_guess) {
+        std::cout << "[DEBUG] ■■■ STABLE GUESS COMPUTED - CALLING solve_with_continuation ■■■" << std::endl;
         auto cont_result =
             continuation_->solve_with_continuation(*this, station, xi, original_config_, stable_guess.value());
 
         if (cont_result && cont_result.value().success) {
+          std::cout << "[DEBUG] @@@@@ CONTINUATION SUCCEEDED - RETURNING SOLUTION @@@@@" << std::endl;
           return cont_result.value().solution;
+        } else {
+          std::cout << "[DEBUG] @@@@@ CONTINUATION FAILED @@@@@" << std::endl;
         }
       }
     }
 
+    std::cout << "[DEBUG] @@@@@ GIVING UP - RETURNING ERROR @@@@@" << std::endl;
     return std::unexpected(
         ConvergenceError(std::format("Station {} failed to converge after {} iterations (residual={})", station,
                                      conv_info.iterations, conv_info.max_residual())));
   }
 
+  std::cout << "[DEBUG] @@@@@ SOLVE_STATION CONVERGED - RETURNING SOLUTION @@@@@" << std::endl;
   return solution;
 }
 
 auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const conditions::BoundaryConditions& bc,
                                                    equations::SolutionState& solution)
     -> std::expected<ConvergenceInfo, SolverError> {
+
+  std::cout << "[DEBUG] ===== ENTERING iterate_station_adaptive for station " << station << " =====" << std::endl;
 
   const auto n_eta = grid_->n_eta();
   const auto n_species = mixture_.n_species();
@@ -446,62 +471,8 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
   auto pipeline = SolverPipeline::create_for_solver(*this);
 
   for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
-    // std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
+    std::cout << "=== ITERATION " << iter << " at station " << station << " ===" << std::endl;
     const auto solution_old = solution;
-
-    // Update wall temperature for radiative equilibrium (if emissivity > 0 and iter > 0)
-    if (config_.wall_parameters.emissivity > 0.0 && iter > 0) {
-      
-      auto derivatives_result = compute_all_derivatives(solution_old);
-      if (derivatives_result) {
-        auto derivatives = derivatives_result.value();
-        
-        auto final_inputs = coefficients::CoefficientInputs{
-          .xi = xi,
-          .F = solution_old.F,
-          .c = solution_old.c,
-          .dc_deta = derivatives.dc_deta,
-          .dc_deta2 = derivatives.dc_deta2,
-          .T = solution_old.T
-        };
-        
-        auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc_dynamic, *xi_derivatives_);
-        if (coeffs_result) {
-          auto coeffs = coeffs_result.value();
-          
-          auto heat_flux_result = heat_flux_calculator_->calculate(
-            final_inputs, coeffs, bc_dynamic, derivatives.dT_deta, station, xi);
-          
-          if (heat_flux_result) {
-            double q_wall = heat_flux_result.value().q_wall_total_dim;
-            
-            // Calculate radiative flux: q_rad = ε*σ*(T_wall^4 - T_∞^4)
-            const double STEFAN_BOLTZMANN = 5.670374419e-8;
-            const double T_wall_current = bc_dynamic.wall.temperature;
-            const double T_inf = config_.wall_parameters.environment_temperature;
-            const double q_rad = config_.wall_parameters.emissivity * STEFAN_BOLTZMANN * 
-                                (std::pow(T_wall_current, 4) - std::pow(T_inf, 4));
-            
-            // Print convergence info
-/*             std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
-                                   "q_wall-q_rad={:.2e} W/m², T_wall={:.1f} K", 
-                                   station, iter, q_wall, q_rad, q_wall - q_rad, T_wall_current) << std::endl; */
-            
-          auto T_wall_result = solve_radiative_equilibrium(
-            q_wall, 
-            config_.wall_parameters.emissivity,
-            config_.wall_parameters.environment_temperature
-          );
-
-          if (!T_wall_result) {
-            return std::unexpected(NumericError(std::format("Radiative equilibrium failed: {}", T_wall_result.error())));
-          }
-
-          bc_dynamic.wall.temperature = T_wall_result.value();
-          }
-        }
-      }
-    }
 
     // Initialize coefficients and inputs
     coefficients::CoefficientSet coeffs;
@@ -566,12 +537,76 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     /*     std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor
                   << " (max residual: " << conv_info.max_residual() << ")" << std::endl; */
 
-    // Apply relaxation
-    solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
-
-    // Check convergence
+    // Check convergence first
     if (conv_info.converged) {
-      break;
+      // If converged, use the new solution directly without further relaxation
+      std::cout << "[DEBUG] CONVERGENCE ACHIEVED at iteration " << iter << " - RETURNING IMMEDIATELY" << std::endl;
+      solution = solution_new;
+      std::cout << "[DEBUG] ===== EXITING iterate_station_adaptive - CONVERGED =====" << std::endl;
+      return conv_info;
+    }
+
+    // Apply relaxation only if not converged
+    solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
+    
+    // Update wall temperature for radiative equilibrium AFTER checking convergence
+    // This prevents changing boundary conditions after convergence is achieved
+    if (config_.wall_parameters.emissivity > 0.0) {
+      
+      auto derivatives_result = compute_all_derivatives(solution);
+      if (derivatives_result) {
+        auto derivatives = derivatives_result.value();
+        
+        auto final_inputs = coefficients::CoefficientInputs{
+          .xi = xi,
+          .F = solution.F,
+          .c = solution.c,
+          .dc_deta = derivatives.dc_deta,
+          .dc_deta2 = derivatives.dc_deta2,
+          .T = solution.T
+        };
+        
+        auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc_dynamic, *xi_derivatives_);
+        if (coeffs_result) {
+          auto coeffs = coeffs_result.value();
+          
+          auto heat_flux_result = heat_flux_calculator_->calculate(
+            final_inputs, coeffs, bc_dynamic, derivatives.dT_deta, station, xi);
+          
+          if (heat_flux_result) {
+            double q_wall = heat_flux_result.value().q_wall_total_dim;
+            
+            // Calculate radiative flux: q_rad = ε*σ*(T_wall^4 - T_∞^4)
+            const double STEFAN_BOLTZMANN = 5.670374419e-8;
+            const double T_wall_current = bc_dynamic.wall.temperature;
+            const double T_inf = config_.wall_parameters.environment_temperature;
+            const double q_rad = config_.wall_parameters.emissivity * STEFAN_BOLTZMANN * 
+                                (std::pow(T_wall_current, 4) - std::pow(T_inf, 4));
+            
+            // Print convergence info
+/*             std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
+                                   "q_wall-q_rad={:.2e} W/m², T_wall={:.1f} K", 
+                                   station, iter, q_wall, q_rad, q_wall - q_rad, T_wall_current) << std::endl; */
+            
+          auto T_wall_result = solve_radiative_equilibrium(
+            q_wall, 
+            config_.wall_parameters.emissivity,
+            config_.wall_parameters.environment_temperature
+          );
+
+          if (!T_wall_result) {
+            return std::unexpected(NumericError(std::format("Radiative equilibrium failed: {}", T_wall_result.error())));
+          }
+
+          double T_wall_old = bc_dynamic.wall.temperature;
+          bc_dynamic.wall.temperature = T_wall_result.value();
+          
+/*           std::cout << std::format("[DEBUG] T_wall update: {:.1f} K -> {:.1f} K (delta={:.1f} K)", 
+                                   T_wall_old, bc_dynamic.wall.temperature, 
+                                   bc_dynamic.wall.temperature - T_wall_old) << std::endl; */
+          }
+        }
+      }
     }
 
     // DEBUG: Print iteration info during continuation
@@ -633,6 +668,9 @@ auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const
     }
   }
 
+  // Only reach here if max iterations reached without convergence
+  std::cout << "[DEBUG] ===== EXITING iterate_station_adaptive - MAX ITERATIONS REACHED =====" << std::endl;
+  std::cout << "[DEBUG] Final conv_info.converged = " << conv_info.converged << std::endl;
   return conv_info;
 }
 
@@ -749,7 +787,8 @@ auto BoundaryLayerSolver::check_convergence(const equations::SolutionState& old_
 
   info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
-  std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
+  std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c 
+            << " | tol=" << tol << " | converged=" << info.converged << std::endl;
   // DEBUG: Always print convergence info during continuation
 /*     if (in_continuation_) {
       std::cout << "[DEBUG] CONVERGENCE CHECK - tol=" << std::scientific << tol

@@ -13,7 +13,7 @@ numerical:
   n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9 
-  max_iterations: 100000
+  max_iterations: 10
 
 mixture:
   name: CO2_5
@@ -47,7 +47,7 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [2200]
+  temperatures: [3000]
   emissivity: 0.8
   environment_temperature: 300
 
