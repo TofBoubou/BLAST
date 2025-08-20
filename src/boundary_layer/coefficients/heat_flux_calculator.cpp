@@ -230,7 +230,6 @@ auto HeatFluxCalculator::compute_conductive_flux_profile(const std::vector<doubl
   for (std::size_t i = 0; i < n_eta; ++i) {
     // Use the same formula as compute_wall_heat_fluxes for consistency
     q_conductive[i] = -k_local[i] * dT_deta[i] * geo_factors.der_fact;
-    // To the wall (matching old code convention, same as compute_wall_heat_fluxes)
     q_conductive[i] = -q_conductive[i];
   }
 
@@ -259,7 +258,6 @@ auto HeatFluxCalculator::compute_diffusive_flux_profile(const CoefficientSet& co
       q_diffusive_species(j, i) = q_species_j;
       q_diffusive_total[i] += q_species_j;
     }
-    // To the wall (matching old code convention, same as compute_wall_heat_fluxes)
     q_diffusive_total[i] = -q_diffusive_total[i];
   }
 
@@ -296,18 +294,16 @@ auto HeatFluxCalculator::compute_wall_heat_fluxes(const CoefficientInputs& input
   }
   const double dT_deta_wall = (inputs.T[1] - inputs.T[0]) / d_eta_;
 
-  // Compute conductive heat flux matching the old BLAST behavior
   double q_wall_conductive = -coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact;
-  q_wall_conductive = -q_wall_conductive; // To the wall (matching old code)
+  q_wall_conductive = -q_wall_conductive;
 
   double q_wall_diffusive = 0.0;
   const auto n_species = coeffs.diffusion.J.rows();
 
-  // Compute diffusive heat flux matching the old BLAST behavior
   for (std::size_t j = 0; j < n_species; ++j) {
     q_wall_diffusive += coeffs.diffusion.J(j, 0) * coeffs.h_species(j, 0);
   }
-  q_wall_diffusive = -q_wall_diffusive; // To the wall (matching old code)
+  q_wall_diffusive = -q_wall_diffusive;
 
   const double q_wall_total = q_wall_conductive + q_wall_diffusive;
 

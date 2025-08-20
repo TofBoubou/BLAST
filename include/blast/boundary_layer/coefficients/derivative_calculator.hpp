@@ -8,15 +8,12 @@
 
 namespace blast::boundary_layer::coefficients {
 
-// Structure unifiée pour TOUTES les dérivées
 struct UnifiedDerivativeState {
-  // Dérivées scalaires
   std::vector<double> dF_deta; // Momentum derivatives
   std::vector<double> dg_deta; // Energy derivatives
   std::vector<double> dV_deta; // Continuity derivatives
   std::vector<double> dT_deta; // Temperature derivatives
 
-  // Dérivées des espèces
   core::Matrix<double> dc_deta;  // First derivatives [n_species x n_eta]
   core::Matrix<double> dc_deta2; // Second derivatives [n_species x n_eta]
 
@@ -29,7 +26,6 @@ class DerivativeCalculator {
 private:
   const double d_eta_;
 
-  // Fonctions de base optimisées
   [[nodiscard]] auto
   eta_derivative_O4(std::span<const double> values) const -> std::expected<std::vector<double>, CoefficientError>;
 
@@ -39,11 +35,9 @@ private:
 public:
   explicit DerivativeCalculator(double d_eta) : d_eta_(d_eta) {}
 
-  // Point d'entrée unique pour TOUS les calculs de dérivées
   [[nodiscard]] auto compute_all_derivatives(const equations::SolutionState& solution) const
       -> std::expected<UnifiedDerivativeState, CoefficientError>;
 
-  // Fonctions spécialisées si besoin ponctuel
   [[nodiscard]] auto compute_single_derivative(std::span<const double> field) const
       -> std::expected<std::vector<double>, CoefficientError>;
 

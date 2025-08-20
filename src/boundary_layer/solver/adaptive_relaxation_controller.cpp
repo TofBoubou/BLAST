@@ -91,7 +91,7 @@ auto AdaptiveRelaxationController::adapt_relaxation_factor(const ConvergenceInfo
 
 auto AdaptiveRelaxationController::detect_oscillations() const -> std::expected<bool, SolverError> {
   if (residual_history_.size() < 4)
-    return false; // Pas d'erreur, juste pas assez de données
+    return false;
 
   // Check if residuals oscillate around a mean value
   const std::size_t n = residual_history_.size();

@@ -134,13 +134,11 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
     -> std::expected<std::vector<double>, BoundaryConditionError> {
 
   if (edge_point.boundary_override_enabled()) {
-    // Utiliser les fractions spécifiées par l'utilisateur
     if (!edge_point.mass_fraction_condition()) {
       return std::unexpected(
           BoundaryConditionError("mass_fraction_condition missing despite boundary_override being enabled"));
     }
 
-    // Vérifier que le nombre d'espèces correspond
     if (edge_point.mass_fraction_condition()->size() != mixture.n_species()) {
       return std::unexpected(
           BoundaryConditionError(std::format("mass_fraction_condition size ({}) doesn't match number of species ({})",
@@ -149,7 +147,6 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
 
     return edge_point.mass_fraction_condition().value();
   } else {
-    // Comportement par défaut : calculer l'équilibre
     auto eq_result = mixture.equilibrium_composition(edge_point.temperature, edge_point.pressure);
     if (!eq_result) {
       return std::unexpected(BoundaryConditionError(
@@ -173,7 +170,6 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
 
   const auto& edge_point = edge_config.edge_points[0];
 
-  // Utilise la nouvelle fonction helper pour obtenir les fractions d'espèces
   auto species_fractions_result = get_species_fractions(edge_point, mixture);
   if (!species_fractions_result) {
     return std::unexpected(species_fractions_result.error());

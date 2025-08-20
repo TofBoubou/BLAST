@@ -105,27 +105,22 @@ auto EnthalpyTemperatureSolver::solve(std::span<const double> enthalpy_field, co
   TemperatureField result;
   result.temperatures.resize(n_points);
   
-  // Déterminer si on est en mode adiabatique
   bool is_adiabatic = bc.simulation_config().adiabatic;
   
   int start_index;
   if (is_adiabatic) {
-    // Mode adiabatique : on doit calculer T[0]
     start_index = 0;
   } else {
-    // Mode température imposée : T[0] = Tw fixe
     result.temperatures[0] = bc.Tw();
     start_index = 1;
   }
   
-  // Calcul des températures
   for (int i = start_index; i < static_cast<int>(n_points); i++) {
     std::vector<double> c_temp(mixture_.n_species());
     for (std::size_t j = 0; j < mixture_.n_species(); j++) {
       c_temp[j] = composition(j, i);
     }
     
-    // double h = enthalpy_field[i] * h_e;  // Dénormaliser l'enthalpie
     double h = enthalpy_field[i];
     
     auto temp_result = solve_single_point(c_temp, h, P, initial_temperatures[i]);
@@ -137,9 +132,8 @@ auto EnthalpyTemperatureSolver::solve(std::span<const double> enthalpy_field, co
     result.temperatures[i] = *temp_result;
   }
   
-  // Si adiabatique, mettre à jour la température du mur
   if (is_adiabatic) {
-    bc.wall.temperature = result.temperatures[0];  // LA LIGNE CLÉ !
+    bc.wall.temperature = result.temperatures[0];
     result.adiabatic_wall_updated = true;
     result.updated_wall_temperature = result.temperatures[0];
   }

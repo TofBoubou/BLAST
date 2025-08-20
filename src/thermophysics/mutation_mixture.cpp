@@ -223,17 +223,14 @@ auto MutationMixture::set_state(std::span<const double> mass_fractions, double t
 
     const auto n_modes = mixture_->nEnergyEqns();
     if (n_modes == 1) {
-      // Modèle mono-température: {P, T}
       double vars[2] = {pressure, temperature};
       mixture_->setState(c_vec.data(), vars, 2);
     } else {
-      // Modèle multi-température: {P, T_mode1, T_mode2, ...}
       std::vector<double> vars(1 + n_modes);
       vars[0] = pressure;
       for (std::size_t i = 1; i <= n_modes; ++i) {
-        vars[i] = temperature; // Initialiser tous les modes à la même température
+        vars[i] = temperature;
       }
-      // Utiliser le var_set 2 (P-T set) pour les modèles multi-température
       mixture_->setState(c_vec.data(), vars.data(), 2);
     }
 
@@ -515,7 +512,6 @@ auto MutationMixture::extract_modal_temperatures(std::span<const double> mass_fr
     if (n_modes == 1) {
       modal_temps[0] = temperature_overall;
     } else {
-      // Récupérer les températures modales depuis l'état Mutation++
       mixture_->getTemperatures(modal_temps.data());
     }
 

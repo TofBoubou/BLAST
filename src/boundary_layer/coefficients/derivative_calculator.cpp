@@ -114,7 +114,6 @@ auto DerivativeCalculator::compute_all_derivatives(const equations::SolutionStat
 
   UnifiedDerivativeState derivatives(n_eta, n_species);
 
-  // ===== DÉRIVÉES SCALAIRES =====
 
   // dF/deta
   auto dF_result = eta_derivative_O4(solution.F);
@@ -144,7 +143,6 @@ auto DerivativeCalculator::compute_all_derivatives(const equations::SolutionStat
   }
   derivatives.dT_deta = std::move(dT_result.value());
 
-  // ===== DÉRIVÉES DES ESPÈCES =====
 
   for (std::size_t j = 0; j < n_species; ++j) {
     // Extraire la ligne j de la matrice c
@@ -153,7 +151,6 @@ auto DerivativeCalculator::compute_all_derivatives(const equations::SolutionStat
       c_row[i] = solution.c(j, i);
     }
 
-    // Première dérivée dc/deta
     auto dc_deta_result = eta_derivative_O4(c_row);
     if (!dc_deta_result) {
       return std::unexpected(CoefficientError("Failed to compute dc/deta for species " + std::to_string(j)));
@@ -163,7 +160,6 @@ auto DerivativeCalculator::compute_all_derivatives(const equations::SolutionStat
       derivatives.dc_deta(j, i) = dc_deta[i];
     }
 
-    // Seconde dérivée dc/deta2
     auto dc_deta2_result = eta_second_derivative_O4(c_row);
     if (!dc_deta2_result) {
       return std::unexpected(CoefficientError("Failed to compute dc/deta2 for species " + std::to_string(j)));
