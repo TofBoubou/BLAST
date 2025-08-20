@@ -39,7 +39,7 @@ public:
   }
 
   ~HDF5Handle() {
-    if (handle_ >= constants::indexing::first) {
+    if (handle_ >= 0) {
       CloseFunc(handle_);
     }
   }
@@ -49,7 +49,7 @@ public:
 
   HDF5Handle& operator=(HDF5Handle&& other) noexcept {
     if (this != &other) {
-      if (handle_ >= constants::indexing::first) {
+      if (handle_ >= 0) {
         CloseFunc(handle_);
       }
       handle_ = other.handle_;
@@ -63,7 +63,7 @@ public:
   HDF5Handle& operator=(const HDF5Handle&) = delete;
 
   [[nodiscard]] auto get() const noexcept -> HandleType { return handle_; }
-  [[nodiscard]] auto valid() const noexcept -> bool { return handle_ >= constants::indexing::first; }
+  [[nodiscard]] auto valid() const noexcept -> bool { return handle_ >= 0; }
 
   // Implicit conversion for C API
   operator HandleType() const noexcept { return handle_; }

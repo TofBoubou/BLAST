@@ -71,13 +71,10 @@ auto HDF5Writer::create_file(const std::filesystem::path& file_path) const -> st
 
   // Create the file
   auto file_id = H5Fcreate(file_path.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, fapl);
-  if (H5Pclose(fapl) < 0) {
-    if (file_id >= 0) {
-      H5Fclose(file_id);
-    }
-    return std::unexpected(OutputError("Failed to close file access property list"));
-  }
-
+  
+  // Close property list after file creation
+  H5Pclose(fapl);
+  
   if (file_id < 0) {
     return std::unexpected(OutputError(std::format("Failed to create HDF5 file: {}", file_path.string())));
   }
