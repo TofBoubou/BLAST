@@ -749,9 +749,9 @@ auto BoundaryLayerSolver::check_convergence(const equations::SolutionState& old_
 
   info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
-  // std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
+  std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c << std::endl;
   // DEBUG: Always print convergence info during continuation
-  /*   if (in_continuation_) {
+/*     if (in_continuation_) {
       std::cout << "[DEBUG] CONVERGENCE CHECK - tol=" << std::scientific << tol
                 << " | F_res=" << info.residual_F << " | g_res=" << info.residual_g
                 << " | c_res=" << info.residual_c << " | converged=" << info.converged << std::endl;
