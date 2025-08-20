@@ -1,4 +1,7 @@
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
+#include "blast/boundary_layer/solver/heat_flux_computer.hpp"
+#include "blast/boundary_layer/solver/initial_guess_factory.hpp"
+#include "blast/boundary_layer/solver/expected_utils.hpp"
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
 #include "blast/boundary_layer/equations/continuity.hpp"
@@ -58,6 +61,16 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
   derivative_calculator_ = std::make_unique<coefficients::DerivativeCalculator>(grid_->d_eta());
 
   continuation_ = std::make_unique<ContinuationMethod>();
+  
+  // Create utility objects for eliminating duplication
+  heat_flux_computer_ = std::make_unique<HeatFluxComputer>(HeatFluxComputer::Config{
+    .coeff_calculator = *coeff_calculator_,
+    .heat_flux_calculator = *heat_flux_calculator_,
+    .derivative_calculator = *derivative_calculator_,
+    .xi_derivatives = *xi_derivatives_
+  });
+  
+  initial_guess_factory_ = std::make_unique<InitialGuessFactory>(*grid_, mixture_);
   
   // Initialize specialized solver components
   initialize_solver_components();
@@ -123,7 +136,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
       const auto& edge_point = config_.outer_edge.edge_points[0];
       const double T_edge = edge_point.temperature;
 
-      auto guess_result = create_initial_guess(station, xi, bc_result.value(), T_edge);
+      auto guess_result = initial_guess_factory_->create_initial_guess(station, xi, bc_result.value(), T_edge);
       if (!guess_result) {
         return std::unexpected(guess_result.error());
       }
@@ -153,67 +166,27 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 
     result.total_iterations++;
 
-    // Calculate heat flux for this converged station
-    auto derivatives_result = compute_all_derivatives(result.stations.back());
-    if (!derivatives_result) {
-      return std::unexpected(NumericError(std::format("Failed to compute derivatives for heat flux at station {}: {}",
-                                                      station, derivatives_result.error().message())));
-    }
-    auto derivatives = derivatives_result.value();
+    // Calculate heat flux for this converged station using unified computer
+    auto bc_result = (station == 0)
+        ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation, mixture_)
+        : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
+                                                      config_.wall_parameters, config_.simulation, mixture_);
 
-    auto final_inputs = coefficients::CoefficientInputs{.xi = xi,
-                                                        .F = result.stations.back().F,
-                                                        .c = result.stations.back().c,
-                                                        .dc_deta = derivatives.dc_deta,
-                                                        .dc_deta2 = derivatives.dc_deta2,
-                                                        .T = result.stations.back().T};
-
-    auto bc_result =
-        (station == 0)
-            ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation,
-                                                       mixture_)
-            : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
-                                                          config_.wall_parameters, config_.simulation, mixture_);
-
-    if (!bc_result) {
-      return std::unexpected(BoundaryConditionError(std::format(
-          "Failed to get boundary conditions for heat flux at station {}: {}", station, bc_result.error().message())));
-    }
-    auto bc = bc_result.value();
+    auto bc = BLAST_TRY_WITH_CONTEXT(bc_result, 
+        std::format("Failed to get boundary conditions for heat flux at station {}", station));
     
     // Update wall temperature if radiative equilibrium was used
     if (config_.wall_parameters.emissivity > 0.0) {
-      // Get the final temperature from the converged solution
       bc.wall.temperature = result.stations.back().T[0];  // T at wall (eta=0)
     }
     
-    // DEBUG: Print wall temperature used for final heat flux calculation
-    /* std::cout << std::format("[FINAL_BC] Station {}: T_wall={:.1f} K (updated for radiative equilibrium)", station, bc.wall.temperature) << std::endl; */
+    // Use unified heat flux computer to eliminate duplication
+    auto heat_flux_data = BLAST_TRY_WITH_CONTEXT(
+        heat_flux_computer_->compute_heat_flux_only(result.stations.back(), bc, xi, station),
+        std::format("Failed to compute heat flux at station {}", station)
+    );
 
-    auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc, *xi_derivatives_);
-    if (!coeffs_result) {
-      return std::unexpected(NumericError(std::format("Failed to compute coefficients for heat flux at station {}: {}",
-                                                      station, coeffs_result.error().message())));
-    }
-    auto coeffs = coeffs_result.value();
-
-    // DEBUG: Print temperatures being used for profile calculation
-/*     std::cout << std::format("[PROFILE_CALC] Station {}: T_wall_in_inputs={:.1f} K, T_wall_in_bc={:.1f} K", 
-                             station, final_inputs.T[0], bc.wall.temperature) << std::endl; */
-    
-    auto heat_flux_result =
-        heat_flux_calculator_->calculate(final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
-    if (!heat_flux_result) {
-      return std::unexpected(NumericError(
-          std::format("Failed to compute heat flux at station {}: {}", station, heat_flux_result.error().message())));
-    }
-    
-    // DEBUG: Print heat flux calculated for final output
-    auto heat_flux_final = heat_flux_result.value();
-/*     std::cout << std::format("[FINAL_CALC] Station {}: q_cond={:.2e} W/m², q_diff={:.2e} W/m², q_total={:.2e} W/m²", 
-                             station, heat_flux_final.q_wall_conductive_dim, heat_flux_final.q_wall_diffusive_dim, heat_flux_final.q_wall_total_dim) << std::endl; */
-
-    result.heat_flux_data.push_back(std::move(heat_flux_result.value()));
+    result.heat_flux_data.push_back(std::move(heat_flux_data));
 
     // Extract modal temperatures if multiple energy modes are present
     if (mixture_.get_number_energy_modes() > 1) {
@@ -323,126 +296,7 @@ auto BoundaryLayerSolver::update_temperature_field(std::span<const double> g_fie
 
 // Note: check_convergence method has been moved to ConvergenceManager
 
-auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc,
-                                               double T_edge) const
-    -> std::expected<equations::SolutionState, SolverError> {
-
-  const auto n_eta = grid_->n_eta();
-  const auto n_species = mixture_.n_species();
-  const double eta_max = grid_->eta_max();
-
-  equations::SolutionState guess(n_eta, n_species);
-
-  std::fill(guess.V.begin(), guess.V.end(), 0.0);
-
-  if (n_species == 1) {
-    guess.c.eigen().setOnes();
-
-    std::array<double, 1> c_wall{{1.0}};
-    auto h_wall_eq_result = mixture_.mixture_enthalpy(c_wall, bc.Tw(), bc.P_e());
-    if (!h_wall_eq_result) {
-      return std::unexpected(NumericError(
-          std::format("Failed to compute wall equilibrium enthalpy: {}", h_wall_eq_result.error().message())));
-    }
-    double g_wall = h_wall_eq_result.value() / bc.he();
-
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
-      const double eta_norm = static_cast<double>(i) / (n_eta - 1);
-
-      guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
-      guess.g[i] = g_wall + eta_norm * (1.0 - g_wall);
-      guess.T[i] = bc.Tw() + guess.F[i] * (T_edge - bc.Tw());
-    }
-
-    return guess;
-  }
-
-  // ===== STEP 1: RETRIEVE BOUNDARY COMPOSITIONS =====
-
-  // Compute equilibrium composition at the wall (Tw, P_e)
-  auto equilibrium_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
-  if (!equilibrium_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute equilibrium composition at wall conditions: {}",
-                                                    equilibrium_result.error().message())));
-  }
-  auto c_wall_equilibrium = equilibrium_result.value();
-
-  // Extract edge composition from input
-  const auto& c_edge = bc.c_e();
-  if (c_edge.size() != n_species) {
-    return std::unexpected(InitializationError(
-        std::format("Edge composition size mismatch: expected {}, got {}", n_species, c_edge.size())));
-  }
-
-  // ===== STEP 1.5: COMPUTE WALL EQUILIBRIUM ENTHALPY =====
-
-  // Calculate enthalpy of equilibrium mixture at wall conditions
-  auto h_wall_eq_result = mixture_.mixture_enthalpy(c_wall_equilibrium, bc.Tw(), bc.P_e());
-  if (!h_wall_eq_result) {
-    return std::unexpected(NumericError(
-        std::format("Failed to compute wall equilibrium enthalpy: {}", h_wall_eq_result.error().message())));
-  }
-  double h_wall_equilibrium = h_wall_eq_result.value();
-
-  // std::cout << "ENTHALPIE AU MUR = " << h_wall_equilibrium << std::endl;
-
-  // Compute dimensionless enthalpy at wall
-  double g_wall = h_wall_equilibrium / bc.he();
-
-  // ===== STEP 2: TRANSITION FUNCTION (TANH INTERPOLATION) =====
-
-  // Smooth transition function from wall (0) to edge (1)
-  // Centered at 35% of the boundary layer thickness, with steep slope
-  auto transition_function = [](double eta_norm, double eta_center = 0.35, double sharpness = 10.0) -> double {
-    return 0.5 * (1.0 + std::tanh(sharpness * (eta_norm - eta_center)));
-  };
-
-  // ===== STEP 3: COMPUTE SPECIES PROFILES =====
-
-  for (std::size_t i = 0; i < n_eta; ++i) {
-    const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
-    const double eta_norm = static_cast<double>(i) / (n_eta - 1); // Normalize to [0,1]
-
-    // Analytical profiles for velocity F (unchanged)
-    guess.F[i] = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
-
-    // Physical enthalpy profile: linear interpolation from wall equilibrium to
-    // edge
-    guess.g[i] = g_wall + eta_norm * (1.0 - g_wall);
-
-    // ===== STEP 4: INTERPOLATE SPECIES CONCENTRATIONS =====
-
-    // Compute transition factor from wall to edge
-    const double f = transition_function(eta_norm);
-
-    // Linear interpolation between wall and edge compositions
-    double sum_interpolated = 0.0;
-    for (std::size_t j = 0; j < n_species; ++j) {
-      guess.c(j, i) = c_wall_equilibrium[j] * (1.0 - f) + c_edge[j] * f;
-      sum_interpolated += guess.c(j, i);
-    }
-
-    // Enforce mass conservation: normalize so that sum_j c_j = 1
-    if (sum_interpolated > 1e-15) {
-      for (std::size_t j = 0; j < n_species; ++j) {
-        guess.c(j, i) /= sum_interpolated;
-      }
-    } else {
-      return std::unexpected(InitializationError(std::format(
-          "Mass conservation violation: sum of species concentrations is too small ({})", sum_interpolated)));
-    }
-  }
-
-  // ===== STEP 5: INITIALIZE TEMPERATURE FIELD =====
-  for (std::size_t i = 0; i < n_eta; ++i) {
-    const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
-    double F_normalized = 1.0 - 1.034 * std::exp(-5.628 * eta / eta_max);
-    guess.T[i] = bc.Tw() + F_normalized * (T_edge - bc.Tw());
-  }
-
-  return guess;
-}
+// Note: create_initial_guess method moved to InitialGuessFactory
 
 // Note: apply_relaxation_differential method has been moved to ConvergenceManager
 

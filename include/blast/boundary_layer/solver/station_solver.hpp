@@ -56,18 +56,7 @@ public:
     [[nodiscard]] auto solve_station(int station, double xi, const equations::SolutionState& initial_guess)
         -> std::expected<equations::SolutionState, SolverError>;
 
-    /**
-     * @brief Create initial guess for a station
-     * @param station Station number
-     * @param xi Streamwise coordinate  
-     * @param bc Boundary conditions
-     * @param T_edge Edge temperature
-     * @return Initial solution state or error
-     */
-    [[nodiscard]] auto create_initial_guess(int station, double xi, 
-                                           const conditions::BoundaryConditions& bc,
-                                           double T_edge) const
-        -> std::expected<equations::SolutionState, SolverError>;
+    // Note: create_initial_guess method moved to InitialGuessFactory
 
     /**
      * @brief Set stable configuration for continuation method
@@ -93,9 +82,7 @@ private:
      * @param initial_guess Initial solution guess
      * @return Error if validation fails
      */
-    [[nodiscard]] auto validate_station_inputs(int station, double xi, 
-                                              const equations::SolutionState& initial_guess) const
-        -> std::expected<void, SolverError>;
+    // Note: validate_station_inputs method moved to InputValidator
 
     /**
      * @brief Get boundary conditions for a station

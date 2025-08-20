@@ -1,5 +1,7 @@
 #include "blast/boundary_layer/solver/radiative_equilibrium_solver.hpp"
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
+#include "blast/boundary_layer/solver/expected_utils.hpp"
+#include "blast/boundary_layer/solver/input_validator.hpp"
 #include <cmath>
 #include <format>
 #include <iomanip>
@@ -14,9 +16,9 @@ RadiativeEquilibriumSolver::RadiativeEquilibriumSolver(BoundaryLayerSolver& solv
 auto RadiativeEquilibriumSolver::solve_radiative_equilibrium(double q_wall, double emissivity, double T_infinity)
     -> std::expected<double, std::string> {
     
-    // Validate inputs
-    if (auto validation_result = validate_inputs(q_wall, emissivity, T_infinity); !validation_result) {
-        return std::unexpected(validation_result.error());
+    // Validate inputs using unified validator
+    if (auto validation_result = InputValidator::validate_radiative_equilibrium_inputs(emissivity, T_infinity, q_wall); !validation_result) {
+        return std::unexpected(validation_result.error().message());
     }
     
     const double T_inf_4 = std::pow(T_infinity, 4);
@@ -41,45 +43,14 @@ auto RadiativeEquilibriumSolver::update_wall_temperature_iteration(int station, 
                                                                   const equations::SolutionState& solution,
                                                                   int iteration) -> std::expected<void, SolverError> {
     
-    // Compute all derivatives
-    auto derivatives_result = solver_.compute_all_derivatives(solution);
-    if (!derivatives_result) {
-        return std::unexpected(NumericError(std::format("Failed to compute derivatives for radiative equilibrium: {}",
-                                                        derivatives_result.error().message())));
-    }
-    auto derivatives = derivatives_result.value();
+    // Use unified heat flux computer to eliminate duplication
+    auto& heat_flux_computer = solver_.get_heat_flux_computer();
+    auto heat_flux_data = BLAST_TRY_WITH_CONTEXT(
+        heat_flux_computer.compute_heat_flux_only(solution, bc, xi, station),
+        "Failed to compute heat flux for radiative equilibrium"
+    );
     
-    // Create coefficient inputs
-    auto final_inputs = coefficients::CoefficientInputs{
-        .xi = xi,
-        .F = solution.F,
-        .c = solution.c,
-        .dc_deta = derivatives.dc_deta,
-        .dc_deta2 = derivatives.dc_deta2,
-        .T = solution.T
-    };
-    
-    // Calculate coefficients
-    auto& coeff_calculator = solver_.get_coeff_calculator();
-    auto& xi_derivatives = solver_.get_xi_derivatives();
-    auto coeffs_result = coeff_calculator.calculate(final_inputs, bc, xi_derivatives);
-    if (!coeffs_result) {
-        return std::unexpected(NumericError(std::format("Failed to calculate coefficients for radiative equilibrium: {}",
-                                                        coeffs_result.error().message())));
-    }
-    auto coeffs = coeffs_result.value();
-    
-    // Calculate heat flux
-    auto& heat_flux_calculator = solver_.get_heat_flux_calculator();
-    auto heat_flux_result = heat_flux_calculator.calculate(
-        final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
-    
-    if (!heat_flux_result) {
-        return std::unexpected(NumericError(std::format("Failed to calculate heat flux for radiative equilibrium: {}",
-                                                        heat_flux_result.error().message())));
-    }
-    
-    double q_wall = heat_flux_result.value().q_wall_total_dim;
+    double q_wall = heat_flux_data.q_wall_total_dim;
     
     // Calculate current radiative flux for debugging
     const double T_wall_current = bc.wall.temperature;
@@ -118,45 +89,12 @@ auto RadiativeEquilibriumSolver::compute_heat_flux_analysis(int station, double 
                                                            const equations::SolutionState& solution) const
     -> std::expected<HeatFluxComponents, SolverError> {
     
-    // Compute derivatives
-    auto derivatives_result = solver_.compute_all_derivatives(solution);
-    if (!derivatives_result) {
-        return std::unexpected(NumericError(std::format("Failed to compute derivatives for heat flux analysis: {}",
-                                                        derivatives_result.error().message())));
-    }
-    auto derivatives = derivatives_result.value();
-    
-    // Create coefficient inputs
-    auto final_inputs = coefficients::CoefficientInputs{
-        .xi = xi,
-        .F = solution.F,
-        .c = solution.c,
-        .dc_deta = derivatives.dc_deta,
-        .dc_deta2 = derivatives.dc_deta2,
-        .T = solution.T
-    };
-    
-    // Calculate coefficients
-    auto& coeff_calculator = solver_.get_coeff_calculator();
-    auto& xi_derivatives = solver_.get_xi_derivatives();
-    auto coeffs_result = coeff_calculator.calculate(final_inputs, bc, xi_derivatives);
-    if (!coeffs_result) {
-        return std::unexpected(NumericError(std::format("Failed to calculate coefficients for heat flux analysis: {}",
-                                                        coeffs_result.error().message())));
-    }
-    auto coeffs = coeffs_result.value();
-    
-    // Calculate heat flux
-    auto& heat_flux_calculator = solver_.get_heat_flux_calculator();
-    auto heat_flux_result = heat_flux_calculator.calculate(
-        final_inputs, coeffs, bc, derivatives.dT_deta, station, xi);
-    
-    if (!heat_flux_result) {
-        return std::unexpected(NumericError(std::format("Failed to calculate heat flux for analysis: {}",
-                                                        heat_flux_result.error().message())));
-    }
-    
-    auto heat_flux = heat_flux_result.value();
+    // Use unified heat flux computer for analysis
+    auto& heat_flux_computer = solver_.get_heat_flux_computer();
+    auto heat_flux = BLAST_TRY_WITH_CONTEXT(
+        heat_flux_computer.compute_heat_flux_only(solution, bc, xi, station),
+        "Failed to compute heat flux for analysis"
+    );
     
     // Calculate radiative flux
     const double T_wall = bc.wall.temperature;
@@ -189,22 +127,6 @@ auto RadiativeEquilibriumSolver::calculate_radiative_flux(double T_wall, double 
     return emissivity * STEFAN_BOLTZMANN * (std::pow(T_wall, 4) - std::pow(T_infinity, 4));
 }
 
-auto RadiativeEquilibriumSolver::validate_inputs(double q_wall, double emissivity, double T_infinity)
-    -> std::expected<void, std::string> {
-    
-    if (emissivity <= 0.0) {
-        return std::unexpected(std::format("Invalid emissivity: {} (must be > 0)", emissivity));
-    }
-    
-    if (T_infinity <= 0.0) {
-        return std::unexpected(std::format("Invalid environment temperature: {} K (must be > 0)", T_infinity));
-    }
-    
-    if (!std::isfinite(q_wall)) {
-        return std::unexpected(std::format("Invalid wall heat flux: {} (not finite)", q_wall));
-    }
-    
-    return {};
-}
+// Note: validate_inputs method moved to InputValidator::validate_radiative_equilibrium_inputs
 
 } // namespace blast::boundary_layer::solver

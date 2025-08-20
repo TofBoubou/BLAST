@@ -18,6 +18,8 @@
 #include "convergence_manager.hpp"
 #include "equation_solver.hpp"
 #include "radiative_equilibrium_solver.hpp"
+#include "heat_flux_computer.hpp"
+#include "initial_guess_factory.hpp"
 #include <expected>
 #include <memory>
 #include <string>
@@ -60,6 +62,10 @@ private:
   std::unique_ptr<ConvergenceManager> convergence_manager_;
   std::unique_ptr<EquationSolver> equation_solver_;
   std::unique_ptr<RadiativeEquilibriumSolver> radiative_solver_;
+  
+  // Utility components for eliminating duplication
+  std::unique_ptr<HeatFluxComputer> heat_flux_computer_;
+  std::unique_ptr<InitialGuessFactory> initial_guess_factory_;
 
 public:
   friend class ContinuationMethod;
@@ -83,6 +89,8 @@ public:
   [[nodiscard]] auto get_coeff_calculator() -> coefficients::CoefficientCalculator& { return *coeff_calculator_; }
   
   [[nodiscard]] auto get_heat_flux_calculator() -> coefficients::HeatFluxCalculator& { return *heat_flux_calculator_; }
+  
+  [[nodiscard]] auto get_heat_flux_computer() -> HeatFluxComputer& { return *heat_flux_computer_; }
   
   [[nodiscard]] auto get_xi_derivatives() -> coefficients::XiDerivatives& { return *xi_derivatives_; }
   
@@ -161,8 +169,7 @@ private:
   [[nodiscard]] auto solve_station(int station, double xi, const equations::SolutionState& initial_guess)
       -> std::expected<equations::SolutionState, SolverError>;
 
-  [[nodiscard]] auto create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc,
-                                          double T_edge) const -> std::expected<equations::SolutionState, SolverError>;
+  // Note: create_initial_guess method moved to InitialGuessFactory
                                           
   // Initialize specialized solver components
   auto initialize_solver_components() -> void;

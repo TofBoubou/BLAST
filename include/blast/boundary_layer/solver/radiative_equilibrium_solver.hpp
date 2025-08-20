@@ -132,8 +132,7 @@ private:
      * @param T_infinity Environment temperature [K]
      * @return Error message if invalid
      */
-    [[nodiscard]] static auto validate_inputs(double q_wall, double emissivity, double T_infinity)
-        -> std::expected<void, std::string>;
+    // Note: validate_inputs method moved to InputValidator::validate_radiative_equilibrium_inputs
 
 private:
     BoundaryLayerSolver& solver_;
