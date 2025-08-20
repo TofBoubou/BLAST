@@ -11,50 +11,36 @@ auto ContinuationMethod::solve_with_continuation(
     BoundaryLayerSolver& solver, int station, double xi, const io::Configuration& target_config,
     const equations::SolutionState& initial_guess) -> std::expected<ContinuationResult, SolverError> {
 
-  std::cout << "[DEBUG] $$$$$ ENTERING solve_with_continuation $$$$$" << std::endl;
   
   double lambda = 0.0;
   double lambda_step = LAMBDA_STEP_INITIAL;
   equations::SolutionState current_solution = initial_guess;
   const auto original_config = solver.config();
 
-  std::cout << "[DEBUG] $$$$$ STARTING CONTINUATION LOOP - MAX_STEPS=" << MAX_STEPS << " $$$$$" << std::endl;
   for (int step = 0; step < MAX_STEPS; ++step) {
-    std::cout << "[DEBUG] $$$$$ CONTINUATION STEP " << step << " - lambda=" << lambda << " lambda_step=" << lambda_step << " $$$$$" << std::endl;
     if (lambda + lambda_step > 1.0) {
       lambda_step = 1.0 - lambda;
-      std::cout << "[DEBUG] $$$$$ Adjusting lambda_step to reach 1.0: lambda_step=" << lambda_step << " $$$$$" << std::endl;
     }
 
     double lambda_try = lambda + lambda_step;
-    std::cout << "[DEBUG] $$$$$ Trying lambda_try=" << lambda_try << " (lambda=" << lambda << " + lambda_step=" << lambda_step << ") $$$$$" << std::endl;
     auto interp_config = interpolate_config(target_config, lambda_try);
 
     solver.set_config(interp_config);
     solver.in_continuation_ = true;
-    std::cout << "[DEBUG] ##### CONTINUATION METHOD CALLING solve_station #####" << std::endl;
     auto result = solver.solve_station(station, xi, current_solution);
     solver.in_continuation_ = false;
     solver.set_config(original_config);
 
     if (result) {
-      std::cout << "[DEBUG] $$$$$ STEP " << step << " SUCCEEDED - lambda_try=" << lambda_try << " $$$$$" << std::endl;
       current_solution = result.value();
-      std::cout << "[DEBUG] $$$$$ BEFORE UPDATE: lambda=" << lambda << " $$$$$" << std::endl;
       lambda = lambda_try;
-      std::cout << "[DEBUG] $$$$$ AFTER UPDATE: lambda=" << lambda << " $$$$$" << std::endl;
 
       if (std::abs(lambda - 1.0) < 1e-10) {
-        std::cout << "[DEBUG] $$$$$ CONTINUATION COMPLETE - RETURNING SUCCESS $$$$$" << std::endl;
         return ContinuationResult{.solution = current_solution, .success = true, .final_lambda = lambda};
       }
-      
-      std::cout << "[DEBUG] $$$$$ CONTINUING - lambda=" << lambda << " < 1.0 $$$$$" << std::endl;
 
       // Increase step after success
-      std::cout << "[DEBUG] $$$$$ BEFORE STEP INCREASE: lambda_step=" << lambda_step << " $$$$$" << std::endl;
       lambda_step = std::min(lambda_step * STEP_INCREASE_FACTOR, LAMBDA_STEP_MAX);
-      std::cout << "[DEBUG] $$$$$ AFTER STEP INCREASE: lambda_step=" << lambda_step << " (FACTOR=" << STEP_INCREASE_FACTOR << ", MAX=" << LAMBDA_STEP_MAX << ") $$$$$" << std::endl;
 
     } else {
       // Check if the failure was due to NaN detection
