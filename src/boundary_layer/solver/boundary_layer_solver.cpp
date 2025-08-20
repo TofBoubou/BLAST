@@ -14,41 +14,7 @@
 #include <numeric>
 #include <vector>
 
-namespace {
-  constexpr double STEFAN_BOLTZMANN = 5.670374419e-8; // W/(m²·K⁴)
-  
-  auto solve_radiative_equilibrium(double q_wall, double emissivity, double T_infinity) 
-      -> std::expected<double, std::string> {
-    
-    if (emissivity <= 0.0) {
-      return std::unexpected(std::format("Invalid emissivity: {} (must be > 0)", emissivity));
-    }
-    
-    if (T_infinity <= 0.0) {
-      return std::unexpected(std::format("Invalid environment temperature: {} K (must be > 0)", T_infinity));
-    }
-    
-    if (!std::isfinite(q_wall)) {
-      return std::unexpected(std::format("Invalid wall heat flux: {} (not finite)", q_wall));
-    }
-    
-    const double T_inf_4 = std::pow(T_infinity, 4);
-    const double T_wall_4 = q_wall / (emissivity * STEFAN_BOLTZMANN) + T_inf_4;
-    
-    if (T_wall_4 <= 0.0) {
-      return std::unexpected(std::format("Radiative equilibrium solution invalid: T_wall^4 = {} <= 0 (q_wall={}, ε={}, T_∞={})", 
-                                        T_wall_4, q_wall, emissivity, T_infinity));
-    }
-    
-    const double T_wall = std::pow(T_wall_4, 0.25);
-    
-    if (!std::isfinite(T_wall) || T_wall <= 0.0) {
-      return std::unexpected(std::format("Invalid computed wall temperature: {} K", T_wall));
-    }
-    
-    return T_wall;
-  }
-}
+// Note: solve_radiative_equilibrium function has been moved to RadiativeEquilibriumSolver
 
 namespace blast::boundary_layer::solver {
 
@@ -91,10 +57,31 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
   // Create derivative calculator
   derivative_calculator_ = std::make_unique<coefficients::DerivativeCalculator>(grid_->d_eta());
 
-  relaxation_controller_ =
-      std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_stagnation_point());
-
   continuation_ = std::make_unique<ContinuationMethod>();
+  
+  // Initialize specialized solver components
+  initialize_solver_components();
+}
+
+auto BoundaryLayerSolver::initialize_solver_components() -> void {
+  // Create specialized solver components
+  station_solver_ = std::make_unique<StationSolver>(*this, mixture_, config_);
+  convergence_manager_ = std::make_unique<ConvergenceManager>(*this, mixture_, config_);
+  equation_solver_ = std::make_unique<EquationSolver>(*this, mixture_, config_);
+  radiative_solver_ = std::make_unique<RadiativeEquilibriumSolver>(*this, config_);
+  
+  // Set up cross-dependencies
+  convergence_manager_->set_radiative_solver(radiative_solver_.get());
+  
+  // Set stable configuration for station solver if continuation is configured
+  if (original_config_.continuation.wall_temperature_stable > 0) {
+    StationSolver::StableGuessConfig stable_config{
+      .wall_temperature_stable = original_config_.continuation.wall_temperature_stable,
+      .edge_temperature_stable = original_config_.continuation.edge_temperature_stable,
+      .pressure_stable = original_config_.continuation.pressure_stable
+    };
+    station_solver_->set_stable_config(stable_config);
+  }
 }
 
 auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> {
@@ -284,379 +271,23 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 
 auto BoundaryLayerSolver::solve_station(int station, double xi, const equations::SolutionState& initial_guess)
     -> std::expected<equations::SolutionState, SolverError> {
-
-
-  // Validate input parameters
-  if (station < 0) {
-    return std::unexpected(
-        InitializationError(std::format("Invalid station number: {} (must be non-negative)", station)));
-  }
-
-  if (!std::isfinite(xi) || xi < 0.0) {
-    return std::unexpected(
-        InitializationError(std::format("Invalid xi coordinate: {} (must be finite and non-negative)", xi)));
-  }
-
-  // Validate initial guess dimensions
-  const auto expected_n_eta = grid_->n_eta();
-  const auto expected_n_species = mixture_.n_species();
-
-  if (initial_guess.F.size() != expected_n_eta || initial_guess.T.size() != expected_n_eta ||
-      initial_guess.g.size() != expected_n_eta) {
-    return std::unexpected(InitializationError(
-        std::format("Initial guess field dimensions mismatch: expected {} eta points", expected_n_eta)));
-  }
-
-  if (initial_guess.c.rows() != expected_n_species || initial_guess.c.cols() != expected_n_eta) {
-    return std::unexpected(InitializationError(std::format(
-        "Initial guess species matrix dimensions mismatch: expected {}x{}", expected_n_species, expected_n_eta)));
-  }
-
-  // Check consistency between station and xi coordinates
-  if (station > 0) {
-    const auto& xi_coords = grid_->xi_coordinates();
-    if (station >= static_cast<int>(xi_coords.size())) {
-      return std::unexpected(InitializationError(
-          std::format("Station {} exceeds available xi coordinates (max: {})", station, xi_coords.size() - 1)));
-    }
-
-    // Allow some tolerance for floating point comparison
-    const double expected_xi = xi_coords[station];
-    if (std::abs(xi - expected_xi) > 1e-10) {
-      return std::unexpected(InitializationError(
-          std::format("Xi coordinate mismatch for station {}: provided {}, expected {}", station, xi, expected_xi)));
-    }
-  }
-
-  // Get boundary conditions
-  auto bc_result =
-      (station == 0)
-          ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation,
-                                                     mixture_)
-          : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
-                                                        config_.wall_parameters, config_.simulation, mixture_);
-
-  if (!bc_result) {
-    return std::unexpected(BoundaryConditionError(
-        std::format("Failed to get boundary conditions for station {}: {}", station, bc_result.error().message())));
-  }
-
-  auto bc = bc_result.value();
-  auto solution = initial_guess;
-
-  // Helper to build a stable initial guess for continuation method
-  auto compute_stable_guess = [&]() -> std::expected<equations::SolutionState, SolverError> {
-    io::Configuration stable_config = original_config_;
-    if (!stable_config.wall_parameters.wall_temperatures.empty()) {
-      stable_config.wall_parameters.wall_temperatures[0] = original_config_.continuation.wall_temperature_stable;
-    }
-    if (!stable_config.outer_edge.edge_points.empty()) {
-      stable_config.outer_edge.edge_points[0].temperature = original_config_.continuation.edge_temperature_stable;
-      stable_config.outer_edge.edge_points[0].pressure = original_config_.continuation.pressure_stable;
-    }
-
-    auto bc_stable = conditions::create_stagnation_conditions(stable_config.outer_edge, stable_config.wall_parameters,
-                                                              stable_config.simulation, mixture_);
-    if (!bc_stable) {
-      return std::unexpected(BoundaryConditionError(
-          std::format("Failed to create stable boundary conditions: {}", bc_stable.error().message())));
-    }
-    double T_edge_stable = stable_config.outer_edge.edge_points[0].temperature;
-    return create_initial_guess(station, xi, bc_stable.value(), T_edge_stable);
-  };
-
-  if (station == 0) {
-    relaxation_controller_ =
-        std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_stagnation_point());
-  } else {
-    relaxation_controller_ =
-        std::make_unique<AdaptiveRelaxationController>(AdaptiveRelaxationController::Config::for_downstream_station());
-  }
-
-  auto convergence_result = iterate_station_adaptive(station, xi, bc, solution);
-
-  if (!convergence_result) {
-    if (continuation_ && !in_continuation_) {
-      auto stable_guess = compute_stable_guess();
-      if (stable_guess) {
-        auto cont_result =
-            continuation_->solve_with_continuation(*this, station, xi, original_config_, stable_guess.value());
-
-        if (cont_result && cont_result.value().success) {
-          return cont_result.value().solution;
-        }
-      }
-    }
-
-    return std::unexpected(convergence_result.error());
-  }
-
-  const auto& conv_info = convergence_result.value();
-
-  if (!conv_info.converged) {
-    // If we're in continuation mode, return failure immediately so continuation can handle it
-    if (in_continuation_) {
-      // Check if it was a NaN failure
-      if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
-        /*         std::cout << "[DEBUG] CONTINUATION FAILED - NaN detected at station " << station
-                          << " after " << conv_info.iterations << " iterations" << std::endl; */
-        return std::unexpected(ConvergenceError(
-            std::format("NaN detected during continuation at station {} iteration {}", station, conv_info.iterations)));
-      } else {
-        /*         std::cout << "[DEBUG] CONTINUATION FAILED - No convergence at station " << station
-                          << " after " << conv_info.iterations << " iterations (max_residual="
-                          << std::scientific << conv_info.max_residual() << ")" << std::endl; */
-        return std::unexpected(ConvergenceError(
-            std::format("Station {} failed to converge during continuation after {} iterations (residual={})", station,
-                        conv_info.iterations, conv_info.max_residual())));
-      }
-    }
-
-    // Try continuation if direct solution failed
-    if (continuation_ && !in_continuation_ && conv_info.max_residual() < 1e10) {
-      auto stable_guess = compute_stable_guess();
-      if (stable_guess) {
-        auto cont_result =
-            continuation_->solve_with_continuation(*this, station, xi, original_config_, stable_guess.value());
-
-        if (cont_result && cont_result.value().success) {
-          return cont_result.value().solution;
-        }
-      }
-    }
-
-    return std::unexpected(
-        ConvergenceError(std::format("Station {} failed to converge after {} iterations (residual={})", station,
-                                     conv_info.iterations, conv_info.max_residual())));
-  }
-
-  return solution;
+  
+  // Set continuation mode for station solver
+  station_solver_->set_continuation_mode(in_continuation_);
+  
+  // Delegate to specialized StationSolver
+  return station_solver_->solve_station(station, xi, initial_guess);
 }
 
-auto BoundaryLayerSolver::iterate_station_adaptive(int station, double xi, const conditions::BoundaryConditions& bc,
-                                                   equations::SolutionState& solution)
-    -> std::expected<ConvergenceInfo, SolverError> {
-
-  const auto n_eta = grid_->n_eta();
-  const auto n_species = mixture_.n_species();
-
-  auto bc_dynamic = bc;
-  ConvergenceInfo conv_info;
-
-  // Create pipeline
-  auto pipeline = SolverPipeline::create_for_solver(*this);
-
-  for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
-    const auto solution_old = solution;
-
-    // Initialize coefficients and inputs
-    coefficients::CoefficientSet coeffs;
-    coefficients::CoefficientInputs inputs{.xi = xi,
-                                           .F = solution.F,
-                                           .c = solution.c,
-                                           .dc_deta = core::Matrix<double>(),
-                                           .dc_deta2 = core::Matrix<double>(),
-                                           .T = solution.T};
-
-    // Create context
-    SolverContext ctx{.solution = solution,
-                      .solution_old = const_cast<equations::SolutionState&>(solution_old),
-                      .bc = bc_dynamic,
-                      .coeffs = coeffs,
-                      .mixture = mixture_,
-                      .station = station,
-                      .xi = xi,
-                      .iteration = iter,
-                      .solver = *this,
-                      .grid = *grid_,
-                      .xi_derivatives = *xi_derivatives_};
-
-    // Execute pipeline
-    auto pipeline_result = pipeline.execute_all(ctx);
-    if (!pipeline_result) {
-      return std::unexpected(NumericError(std::format("Pipeline execution failed at station {} iteration {}: {}",
-                                                      station, iter, pipeline_result.error().what())));
-    }
-
-    // Complete new solution construction
-    equations::SolutionState solution_new(n_eta, n_species);
-    solution_new.V = solution.V;
-    solution_new.F = solution.F;
-    solution_new.g = solution.g;
-    solution_new.c = solution.c;
-    solution_new.T = solution.T;
-
-    // Convergence check
-    conv_info = check_convergence(solution_old, solution_new);
-    conv_info.iterations = iter + 1;
-
-    if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
-      if (in_continuation_) {
-        // When in continuation, break the iteration loop and return non-converged result
-        // This allows the continuation method to handle the failure by reducing step size
-        conv_info.converged = false;
-        conv_info.iterations = iter + 1;
-        return conv_info;
-      } else {
-        return std::unexpected(
-            NumericError(std::format("NaN detected in residuals at station {} iteration {}", station, iter)));
-      }
-    }
-
-    // Adaptive relaxation
-    auto adaptive_factor_result = relaxation_controller_->adapt_relaxation_factor(conv_info, iter);
-    if (!adaptive_factor_result) {
-      return std::unexpected<SolverError>(adaptive_factor_result.error());
-    }
-    double adaptive_factor = adaptive_factor_result.value();
-    /*     std::cout << "Adaptive relaxation factor: " << std::scientific << std::setprecision(3) << adaptive_factor
-                  << " (max residual: " << conv_info.max_residual() << ")" << std::endl; */
-
-    // Check convergence first
-    if (conv_info.converged) {
-      // If converged, use the new solution directly without further relaxation
-      solution = solution_new;
-      return conv_info;
-    }
-
-    // Apply relaxation only if not converged
-    solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
-    
-    // Update wall temperature for radiative equilibrium AFTER checking convergence
-    // This prevents changing boundary conditions after convergence is achieved
-    if (config_.wall_parameters.emissivity > 0.0) {
-      
-      auto derivatives_result = compute_all_derivatives(solution);
-      if (derivatives_result) {
-        auto derivatives = derivatives_result.value();
-        
-        auto final_inputs = coefficients::CoefficientInputs{
-          .xi = xi,
-          .F = solution.F,
-          .c = solution.c,
-          .dc_deta = derivatives.dc_deta,
-          .dc_deta2 = derivatives.dc_deta2,
-          .T = solution.T
-        };
-        
-        auto coeffs_result = coeff_calculator_->calculate(final_inputs, bc_dynamic, *xi_derivatives_);
-        if (coeffs_result) {
-          auto coeffs = coeffs_result.value();
-          
-          auto heat_flux_result = heat_flux_calculator_->calculate(
-            final_inputs, coeffs, bc_dynamic, derivatives.dT_deta, station, xi);
-          
-          if (heat_flux_result) {
-            double q_wall = heat_flux_result.value().q_wall_total_dim;
-            
-            // Calculate radiative flux: q_rad = ε*σ*(T_wall^4 - T_∞^4)
-            const double STEFAN_BOLTZMANN = 5.670374419e-8;
-            const double T_wall_current = bc_dynamic.wall.temperature;
-            const double T_inf = config_.wall_parameters.environment_temperature;
-            const double q_rad = config_.wall_parameters.emissivity * STEFAN_BOLTZMANN * 
-                                (std::pow(T_wall_current, 4) - std::pow(T_inf, 4));
-            
-            // Print convergence info
-/*             std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
-                                   "q_wall-q_rad={:.2e} W/m², T_wall={:.1f} K", 
-                                   station, iter, q_wall, q_rad, q_wall - q_rad, T_wall_current) << std::endl; */
-            
-          auto T_wall_result = solve_radiative_equilibrium(
-            q_wall, 
-            config_.wall_parameters.emissivity,
-            config_.wall_parameters.environment_temperature
-          );
-
-          if (!T_wall_result) {
-            return std::unexpected(NumericError(std::format("Radiative equilibrium failed: {}", T_wall_result.error())));
-          }
-
-          double T_wall_old = bc_dynamic.wall.temperature;
-          bc_dynamic.wall.temperature = T_wall_result.value();
-          
-/*           std::cout << std::format("[DEBUG] T_wall update: {:.1f} K -> {:.1f} K (delta={:.1f} K)", 
-                                   T_wall_old, bc_dynamic.wall.temperature, 
-                                   bc_dynamic.wall.temperature - T_wall_old) << std::endl; */
-          }
-        }
-      }
-    }
-
-    // DEBUG: Print iteration info during continuation
-    /*     if (in_continuation_ && (iter % 100 == 0 || iter < 10)) {
-          std::cout << "[DEBUG] ITER " << iter << " at station " << station
-                    << " - max_residual=" << std::scientific << conv_info.max_residual()
-                    << " adaptive_factor=" << adaptive_factor << std::endl;
-        } */
-
-    // Divergence detection
-    if (conv_info.max_residual() > 1e6) {
-      return std::unexpected(NumericError(std::format("Solution diverged at station {} iteration {} (residual={})",
-                                                      station, iter, conv_info.max_residual())));
-    }
-  }
-
-  // Print final heat flux summary if radiative equilibrium was used
-  if (config_.wall_parameters.emissivity > 0.0) {
-    auto final_derivatives_result = compute_all_derivatives(solution);
-    if (final_derivatives_result) {
-      auto final_derivatives = final_derivatives_result.value();
-      
-      auto final_inputs = coefficients::CoefficientInputs{
-        .xi = xi,
-        .F = solution.F,
-        .c = solution.c,
-        .dc_deta = final_derivatives.dc_deta,
-        .dc_deta2 = final_derivatives.dc_deta2,
-        .T = solution.T
-      };
-      
-      auto final_coeffs_result = coeff_calculator_->calculate(final_inputs, bc_dynamic, *xi_derivatives_);
-      if (final_coeffs_result) {
-        auto final_coeffs = final_coeffs_result.value();
-        
-        auto final_heat_flux_result = heat_flux_calculator_->calculate(
-          final_inputs, final_coeffs, bc_dynamic, final_derivatives.dT_deta, station, xi);
-        
-        if (final_heat_flux_result) {
-          auto final_heat_flux = final_heat_flux_result.value();
-          
-          // Calculate final radiative flux
-          const double STEFAN_BOLTZMANN = 5.670374419e-8;
-          const double T_wall_final = bc_dynamic.wall.temperature;
-          const double T_inf = config_.wall_parameters.environment_temperature;
-          const double q_rad_final = config_.wall_parameters.emissivity * STEFAN_BOLTZMANN * 
-                                    (std::pow(T_wall_final, 4) - std::pow(T_inf, 4));
-          
-/*           std::cout << std::format("\n=== FINAL HEAT FLUX SUMMARY - Station {} ===", station) << std::endl;
-          std::cout << std::format("  Wall Temperature: {:.1f} K", T_wall_final) << std::endl;
-          std::cout << std::format("  Conductive flux:  {:.2e} W/m²", final_heat_flux.q_wall_conductive_dim) << std::endl;
-          std::cout << std::format("  Diffusive flux:   {:.2e} W/m²", final_heat_flux.q_wall_diffusive_dim) << std::endl;
-          std::cout << std::format("  TOTAL flux:       {:.2e} W/m²", final_heat_flux.q_wall_total_dim) << std::endl;
-          std::cout << std::format("  Radiative flux:   {:.2e} W/m²", q_rad_final) << std::endl;
-          std::cout << std::format("  Balance (q-qrad): {:.2e} W/m²", final_heat_flux.q_wall_total_dim - q_rad_final) << std::endl;
-          std::cout << "============================================\n" << std::endl; */
-        }
-      }
-    }
-  }
-
-  // Only reach here if max iterations reached without convergence
-  return conv_info;
-}
+// Note: iterate_station_adaptive method has been moved to ConvergenceManager
 
 auto BoundaryLayerSolver::solve_momentum_equation(const equations::SolutionState& solution,
                                                   const coefficients::CoefficientSet& coeffs,
                                                   const conditions::BoundaryConditions& bc, double xi)
     -> std::expected<std::vector<double>, SolverError> {
-
-  auto result = equations::solve_momentum(solution.F, coeffs, bc, *xi_derivatives_, solution.V, xi, grid_->d_eta());
-
-  if (!result) {
-    return std::unexpected(NumericError(std::format("Momentum equation failed: {}", result.error().message())));
-  }
-
-  return result.value();
+  
+  // Delegate to specialized EquationSolver
+  return equation_solver_->solve_momentum_equation(solution, coeffs, bc, xi);
 }
 
 auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& solution,
@@ -665,25 +296,9 @@ auto BoundaryLayerSolver::solve_energy_equation(const equations::SolutionState& 
                                                 const conditions::BoundaryConditions& bc,
                                                 const thermophysics::MixtureInterface& mixture, int station)
     -> std::expected<std::vector<double>, SolverError> {
-
-  // Get dF/deta from unified derivative calculation
-  auto all_derivatives_result = compute_all_derivatives(solution);
-  if (!all_derivatives_result) {
-    return std::unexpected(NumericError(std::format("Failed to compute derivatives for energy equation: {}",
-                                                    all_derivatives_result.error().message())));
-  }
-  const auto& dF_deta = all_derivatives_result.value().dF_deta;
-
-  auto result = equations::solve_energy(solution.g, inputs, coeffs, bc, *xi_derivatives_, config_.simulation,
-                                        solution.F, dF_deta, solution.V, mixture, station, grid_->d_eta());
-
-  if (!result) {
-    return std::unexpected(NumericError(std::format("Energy equation failed: {}", result.error().message())));
-  }
-
-  auto g_solution = result.value();
-
-  return g_solution;
+  
+  // Delegate to specialized EquationSolver
+  return equation_solver_->solve_energy_equation(solution, inputs, coeffs, bc, mixture, station);
 }
 
 auto BoundaryLayerSolver::solve_species_equations(const equations::SolutionState& solution,
@@ -691,15 +306,9 @@ auto BoundaryLayerSolver::solve_species_equations(const equations::SolutionState
                                                   const coefficients::CoefficientSet& coeffs,
                                                   const conditions::BoundaryConditions& bc, int station)
     -> std::expected<core::Matrix<double>, SolverError> {
-
-  auto result = equations::solve_species(solution.c, inputs, coeffs, bc, *xi_derivatives_, mixture_, config_.simulation,
-                                         solution.F, solution.V, station, grid_->d_eta());
-
-  if (!result) {
-    return std::unexpected(NumericError(std::format("Species equations failed: {}", result.error().message())));
-  }
-
-  return result.value();
+  
+  // Delegate to specialized EquationSolver
+  return equation_solver_->solve_species_equations(solution, inputs, coeffs, bc, station);
 }
 
 auto BoundaryLayerSolver::update_temperature_field(std::span<const double> g_field,
@@ -707,68 +316,12 @@ auto BoundaryLayerSolver::update_temperature_field(std::span<const double> g_fie
                                                    const conditions::BoundaryConditions& bc,
                                                    std::span<const double> current_temperatures)
     -> std::expected<std::vector<double>, SolverError> {
-
-  const auto n_eta = g_field.size();
-  std::vector<double> enthalpy_field(n_eta);
-
-  // Convert g (dimensionless enthalpy) to dimensional enthalpy
-  for (std::size_t i = 0; i < n_eta; ++i) {
-    enthalpy_field[i] = g_field[i] * bc.he();
-  }
-
-  auto result = h2t_solver_->solve(enthalpy_field, composition, bc, current_temperatures);
-  if (!result) {
-    return std::unexpected(NumericError(std::format("Temperature solve failed: {}", result.error().message())));
-  }
-
-  return result.value().temperatures;
+  
+  // Delegate to specialized EquationSolver
+  return equation_solver_->update_temperature_field(g_field, composition, bc, current_temperatures);
 }
 
-auto BoundaryLayerSolver::check_convergence(const equations::SolutionState& old_solution,
-                                            const equations::SolutionState& new_solution) const noexcept
-    -> ConvergenceInfo {
-
-  ConvergenceInfo info;
-  const double tol = config_.numerical.convergence_tolerance;
-
-  // Compute L2 norms of residuals
-  auto compute_residual = [](const auto& old_field, const auto& new_field) {
-    double sum = 0.0;
-    for (std::size_t i = 0; i < old_field.size(); ++i) {
-      const double diff = new_field[i] - old_field[i];
-      sum += diff * diff;
-    }
-    return std::sqrt(sum / old_field.size());
-  };
-
-  info.residual_F = compute_residual(old_solution.F, new_solution.F);
-  info.residual_g = compute_residual(old_solution.g, new_solution.g);
-
-  // Species residual (matrix)
-  double c_sum = 0.0;
-  std::size_t c_count = 0;
-  for (std::size_t i = 0; i < old_solution.c.rows(); ++i) {
-    for (std::size_t j = 0; j < old_solution.c.cols(); ++j) {
-      const double diff = new_solution.c(i, j) - old_solution.c(i, j);
-      c_sum += diff * diff;
-      ++c_count;
-    }
-  }
-  info.residual_c = std::sqrt(c_sum / c_count);
-
-  info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
-
-  std::cout << "CONVERGENCE : " << info.residual_F << " " << info.residual_g << " " << info.residual_c 
-            << " | tol=" << tol << " | converged=" << info.converged << std::endl;
-  // DEBUG: Always print convergence info during continuation
-/*     if (in_continuation_) {
-      std::cout << "[DEBUG] CONVERGENCE CHECK - tol=" << std::scientific << tol
-                << " | F_res=" << info.residual_F << " | g_res=" << info.residual_g
-                << " | c_res=" << info.residual_c << " | converged=" << info.converged << std::endl;
-    } */
-
-  return info;
-}
+// Note: check_convergence method has been moved to ConvergenceManager
 
 auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc,
                                                double T_edge) const
@@ -891,32 +444,7 @@ auto BoundaryLayerSolver::create_initial_guess(int station, double xi, const con
   return guess;
 }
 
-auto BoundaryLayerSolver::apply_relaxation_differential(const equations::SolutionState& old_solution,
-                                                        const equations::SolutionState& new_solution,
-                                                        double base_factor) const -> equations::SolutionState {
-
-  auto relaxed = new_solution;
-
-  const double alpha_F = base_factor;
-  const double alpha_g = base_factor * 1;
-  const double alpha_c = base_factor * 1;
-  const double alpha_T = base_factor * 1;
-
-  for (std::size_t i = 0; i < relaxed.F.size() - 1; ++i) {
-    relaxed.F[i] = (1.0 - alpha_F) * old_solution.F[i] + alpha_F * new_solution.F[i];
-    relaxed.g[i] = (1.0 - alpha_g) * old_solution.g[i] + alpha_g * new_solution.g[i];
-    // relaxed.T[i] = (1.0 - alpha_T) * old_solution.T[i] + alpha_T *
-    // new_solution.T[i];
-  }
-
-  for (std::size_t i = 0; i < relaxed.c.rows(); ++i) {
-    for (std::size_t j = 0; j < relaxed.c.cols(); ++j) {
-      relaxed.c(i, j) = (1.0 - alpha_c) * old_solution.c(i, j) + alpha_c * new_solution.c(i, j);
-    }
-  }
-
-  return relaxed;
-}
+// Note: apply_relaxation_differential method has been moved to ConvergenceManager
 
 auto BoundaryLayerSolver::compute_all_derivatives(const equations::SolutionState& solution) const
     -> std::expected<coefficients::UnifiedDerivativeState, SolverError> {

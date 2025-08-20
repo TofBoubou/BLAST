@@ -6,13 +6,13 @@ simulation:
   consider_thermal_diffusion: false
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: false
+  catalytic_wall: true
   adiabatic: false
 
 numerical:
-  n_eta: 20                       
+  n_eta: 200                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-9 
+  convergence_tolerance: 1.0e-10
   max_iterations: 10000000
 
 mixture:
@@ -47,9 +47,9 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [3000]
+  temperatures: [5000]
   emissivity: 0.8
-  environment_temperature: 300
+  environment_temperature: 1
 
 abaque:
   enabled: false
@@ -58,7 +58,7 @@ abaque:
   temperature_points: 30
 
 continuation:
-  wall_temperature_stable: 3000.0
+  wall_temperature_stable: 5000.0
   edge_temperature_stable: 5905.5
   pressure_stable: 7000.0
 

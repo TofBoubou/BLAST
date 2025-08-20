@@ -39,16 +39,16 @@ public:
     // Adaptation factors
     double strong_increase = 1.01;   // Strong increase for ratio < 0.8
     double moderate_increase = 1.01; // Moderate increase for [0.8, 1.0]
-    double decrease_factor = 1;      // Decrease for ratio > X
-    double oscillation_penalty = 1;  // Penalty factor for oscillations
+    double decrease_factor = 0.7;      // Decrease for ratio > X
+    double oscillation_penalty = 0.9;  // Penalty factor for oscillations
 
     // Specialized configurations
     [[nodiscard]] static auto for_stagnation_point() -> Config {
       Config config;
       config.initial_factor = 0.01;
       config.max_factor = 1;          // More conservative
-      config.strong_increase = 1.0;   // Slower growth
-      config.moderate_increase = 1.0; // Very moderate
+      config.strong_increase = 1.001;   // Slower growth
+      config.moderate_increase = 1.001; // Very moderate
       return config;
     }
 

@@ -14,6 +14,10 @@
 #include "continuation_method.hpp"
 #include "solver_errors.hpp"
 #include "solver_steps.hpp"
+#include "station_solver.hpp"
+#include "convergence_manager.hpp"
+#include "equation_solver.hpp"
+#include "radiative_equilibrium_solver.hpp"
 #include <expected>
 #include <memory>
 #include <string>
@@ -46,14 +50,23 @@ private:
   std::unique_ptr<thermodynamics::EnthalpyTemperatureSolver> h2t_solver_;
   std::unique_ptr<coefficients::XiDerivatives> xi_derivatives_;
   std::unique_ptr<coefficients::DerivativeCalculator> derivative_calculator_;
-  std::unique_ptr<AdaptiveRelaxationController> relaxation_controller_;
   std::unique_ptr<coefficients::HeatFluxCalculator> heat_flux_calculator_;
   std::unique_ptr<ContinuationMethod> continuation_;
   io::Configuration original_config_;
   bool in_continuation_ = false;
+  
+  // Specialized solver components
+  std::unique_ptr<StationSolver> station_solver_;
+  std::unique_ptr<ConvergenceManager> convergence_manager_;
+  std::unique_ptr<EquationSolver> equation_solver_;
+  std::unique_ptr<RadiativeEquilibriumSolver> radiative_solver_;
 
 public:
   friend class ContinuationMethod;
+  friend class StationSolver;
+  friend class ConvergenceManager;
+  friend class EquationSolver;
+  friend class RadiativeEquilibriumSolver;
 
   explicit BoundaryLayerSolver(const thermophysics::MixtureInterface& mixture, const io::Configuration& config);
 
@@ -68,6 +81,16 @@ public:
   [[nodiscard]] auto get_grid() -> const grid::BoundaryLayerGrid& { return *grid_; }
 
   [[nodiscard]] auto get_coeff_calculator() -> coefficients::CoefficientCalculator& { return *coeff_calculator_; }
+  
+  [[nodiscard]] auto get_heat_flux_calculator() -> coefficients::HeatFluxCalculator& { return *heat_flux_calculator_; }
+  
+  [[nodiscard]] auto get_xi_derivatives() -> coefficients::XiDerivatives& { return *xi_derivatives_; }
+  
+  [[nodiscard]] auto get_convergence_manager() -> ConvergenceManager& { return *convergence_manager_; }
+  
+  [[nodiscard]] auto get_continuation() -> ContinuationMethod* { return continuation_.get(); }
+  
+  [[nodiscard]] auto get_original_config() const -> const io::Configuration& { return original_config_; }
 
   // =============================================================================
   // PUBLIC METHODS FOR STEP ACCESS
@@ -99,6 +122,11 @@ public:
                                              const coefficients::CoefficientSet& coeffs,
                                              const conditions::BoundaryConditions& bc,
                                              int station) -> std::expected<core::Matrix<double>, SolverError>;
+
+  [[nodiscard]] auto update_temperature_field(std::span<const double> g_field, const core::Matrix<double>& composition,
+                                              const conditions::BoundaryConditions& bc,
+                                              std::span<const double> current_temperatures)
+      -> std::expected<std::vector<double>, SolverError>;
 
   auto set_wall_temperature(double Tw) -> void {
     if (!config_.wall_parameters.wall_temperatures.empty()) {
@@ -133,24 +161,11 @@ private:
   [[nodiscard]] auto solve_station(int station, double xi, const equations::SolutionState& initial_guess)
       -> std::expected<equations::SolutionState, SolverError>;
 
-  [[nodiscard]] auto
-  iterate_station_adaptive(int station, double xi, const conditions::BoundaryConditions& bc,
-                           equations::SolutionState& solution) -> std::expected<ConvergenceInfo, SolverError>;
-
-  [[nodiscard]] auto update_temperature_field(std::span<const double> g_field, const core::Matrix<double>& composition,
-                                              const conditions::BoundaryConditions& bc,
-                                              std::span<const double> current_temperatures)
-      -> std::expected<std::vector<double>, SolverError>;
-
-  [[nodiscard]] auto check_convergence(const equations::SolutionState& old_solution,
-                                       const equations::SolutionState& new_solution) const noexcept -> ConvergenceInfo;
-
   [[nodiscard]] auto create_initial_guess(int station, double xi, const conditions::BoundaryConditions& bc,
                                           double T_edge) const -> std::expected<equations::SolutionState, SolverError>;
-
-  [[nodiscard]] auto apply_relaxation_differential(const equations::SolutionState& old_solution,
-                                                   const equations::SolutionState& new_solution,
-                                                   double base_factor) const -> equations::SolutionState;
+                                          
+  // Initialize specialized solver components
+  auto initialize_solver_components() -> void;
 };
 
 } // namespace blast::boundary_layer::solver
