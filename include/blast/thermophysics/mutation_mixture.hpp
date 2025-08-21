@@ -1,5 +1,6 @@
 #pragma once
 #include "mixture_interface.hpp"
+#include <cassert>
 #include <memory>
 #include <mutation++/mutation++.h>
 #include <vector>

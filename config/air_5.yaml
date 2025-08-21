@@ -10,13 +10,13 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 100                       
+  n_eta: 200                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-10
-  max_iterations: 10000000
+  convergence_tolerance: 1.0e-9
+  max_iterations: 10000
 
 mixture:
-  name: air_5
+  name: CO2_5
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
   thermal_conductivity_algorithm: chapman_enskog_ldlt
@@ -47,8 +47,8 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [1500]
-  emissivity: 0.8
+  temperatures: [5000]
+  emissivity: 0
   environment_temperature: 1
 
 abaque:
@@ -59,7 +59,7 @@ abaque:
 
 continuation:
   wall_temperature_stable: 300
-  edge_temperature_stable: 500
+  edge_temperature_stable: 526.181601661059
   pressure_stable: 10386.998246546822
 
 # ./blast config/default.yaml test_output
