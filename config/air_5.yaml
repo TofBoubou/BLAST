@@ -13,10 +13,10 @@ numerical:
   n_eta: 100                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9
-  max_iterations: 10000
+  max_iterations: 100000
 
 mixture:
-  name: air_7
+  name: air_5
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
   thermal_conductivity_algorithm: chapman_enskog_ldlt
@@ -48,7 +48,7 @@ outer_edge:
 
 wall_parameters:
   temperatures: [1500]
-  emissivity: 0.89
+  emissivity: 0
   environment_temperature: 1
 
 abaque:

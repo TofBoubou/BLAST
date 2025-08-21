@@ -73,13 +73,13 @@ auto RadiativeEquilibriumSolver::update_wall_temperature_iteration(int station, 
     bc.wall.temperature = T_wall_result.value();
     
     // Optional debug output (commented out for production)
-    std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
+/*     std::cout << std::format("[RADIATIVE] Station {} Iter {}: q_wall={:.2e} W/m², q_rad={:.2e} W/m², "
                            "q_wall-q_rad={:.2e} W/m², T_wall={:.1f} K", 
                            station, iteration, q_wall, q_rad, q_wall - q_rad, T_wall_current) << std::endl;
     
     std::cout << std::format("[DEBUG] T_wall update: {:.1f} K -> {:.1f} K (delta={:.1f} K)", 
                            T_wall_old, bc.wall.temperature, 
-                           bc.wall.temperature - T_wall_old) << std::endl;
+                           bc.wall.temperature - T_wall_old) << std::endl; */
     
     return {};
 }
