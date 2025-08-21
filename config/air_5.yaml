@@ -33,7 +33,7 @@ outer_edge:
   edge_points:
     - x: 0.0                           # Axial position [m]
       radius: 1                        # Body radius [m] at this position
-      velocity: 1000                   # Edge velocity [m/s]
+      velocity: 0                   # Edge velocity [m/s]
       temperature: 5526.181601661059   # Edge temperature [K]
       pressure: 10386.998246546822     # Edge pressure [Pa]
       boundary_override: 
@@ -67,7 +67,7 @@ abacus:
 # Continuation method parameters (for convergence)
 continuation:
   wall_temperature_stable: 300        # Initial stable wall temperature [K]
-  edge_temperature_stable: 526.181601661059    # Initial stable edge temperature [K]
+  edge_temperature_stable: 500    # Initial stable edge temperature [K]
   pressure_stable: 10386.998246546822          # Initial stable pressure [Pa]
 
 # Usage examples:
