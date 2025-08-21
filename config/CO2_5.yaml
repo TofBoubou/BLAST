@@ -10,7 +10,7 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 10                       
+  n_eta: 100                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-10
   max_iterations: 10000000

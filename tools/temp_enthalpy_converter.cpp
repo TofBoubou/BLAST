@@ -10,19 +10,22 @@
 
 void print_usage() {
     std::cout << "Usage:\n";
-    std::cout << "  temp_enthalpy_converter <mixture_name> <pressure_Pa> <mode> <value>\n";
+    std::cout << "  temp_enthalpy_converter <mixture_name> <pressure_Pa> <mode> <value> [mass_fractions]\n";
     std::cout << "\nModes:\n";
-    std::cout << "  T2H  - Convert temperature to enthalpy\n";
-    std::cout << "  H2T  - Convert enthalpy to temperature\n";
-    std::cout << "\nExample:\n";
+    std::cout << "  T2H  - Convert temperature to enthalpy (uses equilibrium composition if no custom composition)\n";
+    std::cout << "  H2T  - Convert enthalpy to temperature (uses iterative equilibrium if no custom composition)\n";
+    std::cout << "\nParameters:\n";
+    std::cout << "  mass_fractions - Custom composition (optional, if not provided uses equilibrium composition)\n";
+    std::cout << "\nExamples:\n";
     std::cout << "  temp_enthalpy_converter air_5 101325 T2H 300\n";
     std::cout << "  temp_enthalpy_converter air_5 101325 H2T 300000\n";
+    std::cout << "  temp_enthalpy_converter air_5 101325 T2H 300 0 0 0 0.767 0.233\n";
 }
 
 double enthalpy_to_temperature(Mutation::Mixture& mix, std::vector<double>& mass_fractions, 
                               double target_h, double pressure) {
     const double tol = 1e-6;
-    const int max_iter = 100;
+    const int max_iter = 5000;
     
     double T_min = 200.0;
     double T_max = 15000.0;
@@ -46,6 +49,78 @@ double enthalpy_to_temperature(Mutation::Mixture& mix, std::vector<double>& mass
     }
     
     return (T_min + T_max) / 2.0;
+}
+
+double enthalpy_to_temperature_with_equilibrium(Mutation::Mixture& mix, double target_h, double pressure) {
+    const double tol_H = 1e-6;  // Enthalpy tolerance in J/kg
+    const int max_iter = 5000;
+    
+    double T_min = 10.0;
+    double T_max = 20000.0;
+    
+    std::cout << "Starting equilibrium bisection method for H2T conversion\n";
+    std::cout << "Target enthalpy: " << target_h << " J/kg\n";
+    
+    // Helper function to calculate enthalpy at equilibrium for a given temperature
+    auto calculate_equilibrium_enthalpy = [&](double T) -> double {
+        try {
+            // Calculate equilibrium composition at temperature T
+            std::vector<double> x_mole(mix.nSpecies());
+            mix.equilibriumComposition(T, pressure, x_mole.data());
+            
+            std::vector<double> mass_fractions(mix.nSpecies());
+            mix.convert<Mutation::Thermodynamics::X_TO_Y>(x_mole.data(), mass_fractions.data());
+            
+            // Calculate enthalpy with equilibrium composition
+            double vars[2] = {pressure, T};
+            mix.setState(mass_fractions.data(), vars, 2);
+            return mix.mixtureHMass();
+        } catch (const std::exception&) {
+            return -1e20; // Invalid enthalpy for error cases
+        }
+    };
+    
+    // Check bounds
+    double h_min = calculate_equilibrium_enthalpy(T_min);
+    double h_max = calculate_equilibrium_enthalpy(T_max);
+    
+    std::cout << "Bounds: T_min=" << T_min << "K (H=" << h_min << "), T_max=" << T_max << "K (H=" << h_max << ")\n";
+    
+    if (target_h < h_min || target_h > h_max) {
+        // Extend bounds if needed
+        if (target_h < h_min) {
+            T_min = 200.0;
+            h_min = calculate_equilibrium_enthalpy(T_min);
+        }
+        if (target_h > h_max) {
+            T_max = 15000.0;
+            h_max = calculate_equilibrium_enthalpy(T_max);
+        }
+        std::cout << "Extended bounds: T_min=" << T_min << "K (H=" << h_min << "), T_max=" << T_max << "K (H=" << h_max << ")\n";
+    }
+    
+    // Bisection method on temperature directly
+    for (int iter = 0; iter < max_iter; ++iter) {
+        double T_mid = (T_min + T_max) / 2.0;
+        double h_mid = calculate_equilibrium_enthalpy(T_mid);
+        
+        std::cout << "Iteration " << iter+1 << ": T = " << T_mid << "K, H = " << h_mid << " J/kg (error = " << std::abs(h_mid - target_h) << ")\n";
+        
+        if (std::abs(h_mid - target_h) < tol_H) {
+            std::cout << "Converged after " << iter+1 << " iterations\n";
+            return T_mid;
+        }
+        
+        if (h_mid < target_h) {
+            T_min = T_mid;
+        } else {
+            T_max = T_mid;
+        }
+    }
+    
+    double T_final = (T_min + T_max) / 2.0;
+    std::cout << "Maximum iterations reached, using T = " << T_final << "K\n";
+    return T_final;
 }
 
 void setup_mutation_data_path() {
@@ -116,9 +191,23 @@ int main(int argc, char* argv[]) {
             for (double& f : mass_fractions) sum += f;
             for (double& f : mass_fractions) f /= sum;
         } else {
-            const double* default_comp = mix.getDefaultComposition();
-            for (int i = 0; i < mix.nSpecies(); ++i) {
-                mass_fractions[i] = default_comp[i];
+            // Use equilibrium composition for both T2H and H2T modes
+            if (mode == "T2H") {
+                // T2H: Calculate equilibrium composition at given temperature
+                double temperature = value;
+                try {
+                    std::vector<double> x_mole(mix.nSpecies());
+                    mix.equilibriumComposition(temperature, pressure, x_mole.data());
+                    mix.convert<Mutation::Thermodynamics::X_TO_Y>(x_mole.data(), mass_fractions.data());
+                    std::cout << "Using equilibrium composition at T=" << temperature << "K, P=" << pressure << "Pa\n";
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: Failed to compute equilibrium composition: " << e.what() << "\n";
+                    return 1;
+                }
+            } else {
+                // H2T: Use iterative method to find equilibrium composition and temperature
+                std::cout << "Using iterative equilibrium method for H2T conversion\n";
+                // This will be handled separately in the H2T section below
             }
         }
         
@@ -163,8 +252,20 @@ int main(int argc, char* argv[]) {
             
         } else if (mode == "H2T") {
             double target_enthalpy = value;
+            double temperature;
             
-            double temperature = enthalpy_to_temperature(mix, mass_fractions, target_enthalpy, pressure);
+            if (use_custom_composition) {
+                // Use provided composition
+                temperature = enthalpy_to_temperature(mix, mass_fractions, target_enthalpy, pressure);
+            } else {
+                // Use iterative equilibrium method
+                temperature = enthalpy_to_temperature_with_equilibrium(mix, target_enthalpy, pressure);
+                
+                // Get final equilibrium composition for display
+                std::vector<double> x_mole(mix.nSpecies());
+                mix.equilibriumComposition(temperature, pressure, x_mole.data());
+                mix.convert<Mutation::Thermodynamics::X_TO_Y>(x_mole.data(), mass_fractions.data());
+            }
             
             double vars[2] = {pressure, temperature};
             mix.setState(mass_fractions.data(), vars, 2);
@@ -209,15 +310,20 @@ USAGE INSTRUCTIONS:
    ./temp_enthalpy_converter <mixture> <pressure_Pa> <mode> <value> [mass_fractions]
 
    Modes:
-   - T2H: Convert temperature (K) to enthalpy (J/kg)
-   - H2T: Convert enthalpy (J/kg) to temperature (K)
+   - T2H: Convert temperature (K) to enthalpy (J/kg) using equilibrium composition
+   - H2T: Convert enthalpy (J/kg) to temperature (K) using iterative equilibrium method
 
-3. EXAMPLES:
+3. COMPOSITION BEHAVIOR:
+   - DEFAULT: Uses chemical equilibrium composition at given conditions (T,P)
+   - CUSTOM: Optional mass fractions override equilibrium calculation
+   - Never uses frozen/default mixture composition unless custom provided
 
-   # Temperature to enthalpy conversion at 300K, 1 atm
+4. EXAMPLES:
+
+   # Temperature to enthalpy with equilibrium composition at 300K, 1 atm
    ./temp_enthalpy_converter air_5 101325 T2H 300
 
-   # Enthalpy to temperature conversion
+   # Enthalpy to temperature with iterative equilibrium calculation
    ./temp_enthalpy_converter air_5 101325 H2T 300000
 
    # With custom composition (mass fractions for each species)
@@ -225,13 +331,17 @@ USAGE INSTRUCTIONS:
    # Standard air: 76.7% N2, 23.3% O2
    ./temp_enthalpy_converter air_5 101325 T2H 300 0 0 0 0.767 0.233
 
-   # High temperature example
+   # High temperature equilibrium (shows dissociation effects)
    ./temp_enthalpy_converter air_5 101325 T2H 2000
 
-4. NOTES:
+   # High enthalpy H2T (converges to equilibrium T and composition)
+   ./temp_enthalpy_converter air_5 101325 H2T 2283296
+
+5. NOTES:
    - Pressure is in Pascals (101325 Pa = 1 atm)
    - Temperature is in Kelvin
    - Enthalpy is in J/kg
    - Mass fractions must sum to 1 (will be normalized if not)
    - The program automatically finds the Mutation++ data directory
+   - Results include equilibrium composition and thermodynamic properties
 */

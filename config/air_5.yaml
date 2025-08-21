@@ -10,7 +10,7 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 100                       
+  n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9
   max_iterations: 100000
@@ -30,7 +30,7 @@ outer_edge:
   edge_points:
     - x: 0.0
       radius: 1
-      velocity: 0
+      velocity: 1000
       temperature: 5526.181601661059
       pressure: 10386.998246546822
       boundary_override: 
