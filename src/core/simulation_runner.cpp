@@ -160,18 +160,18 @@ auto SimulationRunner::display_standard_results(const boundary_layer::solver::So
 
     // Print some profiles
     std::cout << "\nBoundary layer profiles (selected points):" << std::endl;
-    std::cout << std::setw(constants::string_processing::narrow_field_width) << "η/η_max" 
+    std::cout << std::setw(constants::string_processing::wide_field_width) << "η/η_max" 
               << std::setw(constants::string_processing::wide_field_width) << "F" 
               << std::setw(constants::string_processing::wide_field_width) << "g" 
               << std::setw(constants::string_processing::wide_field_width) << "V" << std::endl;
-    std::cout << std::string(constants::string_processing::separator_width, '-') << std::endl;
+    std::cout << std::string(4 * constants::string_processing::wide_field_width, '-') << std::endl;
 
     const std::size_t n_print = std::min(static_cast<std::size_t>(constants::indexing::max_profile_print_points), n_eta);
     for (std::size_t i = constants::indexing::first; i < n_print; ++i) {
       const std::size_t idx = (i * (n_eta - constants::indexing::second)) / (n_print - constants::indexing::second);
       const double eta_norm = static_cast<double>(idx) / (n_eta - constants::indexing::second);
 
-      std::cout << std::setw(constants::string_processing::narrow_field_width) << std::fixed 
+      std::cout << std::setw(constants::string_processing::wide_field_width) << std::fixed 
                 << std::setprecision(constants::string_processing::float_precision_2) << eta_norm 
                 << std::setw(constants::string_processing::wide_field_width) << std::fixed
                 << std::setprecision(constants::string_processing::float_precision_4) << final_station.F[idx] 

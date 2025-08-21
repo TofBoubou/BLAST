@@ -512,4 +512,4 @@ This project builds upon several excellent open-source libraries:
 - **[yaml-cpp](https://github.com/jbeder/yaml-cpp)**: YAML parsing library (MIT)
 - **[HDF5](https://www.hdfgroup.org/solutions/hdf5/)**: High-performance data format (BSD-style)
 
-**BLAST** - High-Performance Boundary Layer Analysis for Hypersonic Flows
+**BLAST** - Boundary Layer Analysis & Simulation Tool

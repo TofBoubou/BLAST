@@ -68,12 +68,14 @@ auto ApplicationRunner::run(int argc, char* argv[]) -> ApplicationResult {
     auto result = std::move(simulation_result.value());
     
     // Write output files (only for standard simulations)
+    std::vector<std::filesystem::path> output_files;
     if (!result.is_abacus) {
       auto output_result = output_manager_->write_simulation_results(
         result.solution, config, *mixture, args.output_name, metrics);
       if (!output_result) {
         return handle_error(output_result.error());
       }
+      output_files = std::move(output_result.value());
     }
     
     // Calculate total time
@@ -83,7 +85,7 @@ auto ApplicationRunner::run(int argc, char* argv[]) -> ApplicationResult {
     // Display results and performance
     simulation_runner_->display_simulation_results(result, *mixture, metrics);
     display_performance_summary(metrics);
-    display_completion_message();
+    display_completion_message(output_files, result.is_abacus ? result.output_filename : "");
     
     cleanup();
     
@@ -123,7 +125,15 @@ auto ApplicationRunner::display_usage(const std::string& program_name) const -> 
 }
 
 auto ApplicationRunner::display_header() const -> void {
-  std::cout << "=== BLAST Boundary Layer Solver ===" << std::endl;
+  std::cout << "===============================================" << std::endl;
+  std::cout << "    BLAST - Boundary Layer Analysis &" << std::endl;
+  std::cout << "            Simulation Tool" << std::endl;
+  std::cout << "===============================================" << std::endl;
+  std::cout << "Authors: Théophane Bourdon - ENSTA Paris" << std::endl;
+  std::cout << "         Domenico Lanza - Politecnico Milano" << std::endl;
+  std::cout << "Work conducted at: University of Illinois" << std::endl;
+  std::cout << "                   Urbana-Champaign (UIUC)" << std::endl;
+  std::cout << "===============================================" << std::endl;
 }
 
 auto ApplicationRunner::display_performance_summary(const PerformanceMetrics& metrics) const -> void {
@@ -131,10 +141,30 @@ auto ApplicationRunner::display_performance_summary(const PerformanceMetrics& me
   std::cout << "Total runtime: " << metrics.total_time.count() << " ms" << std::endl;
 }
 
-auto ApplicationRunner::display_completion_message() const -> void {
+auto ApplicationRunner::display_completion_message(
+    const std::vector<std::filesystem::path>& output_files,
+    const std::string& abacus_filename) const -> void {
   std::cout << "\n=== CALCULATION COMPLETED SUCCESSFULLY ===" << std::endl;
   std::cout << "\nPost-processing recommendations:" << std::endl;
   std::cout << "  • Open .h5 files with HDFView or Python (h5py, pandas)" << std::endl;
+  
+  // Display post-processing commands for output files
+  if (!output_files.empty()) {
+    std::cout << "\nRecommended post-processing commands:" << std::endl;
+    for (const auto& file : output_files) {
+      if (file.extension() == ".h5") {
+        std::cout << "  python3 scripts/postprocess_blast.py --input " 
+                  << file.string() << " --plots all --output results" << std::endl;
+      }
+    }
+  }
+  
+  // Display post-processing command for abacus files
+  if (!abacus_filename.empty()) {
+    std::cout << "\nRecommended abacus post-processing command:" << std::endl;
+    std::cout << "  python3 scripts/postprocess_abacus.py --input " 
+              << abacus_filename << " --output abacus_results" << std::endl;
+  }
 }
 
 auto ApplicationRunner::cleanup() -> void {

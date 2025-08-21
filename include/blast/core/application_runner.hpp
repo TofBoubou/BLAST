@@ -5,6 +5,7 @@
 #include "output_manager.hpp"
 #include "simulation_runner.hpp"
 #include <expected>
+#include <filesystem>
 #include <memory>
 
 namespace blast::core {
@@ -37,7 +38,8 @@ private:
   auto display_performance_summary(const PerformanceMetrics& metrics) const -> void;
   
   // Display completion message
-  auto display_completion_message() const -> void;
+  auto display_completion_message(const std::vector<std::filesystem::path>& output_files,
+                                  const std::string& abacus_filename) const -> void;
   
   // Cleanup resources
   auto cleanup() -> void;

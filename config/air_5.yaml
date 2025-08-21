@@ -64,7 +64,7 @@ abacus:
   temperature_range: [3000, 5000]     # Wall temperature range [K] for study
   temperature_points: 30               # Number of temperature points in study
 
-# Continuation method parameters (for sconvergence)
+# Continuation method parameters (for convergence)
 continuation:
   wall_temperature_stable: 300        # Initial stable wall temperature [K]
   edge_temperature_stable: 526.181601661059    # Initial stable edge temperature [K]
