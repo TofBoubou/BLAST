@@ -75,7 +75,7 @@ inline constexpr double default_eta_max = 8.0;
 /// Minimum required points for numerical differentiation
 inline constexpr std::size_t min_differentiation_points = 5;
 
-/// Default temperature discretization points for abaque
+/// Default temperature discretization points for abacus
 inline constexpr int default_temperature_points = 100;
 }  // namespace grid
 
@@ -153,11 +153,11 @@ inline constexpr double default_emissivity = 0.0;
 /// Maximum valid emissivity value
 inline constexpr double max_emissivity = 1.0;
 
-/// Default abaque temperature range
-namespace abaque {
+/// Default abacus temperature range
+namespace abacus {
 inline constexpr double temperature_min = 300.0;
 inline constexpr double temperature_max = 2000.0;
-}  // namespace abaque
+}  // namespace abacus
 }  // namespace defaults
 
 // ================================================================================================

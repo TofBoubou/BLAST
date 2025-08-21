@@ -91,14 +91,14 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.wall_parameters = std::move(wall_result.value());
 
-    auto abaque_result = parse_abaque_config(root_["abaque"]);
-    if (!abaque_result) {
-      return std::unexpected(abaque_result.error());
+    auto abacus_result = parse_abacus_config(root_["abacus"]);
+    if (!abacus_result) {
+      return std::unexpected(abacus_result.error());
     }
-    config.abaque = std::move(abaque_result.value());
+    config.abacus = std::move(abacus_result.value());
 
-    // Force catalytic wall when abaque generation is enabled
-    if (config.abaque.enabled) {
+    // Force catalytic wall when abacus generation is enabled
+    if (config.abacus.enabled) {
       config.simulation.catalytic_wall = true;
     }
 
@@ -501,12 +501,12 @@ auto YamlParser::parse_wall_parameters_config(const YAML::Node& node) const
   }
 }
 
-auto YamlParser::parse_abaque_config(const YAML::Node& node) const
-    -> std::expected<AbaqueConfig, core::ConfigurationError> {
+auto YamlParser::parse_abacus_config(const YAML::Node& node) const
+    -> std::expected<AbacusConfig, core::ConfigurationError> {
 
-  AbaqueConfig config;
+  AbacusConfig config;
 
-  // If no abaque section, return default (disabled)
+  // If no abacus section, return default (disabled)
   if (!node) {
     return config;
   }
@@ -522,7 +522,7 @@ auto YamlParser::parse_abaque_config(const YAML::Node& node) const
       // Parse catalyticity values
       if (!node["catalyticity_values"]) {
         return std::unexpected(
-            core::ConfigurationError("Missing required 'catalyticity_values' when abaque is enabled"));
+            core::ConfigurationError("Missing required 'catalyticity_values' when abacus is enabled"));
       }
       config.catalyticity_values = node["catalyticity_values"].as<std::vector<double>>();
 
@@ -556,7 +556,7 @@ auto YamlParser::parse_abaque_config(const YAML::Node& node) const
     return config;
 
   } catch (const YAML::Exception& e) {
-    return std::unexpected(core::ConfigurationError(std::format("In 'abaque' section: {}", e.what())));
+    return std::unexpected(core::ConfigurationError(std::format("In 'abacus' section: {}", e.what())));
   }
 }
 

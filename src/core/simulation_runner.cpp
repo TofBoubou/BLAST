@@ -17,16 +17,16 @@ auto SimulationRunner::run_simulation(
   PerformanceMetrics& metrics) 
   -> std::expected<SimulationResult, ApplicationError> {
     
-  if (config.abaque.enabled) {
-    auto abaque_filename = run_abaque_generation(solver, mixture, config, case_name, metrics);
-    if (!abaque_filename) {
-      return std::unexpected(abaque_filename.error());
+  if (config.abacus.enabled) {
+    auto abacus_filename = run_abacus_generation(solver, mixture, config, case_name, metrics);
+    if (!abacus_filename) {
+      return std::unexpected(abacus_filename.error());
     }
     
     return SimulationResult{
       .solution = {},
-      .is_abaque = true,
-      .output_filename = abaque_filename.value()
+      .is_abacus = true,
+      .output_filename = abacus_filename.value()
     };
   } else {
     auto solution = run_standard_simulation(solver, metrics);
@@ -36,7 +36,7 @@ auto SimulationRunner::run_simulation(
     
     return SimulationResult{
       .solution = std::move(solution.value()),
-      .is_abaque = false,
+      .is_abacus = false,
       .output_filename = ""
     };
   }
@@ -45,13 +45,13 @@ auto SimulationRunner::run_simulation(
 auto SimulationRunner::display_simulation_results(const SimulationResult& result,
                                                   const thermophysics::MixtureInterface& mixture,
                                                   const PerformanceMetrics& metrics) const -> void {
-  if (result.is_abaque) {
-    std::cout << "✓ Abaque generated successfully!" << std::endl;
+  if (result.is_abacus) {
+    std::cout << "✓ Abacus generated successfully!" << std::endl;
     if (!result.output_filename.empty()) {
-      auto abaque_file_size = std::filesystem::file_size(result.output_filename);
-      std::cout << "  Abaque file: " << std::filesystem::path(result.output_filename).filename().string() 
+      auto abacus_file_size = std::filesystem::file_size(result.output_filename);
+      std::cout << "  Abacus file: " << std::filesystem::path(result.output_filename).filename().string() 
                 << " (" << std::setprecision(constants::string_processing::float_precision_2) << std::fixed
-                << (abaque_file_size / constants::io::bytes_to_kb) << " KB)" << std::endl;
+                << (abacus_file_size / constants::io::bytes_to_kb) << " KB)" << std::endl;
     }
   } else {
     display_standard_results(result.solution, mixture);
@@ -85,7 +85,7 @@ auto SimulationRunner::run_standard_simulation(
   return std::move(solution_result.value());
 }
 
-auto SimulationRunner::run_abaque_generation(
+auto SimulationRunner::run_abacus_generation(
   boundary_layer::solver::BoundaryLayerSolver& solver,
   const thermophysics::MixtureInterface& mixture,
   const io::Configuration& config,
@@ -93,40 +93,40 @@ auto SimulationRunner::run_abaque_generation(
   PerformanceMetrics& metrics) 
   -> std::expected<std::string, ApplicationError> {
     
-  std::cout << "\n=== GENERATING ABAQUE ===" << std::endl;
-  std::cout << "Abaque mode enabled - skipping normal simulation" << std::endl;
+  std::cout << "\n=== GENERATING ABACUS ===" << std::endl;
+  std::cout << "Abacus mode enabled - skipping normal simulation" << std::endl;
   
-  display_abaque_info(config);
+  display_abacus_info(config);
   
-  auto abaque_start = std::chrono::high_resolution_clock::now();
+  auto abacus_start = std::chrono::high_resolution_clock::now();
   
-  io::AbaqueGenerator abaque_generator(solver, const_cast<thermophysics::MixtureInterface&>(mixture), config);
-  auto abaque_result = abaque_generator.generate();
+  io::AbacusGenerator abacus_generator(solver, const_cast<thermophysics::MixtureInterface&>(mixture), config);
+  auto abacus_result = abacus_generator.generate();
   
-  if (!abaque_result.success) {
+  if (!abacus_result.success) {
     return std::unexpected(ApplicationError{
-      "Failed to generate abaque",
+      "Failed to generate abacus",
       constants::indexing::second
     });
   }
   
-  // Save abaque results
-  std::string abaque_filename = case_name + "_abaque.h5";
-  std::filesystem::path abaque_path = std::filesystem::path(config.output.output_directory) / abaque_filename;
+  // Save abacus results
+  std::string abacus_filename = case_name + "_abacus.h5";
+  std::filesystem::path abacus_path = std::filesystem::path(config.output.output_directory) / abacus_filename;
   
-  if (!abaque_generator.save_results(abaque_result, abaque_path)) {
+  if (!abacus_generator.save_results(abacus_result, abacus_path)) {
     return std::unexpected(ApplicationError{
-      "Failed to save abaque results to: " + abaque_path.string(),
+      "Failed to save abacus results to: " + abacus_path.string(),
       constants::indexing::second
     });
   }
   
-  auto abaque_end = std::chrono::high_resolution_clock::now();
-  auto abaque_duration = std::chrono::duration_cast<std::chrono::milliseconds>(abaque_end - abaque_start);
+  auto abacus_end = std::chrono::high_resolution_clock::now();
+  auto abacus_duration = std::chrono::duration_cast<std::chrono::milliseconds>(abacus_end - abacus_start);
   
-  std::cout << "  Generation time: " << abaque_duration.count() << " ms" << std::endl;
+  std::cout << "  Generation time: " << abacus_duration.count() << " ms" << std::endl;
   
-  return abaque_path.string();
+  return abacus_path.string();
 }
 
 auto SimulationRunner::display_standard_results(const boundary_layer::solver::SolutionResult& solution,
@@ -184,17 +184,17 @@ auto SimulationRunner::display_standard_results(const boundary_layer::solver::So
   }
 }
 
-auto SimulationRunner::display_abaque_info(const io::Configuration& config) const -> void {
-  std::cout << "Temperature range: " << config.abaque.temperature_min << " - " 
-            << config.abaque.temperature_max << " K" << std::endl;
-  std::cout << "Temperature points: " << config.abaque.temperature_points << std::endl;
+auto SimulationRunner::display_abacus_info(const io::Configuration& config) const -> void {
+  std::cout << "Temperature range: " << config.abacus.temperature_min << " - " 
+            << config.abacus.temperature_max << " K" << std::endl;
+  std::cout << "Temperature points: " << config.abacus.temperature_points << std::endl;
   std::cout << "Catalyticity values: ";
   
-  for (size_t i = constants::indexing::first; i < config.abaque.catalyticity_values.size(); ++i) {
+  for (size_t i = constants::indexing::first; i < config.abacus.catalyticity_values.size(); ++i) {
     if (i > constants::indexing::first) {
       std::cout << ", ";
     }
-    std::cout << config.abaque.catalyticity_values[i];
+    std::cout << config.abacus.catalyticity_values[i];
   }
   std::cout << std::endl;
 }

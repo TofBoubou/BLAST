@@ -116,11 +116,11 @@ struct WallParametersConfig {
   double environment_temperature = constants::defaults::ambient_temperature;     
 };
 
-struct AbaqueConfig {
+struct AbacusConfig {
   bool enabled = false;
   std::vector<double> catalyticity_values;
-  double temperature_min = constants::defaults::abaque::temperature_min;
-  double temperature_max = constants::defaults::abaque::temperature_max;
+  double temperature_min = constants::defaults::abacus::temperature_min;
+  double temperature_max = constants::defaults::abacus::temperature_max;
   int temperature_points = constants::grid::default_temperature_points;
 };
 
@@ -138,7 +138,7 @@ struct Configuration {
   InitialGuessConfig initial_guess;
   OuterEdgeConfig outer_edge;
   WallParametersConfig wall_parameters;
-  AbaqueConfig abaque;
+  AbacusConfig abacus;
   ContinuationConfig continuation;
 };
 

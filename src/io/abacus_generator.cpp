@@ -1,4 +1,4 @@
-#include "blast/io/abaque_generator.hpp"
+#include "blast/io/abacus_generator.hpp"
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
 #include "blast/thermophysics/mixture_interface.hpp"
 #include <H5Apublic.h>
@@ -16,7 +16,7 @@
 
 namespace blast::io {
 
-AbaqueGenerator::AbaqueGenerator(boundary_layer::solver::BoundaryLayerSolver& solver,
+AbacusGenerator::AbacusGenerator(boundary_layer::solver::BoundaryLayerSolver& solver,
                                  thermophysics::MixtureInterface& mixture, const Configuration& config)
     : solver_(solver), mixture_(mixture), config_(config) {
 
@@ -29,42 +29,42 @@ AbaqueGenerator::AbaqueGenerator(boundary_layer::solver::BoundaryLayerSolver& so
   }
 }
 
-AbaqueGenerator::~AbaqueGenerator() {
+AbacusGenerator::~AbacusGenerator() {
   // Always restore original GSI on destruction
   if (gsi_backed_up_) {
     restore_gsi_file();
   }
 }
 
-auto AbaqueGenerator::generate() -> Result {
+auto AbacusGenerator::generate() -> Result {
   Result result;
 
-  if (!config_.abaque.enabled) {
+  if (!config_.abacus.enabled) {
     return result;
   }
 
-  const auto& abaque_config = config_.abaque;
-  const int n_temps = abaque_config.temperature_points;
-  const int n_gammas = abaque_config.catalyticity_values.size();
+  const auto& abacus_config = config_.abacus;
+  const int n_temps = abacus_config.temperature_points;
+  const int n_gammas = abacus_config.catalyticity_values.size();
 
   // Setup temperature vector
   result.temperatures.resize(n_temps);
-  const double dT = (abaque_config.temperature_max - abaque_config.temperature_min) / (n_temps - 1);
+  const double dT = (abacus_config.temperature_max - abacus_config.temperature_min) / (n_temps - 1);
   for (int i = 0; i < n_temps; ++i) {
-    result.temperatures[i] = abaque_config.temperature_min + i * dT;
+    result.temperatures[i] = abacus_config.temperature_min + i * dT;
   }
 
   // Copy catalyticity values
-  result.catalyticity_values = abaque_config.catalyticity_values;
+  result.catalyticity_values = abacus_config.catalyticity_values;
 
   // Initialize heat flux matrix
   result.heat_fluxes = core::Matrix<double>(n_gammas, n_temps);
 
   // Main computation loop
-  std::cout << "\n=== ABAQUE GENERATION ===" << std::endl;
+  std::cout << "\n=== ABACUS GENERATION ===" << std::endl;
 
   for (int gamma_idx = 0; gamma_idx < n_gammas; ++gamma_idx) {
-    const double gamma = abaque_config.catalyticity_values[gamma_idx];
+    const double gamma = abacus_config.catalyticity_values[gamma_idx];
 
     std::cout << "\nProcessing gamma = " << gamma << " (" << (gamma_idx + 1) << "/" << n_gammas << ")" << std::endl;
 
@@ -95,13 +95,13 @@ auto AbaqueGenerator::generate() -> Result {
     }
   }
 
-  std::cout << "\n=== ABAQUE GENERATION COMPLETE ===" << std::endl;
+  std::cout << "\n=== ABACUS GENERATION COMPLETE ===" << std::endl;
 
   result.success = true;
   return result;
 }
 
-auto AbaqueGenerator::solve_for_temperature(double wall_temperature) -> double {
+auto AbacusGenerator::solve_for_temperature(double wall_temperature) -> double {
   // Update wall temperature in configuration
   solver_.set_wall_temperature(wall_temperature);
 
@@ -122,7 +122,7 @@ auto AbaqueGenerator::solve_for_temperature(double wall_temperature) -> double {
   return solution_result.value().heat_flux_data[0].q_wall_total_dim;
 }
 
-auto AbaqueGenerator::backup_gsi_file() -> std::expected<void, std::string> {
+auto AbacusGenerator::backup_gsi_file() -> std::expected<void, std::string> {
   if (!std::filesystem::exists(gsi_file_path_)) {
     return std::unexpected(std::format("GSI file not found: {}", gsi_file_path_.string()));
   }
@@ -141,7 +141,7 @@ auto AbaqueGenerator::backup_gsi_file() -> std::expected<void, std::string> {
   return {};
 }
 
-auto AbaqueGenerator::restore_gsi_file() -> void {
+auto AbacusGenerator::restore_gsi_file() -> void {
   if (!gsi_backed_up_ || original_gsi_content_.empty()) {
     return;
   }
@@ -153,7 +153,7 @@ auto AbaqueGenerator::restore_gsi_file() -> void {
   }
 }
 
-auto AbaqueGenerator::update_gsi_catalyticity(double gamma) -> std::expected<void, std::string> {
+auto AbacusGenerator::update_gsi_catalyticity(double gamma) -> std::expected<void, std::string> {
   if (!gsi_backed_up_) {
     return std::unexpected("GSI file not backed up");
   }
@@ -214,7 +214,7 @@ auto AbaqueGenerator::update_gsi_catalyticity(double gamma) -> std::expected<voi
   return {};
 }
 
-auto AbaqueGenerator::construct_gsi_path() const -> std::filesystem::path {
+auto AbacusGenerator::construct_gsi_path() const -> std::filesystem::path {
   // Get MPP_DATA_DIRECTORY from environment
   const char* mpp_data = std::getenv("MPP_DATA_DIRECTORY");
 
@@ -240,7 +240,7 @@ auto AbaqueGenerator::construct_gsi_path() const -> std::filesystem::path {
   return gsi_path / gsi_filename;
 }
 
-auto AbaqueGenerator::save_results(const Result& results, const std::filesystem::path& output_path) const -> bool {
+auto AbacusGenerator::save_results(const Result& results, const std::filesystem::path& output_path) const -> bool {
 
   if (!results.success) {
     return false;
@@ -325,7 +325,7 @@ auto AbaqueGenerator::save_results(const Result& results, const std::filesystem:
     hid_t space_id = H5Screate_simple(1, dims, nullptr);
     hid_t attr_id = H5Acreate2(root_group, "temperature_range", H5T_NATIVE_DOUBLE, space_id, H5P_DEFAULT, H5P_DEFAULT);
     if (attr_id >= 0) {
-      double range[2] = {config_.abaque.temperature_min, config_.abaque.temperature_max};
+      double range[2] = {config_.abacus.temperature_min, config_.abacus.temperature_max};
       H5Awrite(attr_id, H5T_NATIVE_DOUBLE, range);
       H5Aclose(attr_id);
     }
@@ -335,7 +335,7 @@ auto AbaqueGenerator::save_results(const Result& results, const std::filesystem:
     hid_t scalar_space = H5Screate(H5S_SCALAR);
     attr_id = H5Acreate2(root_group, "n_temperatures", H5T_NATIVE_INT, scalar_space, H5P_DEFAULT, H5P_DEFAULT);
     if (attr_id >= 0) {
-      int n_temps = config_.abaque.temperature_points;
+      int n_temps = config_.abacus.temperature_points;
       H5Awrite(attr_id, H5T_NATIVE_INT, &n_temps);
       H5Aclose(attr_id);
     }
@@ -354,7 +354,7 @@ auto AbaqueGenerator::save_results(const Result& results, const std::filesystem:
   H5Fclose(file_id);
 
   if (success) {
-    std::cout << "Abaque results saved to: " << output_path << std::endl;
+    std::cout << "Abacus results saved to: " << output_path << std::endl;
   }
 
   return success;

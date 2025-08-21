@@ -3,6 +3,7 @@ simulation:
   only_stagnation_point: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
+  consider_dufour_effect: false
   chemical_mode: "non_equilibrium" # "frozen" or "equilibrium" or "non_equilibrium"
   catalytic_wall: true
 
@@ -36,7 +37,7 @@ outer_edge:
 wall_parameters:
   temperatures: [3000]
 
-abaque:
+abacus:
   enabled: true
   catalyticity_values: [0.0, 0.01, 0.05, 0.1, 0.2, 0.4]
   temperature_range: [2000, 3000]

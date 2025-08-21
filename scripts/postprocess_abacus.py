@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-BLAST Abaque Post-Processing Script (map + curves)
+BLAST Abacus Post-Processing Script (map + curves)
 
-Reads abaque HDF5 produced by BLAST with datasets at root:
+Reads abacus HDF5 produced by BLAST with datasets at root:
 - temperatures: double[N]
 - catalyticity_values: double[M]
 - heat_fluxes: double[M, N]   # rows: gamma index, cols: Tw index
@@ -12,8 +12,8 @@ Produces a single figure with two subplots on one row:
 - Right: line plots q_wall(T_w) for each gamma (no extra interpolation)
 
 Usage:
-    python3 postprocess_abaque.py --input abaque.h5 --output abaque_plots/abaque_map
-    python3 postprocess_abaque.py --input abaque.h5 --show
+    python3 postprocess_abacus.py --input abacus.h5 --output abacus_plots/abacus_map
+    python3 postprocess_abacus.py --input abacus.h5 --show
 """
 
 import argparse
@@ -43,11 +43,11 @@ plt.rcParams.update({
     'savefig.dpi': 600,
 })
 
-class AbaqueFileError(Exception):
+class AbacusFileError(Exception):
     pass
 
-class AbaqueReader:
-    """Minimal robust reader for abaque HDF5"""
+class AbacusReader:
+    """Minimal robust reader for abacus HDF5"""
 
     REQUIRED = ('temperatures', 'catalyticity_values', 'heat_fluxes')
 
@@ -68,19 +68,19 @@ class AbaqueReader:
             with h5py.File(self.input_path, 'r') as f:
                 for k in self.REQUIRED:
                     if k not in f:
-                        raise AbaqueFileError(f"Missing dataset '{k}' at root")
+                        raise AbacusFileError(f"Missing dataset '{k}' at root")
 
                 temps = np.array(f['temperatures'])
                 gammas = np.array(f['catalyticity_values'])
                 q = np.array(f['heat_fluxes'])
 
                 if q.ndim != 2:
-                    raise AbaqueFileError("'heat_fluxes' must be 2D [M, N]")
+                    raise AbacusFileError("'heat_fluxes' must be 2D [M, N]")
                 M, N = q.shape
                 if temps.ndim != 1 or temps.size != N:
-                    raise AbaqueFileError("'temperatures'.size must equal heat_fluxes.shape[1]")
+                    raise AbacusFileError("'temperatures'.size must equal heat_fluxes.shape[1]")
                 if gammas.ndim != 1 or gammas.size != M:
-                    raise AbaqueFileError("'catalyticity_values'.size must equal heat_fluxes.shape[0]")
+                    raise AbacusFileError("'catalyticity_values'.size must equal heat_fluxes.shape[0]")
 
                 self.data = {
                     'temperatures': temps,
@@ -94,18 +94,18 @@ class AbaqueReader:
                     if name in f.attrs:
                         self.attrs[name] = f.attrs[name]
 
-                print(f"Loaded abaque: M={M} γ values, N={N} temperatures")
+                print(f"Loaded abacus: M={M} γ values, N={N} temperatures")
                 return self.data
 
         except Exception as e:
-            if isinstance(e, AbaqueFileError):
+            if isinstance(e, AbacusFileError):
                 raise
             raise RuntimeError(f"Failed to load HDF5: {e}")
 
-class AbaquePlotter:
+class AbacusPlotter:
     """One figure with two subplots: map (left) + curves (right)"""
 
-    def __init__(self, reader: AbaqueReader, dpi: int = 300):
+    def __init__(self, reader: AbacusReader, dpi: int = 300):
         self.reader = reader
         self.dpi = dpi
 
@@ -119,7 +119,7 @@ class AbaquePlotter:
 
         # Figure with two subplots in one row
         fig, (ax_map, ax_curves) = plt.subplots(1, 2, figsize=(16, 7), dpi=self.dpi)
-        fig.suptitle('Abaque: q_wall(γ, T_w)', fontsize=16, fontweight='bold')
+        fig.suptitle('Abacus: q_wall(γ, T_w)', fontsize=16, fontweight='bold')
 
         # LEFT: 2D map (imshow) with explicit extent; axis 0 = gamma
         im = ax_map.imshow(
@@ -167,7 +167,7 @@ class AbaquePlotter:
             save_path.parent.mkdir(parents=True, exist_ok=True)
             out_pdf = save_path.with_suffix('.pdf')
             plt.savefig(out_pdf, format='pdf', bbox_inches='tight')
-            print(f"Abaque map + curves saved to: {out_pdf}")
+            print(f"Abacus map + curves saved to: {out_pdf}")
         else:
             plt.show()
 
@@ -175,21 +175,21 @@ class AbaquePlotter:
         return True
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='BLAST Abaque Post-Processing (map + curves)')
-    parser.add_argument('--input', '-i', type=str, required=True, help='Input abaque HDF5 file')
-    parser.add_argument('--output', '-o', type=str, default='abaque_plots/abaque_map', help='Output path (without extension) if not --show')
+    parser = argparse.ArgumentParser(description='BLAST Abacus Post-Processing (map + curves)')
+    parser.add_argument('--input', '-i', type=str, required=True, help='Input abacus HDF5 file')
+    parser.add_argument('--output', '-o', type=str, default='abacus_plots/abacus_map', help='Output path (without extension) if not --show')
     parser.add_argument('--dpi', type=int, default=300, help='Figure DPI')
     parser.add_argument('--show', action='store_true', help='Show interactively instead of saving')
     args = parser.parse_args()
 
     try:
-        reader = AbaqueReader(args.input)
+        reader = AbacusReader(args.input)
         reader.load()
     except Exception as e:
         print(f"Error initializing reader: {e}")
         return 1
 
-    plotter = AbaquePlotter(reader, dpi=args.dpi)
+    plotter = AbacusPlotter(reader, dpi=args.dpi)
 
     try:
         if args.show:

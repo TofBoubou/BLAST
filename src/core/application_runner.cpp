@@ -68,7 +68,7 @@ auto ApplicationRunner::run(int argc, char* argv[]) -> ApplicationResult {
     auto result = std::move(simulation_result.value());
     
     // Write output files (only for standard simulations)
-    if (!result.is_abaque) {
+    if (!result.is_abacus) {
       auto output_result = output_manager_->write_simulation_results(
         result.solution, config, *mixture, args.output_name, metrics);
       if (!output_result) {

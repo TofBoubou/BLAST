@@ -42,7 +42,7 @@ outer_edge:
 wall_parameters:
   temperatures: [300]
 
-abaque:
+abacus:
   enabled: false
   catalyticity_values: [0.0, 0.01]
   temperature_range: [3500, 5500]

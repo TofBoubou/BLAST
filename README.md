@@ -12,7 +12,7 @@ BLAST is a computational fluid dynamics solver specifically designed for analyzi
 - Stefan-Maxwell multicomponent diffusion with thermal effects
 - Catalytic wall modeling for surface reactions
 - Numerical continuation methods for challenging convergence cases
-- Automated abaque generation for thermal protection system design
+- Automated abacus generation for thermal protection system design
 - Comprehensive thermodynamic property calculations via Mutation++
 - HDF5-based output system with complete flow field data
 - YAML-driven configuration system
@@ -36,7 +36,7 @@ BLAST is a computational fluid dynamics solver specifically designed for analyzi
 - **Tridiagonal Solvers**: Efficient linear system solution
 
 ### Engineering Tools
-- **Abaque Generation**: Automated heat flux maps for thermal protection design
+- **Abacus Generation**: Automated heat flux maps for thermal protection design
 - **Multi-Station Analysis**: Complete boundary layer development along vehicle surface
 - **Comprehensive Post-Processing**: Specialized Python tools for data analysis and visualization
 
@@ -225,19 +225,19 @@ continuation:
 - High-pressure flows
 - Cases where direct solving fails to converge
 
-### Abaque Generation
+### Abacus Generation
 
-BLAST can automatically generate abaques (heat flux maps) for thermal protection system design:
+BLAST can automatically generate abacuses (heat flux maps) for thermal protection system design:
 
 ```yaml
-abaque:
+abacus:
   enabled: true
   catalyticity_values: [0.0, 0.01, 0.1, 1.0]     # Range of catalytic efficiencies
   temperature_range: [300, 3000]                  # Wall temperature range [K]
   temperature_points: 50                          # Resolution
 ```
 
-**Purpose**: Abaques provide heat flux as a function of wall temperature and catalyticity, essential for:
+**Purpose**: Abacuses provide heat flux as a function of wall temperature and catalyticity, essential for:
 - Thermal protection system sizing
 - Material selection
 - Mission design optimization
@@ -290,7 +290,7 @@ outer_edge:
 wall_parameters:
   temperatures: [300]
 
-abaque:
+abacus:
   enabled: false
   catalyticity_values: [0.0, 0.01]
   temperature_range: [3500, 5500]
@@ -367,14 +367,14 @@ python3 postprocess_blast_temperatures.py --input simulation.h5 --plots all
 - Multi-station temperature comparison
 - Wall temperature effects
 
-### Abaque Processing Script
+### Abacus Processing Script
 
 ```bash
-python3 postprocess_abaque.py --input simulation_abaque.h5
+python3 postprocess_abacus.py --input simulation_abacus.h5
 ```
 
 **Purpose:**
-- Process abaque simulation results
+- Process abacus simulation results
 - Generate heat flux contour maps
 - Export data for thermal protection system design
 - Create catalyticity effect visualizations
@@ -401,7 +401,7 @@ simulation:
 wall_parameters:
   temperatures: [300, 500, 1000, 1500, 2000]
 
-abaque:
+abacus:
   enabled: true
   catalyticity_values: [0.0, 0.01, 0.1, 1.0]
   temperature_range: [300, 2500]
@@ -413,7 +413,7 @@ abaque:
 ./blast config/CO2_catalytic.yaml
 
 # Process results
-python3 scripts/postprocess_abaque.py --input test_outputs/simulation_abaque.h5
+python3 scripts/postprocess_abacus.py --input test_outputs/simulation_abacus.h5
 ```
 
 ### Example 2: High-Temperature Case with Continuation

@@ -21,7 +21,7 @@ class BoundaryLayerSolver;
 
 namespace io {
 
-class AbaqueGenerator {
+class AbacusGenerator {
 public:
   struct Result {
     std::vector<double> temperatures;
@@ -30,12 +30,12 @@ public:
     bool success = false;
   };
 
-  AbaqueGenerator(boundary_layer::solver::BoundaryLayerSolver& solver, thermophysics::MixtureInterface& mixture,
+  AbacusGenerator(boundary_layer::solver::BoundaryLayerSolver& solver, thermophysics::MixtureInterface& mixture,
                   const Configuration& config);
 
-  ~AbaqueGenerator();
+  ~AbacusGenerator();
 
-  // Generate the abaque by varying gamma and Tw
+  // Generate the abacus by varying gamma and Tw
   [[nodiscard]] auto generate() -> Result;
 
   // Save results to HDF5 file

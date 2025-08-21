@@ -51,7 +51,7 @@ wall_parameters:
   emissivity: 0.8
   environment_temperature: 1
 
-abaque:
+abacus:
   enabled: false
   catalyticity_values: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
   temperature_range: [3000, 5000]
@@ -65,4 +65,4 @@ continuation:
 # ./blast config/default.yaml test_output
 # python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250713_232651.h5 --plots all --output results_h5
 # python3 scripts/postprocess_blast_temperatures.py --input test_outputs/simulation_20250811_032725.h5 --plots all
-# python3 scripts/postprocess_abaque.py --input test_outputs/simulation_abaque.h5
+# python3 scripts/postprocess_abacus.py --input test_outputs/simulation_abacus.h5
