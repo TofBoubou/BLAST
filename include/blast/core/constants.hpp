@@ -104,6 +104,30 @@ inline constexpr double divisor = 3.0;
 
 /// Trapezoidal rule coefficient
 inline constexpr double trapezoidal_coeff = 0.5;
+
+/// Tridiagonal solver and collocation method constants
+namespace tridiagonal_solver {
+/// Collocation point positions
+inline constexpr double left_point = -1.0;
+inline constexpr double center_point = 0.0;
+inline constexpr double right_point = 1.0;
+
+/// Common collocation coefficients
+inline constexpr double half_coeff = 0.5;
+inline constexpr double one_half_coeff = 1.5;
+inline constexpr double minus_half_coeff = -0.5;
+inline constexpr double minus_one_half_coeff = -1.5;
+inline constexpr double two_coeff = 2.0;
+inline constexpr double minus_two_coeff = -2.0;
+inline constexpr double six_coeff = 6.0;
+inline constexpr double minus_six_coeff = -6.0;
+inline constexpr double ten_coeff = 10.0;
+inline constexpr double minus_ten_coeff = -10.0;
+
+/// Numerical tolerance for matrix operations
+inline constexpr double diagonal_tolerance = 1e-14;
+inline constexpr double solution_normalization_tolerance = 1e-9;
+}  // namespace tridiagonal_solver
 }  // namespace numerical_methods
 
 // ================================================================================================
