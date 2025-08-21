@@ -303,6 +303,7 @@ auto solve_species_block_tridiagonal(const core::Matrix<double>& prev_solution, 
   A[n_eta - 2].setZero();
 
   core::Matrix<double> solution(n_species, n_eta);
+  solution.setZero();
   if (auto result = detail::block_thomas_algorithm(C, B, A, D, solution, start_idx); !result) {
     return std::unexpected(result.error());
   }

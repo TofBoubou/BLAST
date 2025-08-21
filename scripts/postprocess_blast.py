@@ -398,15 +398,53 @@ class BLASTPlotter:
         
         axes[1, 0].set_title(f'Station {station_index:03d} - Species Concentrations')
         
-        # Plot 5: V profile
-        axes[1, 1].plot(station_data['V'], eta, 'black', linewidth=2)
-        axes[1, 1].set_xlabel('V (Velocity Component)')
-        axes[1, 1].set_ylabel('η')
-        axes[1, 1].grid(True, alpha=0.3)
-        axes[1, 1].set_title(f'Station {station_index:03d} - V Profile')
+        # Plot 5: Species concentrations in LOG scale
+        legend_added_log = False
+        min_positive_value = 1.0  # Start with max possible value
         
-        # Plot 6: Leave empty or add additional data if available
-        axes[1, 2].axis('off')
+        for i, species in enumerate(species_names):
+            col_name = f'c_{species}'
+            if col_name in station_data:
+                # Filter out zero/negative values for log scale
+                data = station_data[col_name]
+                positive_mask = data > 0
+                if np.any(positive_mask):
+                    # Track minimum positive value across all species
+                    min_positive_value = min(min_positive_value, np.min(data[positive_mask]))
+                    
+                    style_idx = i % len(line_styles)
+                    marker_idx = i % len(markers)
+                    
+                    axes[1, 1].semilogx(data[positive_mask], eta[positive_mask], 
+                                color='black',
+                                linestyle=line_styles[style_idx],
+                                marker=markers[marker_idx] if markers[marker_idx] else None,
+                                markevery=max(1, np.sum(positive_mask)//8),
+                                markersize=3.5,
+                                linewidth=1.5, 
+                                label=species)
+                    legend_added_log = True
+        
+        axes[1, 1].set_xlabel('Mass Fraction (log scale)')
+        axes[1, 1].set_ylabel('η')
+        axes[1, 1].grid(True, alpha=0.3, which='both')
+        
+        # Set adaptive x-axis limits
+        if legend_added_log and min_positive_value < 1.0:
+            # Set lower limit to one decade below the minimum value
+            axes[1, 1].set_xlim(left=min_positive_value * 0.1, right=1.5)
+        
+        if legend_added_log:
+            axes[1, 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        axes[1, 1].set_title(f'Station {station_index:03d} - Species Concentrations (Log Scale)')
+        
+        # Plot 6: V profile (moved from position 5)
+        axes[1, 2].plot(station_data['V'], eta, 'black', linewidth=2)
+        axes[1, 2].set_xlabel('V (Velocity Component)')
+        axes[1, 2].set_ylabel('η')
+        axes[1, 2].grid(True, alpha=0.3)
+        axes[1, 2].set_title(f'Station {station_index:03d} - V Profile')
         
         plt.tight_layout()
         

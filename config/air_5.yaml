@@ -10,13 +10,13 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 200                       
+  n_eta: 100                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9
   max_iterations: 10000
 
 mixture:
-  name: CO2_5
+  name: air_7
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
   thermal_conductivity_algorithm: chapman_enskog_ldlt
@@ -47,8 +47,8 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [5000]
-  emissivity: 0
+  temperatures: [1500]
+  emissivity: 0.89
   environment_temperature: 1
 
 abaque:
