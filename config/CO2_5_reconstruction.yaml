@@ -13,7 +13,7 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 200                       
+  n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-9
   max_iterations: 10000000

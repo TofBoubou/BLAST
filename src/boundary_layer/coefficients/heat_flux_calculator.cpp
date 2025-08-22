@@ -1,4 +1,5 @@
 #include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
+#include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include <algorithm>
 #include <cmath>
 #include <expected>
@@ -292,7 +293,13 @@ auto HeatFluxCalculator::compute_wall_heat_fluxes(const CoefficientInputs& input
   if (inputs.T.size() < 2 || d_eta_ <= 0.0) {
     return std::unexpected(HeatFluxError("Insufficient data for wall heat flux computation"));
   }
-  const double dT_deta_wall = (inputs.T[1] - inputs.T[0]) / d_eta_;
+  
+  // Use high-order derivative formula for consistency with profile calculation
+  auto dT_deta_result = coefficients::derivatives::compute_eta_derivative(inputs.T, d_eta_);
+  if (!dT_deta_result) {
+    return std::unexpected(HeatFluxError("Failed to compute temperature derivative at wall"));
+  }
+  const double dT_deta_wall = dT_deta_result.value()[0];
 
   double q_wall_conductive = coeffs.wall.k_wall * dT_deta_wall * geo_factors.der_fact;
 

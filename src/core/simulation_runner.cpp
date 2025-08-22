@@ -177,9 +177,9 @@ auto SimulationRunner::display_standard_results(const boundary_layer::solver::So
     // Print some profiles
     std::cout << "\nBoundary layer profiles (selected points):" << std::endl;
     std::cout << std::setw(constants::string_processing::wide_field_width) << "η/η_max" 
-              << std::setw(constants::string_processing::wide_field_width) << "F" 
-              << std::setw(constants::string_processing::wide_field_width) << "g" 
-              << std::setw(constants::string_processing::wide_field_width) << "V" << std::endl;
+              << "     " << "F" 
+              << "         " << "g" 
+              << "         " << "V" << std::endl;
     std::cout << std::string(4 * constants::string_processing::wide_field_width, '-') << std::endl;
 
     const std::size_t n_print = std::min(static_cast<std::size_t>(constants::indexing::max_profile_print_points), n_eta);
