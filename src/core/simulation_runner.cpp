@@ -267,7 +267,9 @@ auto SimulationRunner::run_edge_reconstruction(
   // Update performance metrics
   metrics.reconstruction_time = reconstruction_duration;
   
-  return std::move(edge.full_solution);
+  // Create a copy to avoid issues with destructor ordering
+  auto solution_copy = edge.full_solution;
+  return solution_copy;
 }
 
 } // namespace blast::core

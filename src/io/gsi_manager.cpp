@@ -47,6 +47,7 @@ auto GsiManager::restore_gsi_file() -> void {
   if (file.is_open()) {
     file << original_gsi_content_;
     file.close();
+    gsi_backed_up_ = false;  // Mark as restored to avoid double restoration
   }
 }
 

@@ -13,9 +13,9 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 20                       
+  n_eta: 200                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-10
+  convergence_tolerance: 1.0e-9
   max_iterations: 10000000
 
 mixture:
@@ -38,7 +38,7 @@ outer_edge:
       temperature: 5000  # This will be calculated
       pressure: 7000
       boundary_override: 
-        enabled: true
+        enabled: false
         mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]  # CO2, CO, O2, O, C
   
   velocity_gradient_stagnation: 4027.1213622326
@@ -84,7 +84,7 @@ edge_reconstruction:
   solver:
     initial_temperature_guess: 5600  # [K] Near expected value
     temperature_min: 4500            # [K] 
-    temperature_max: 7300            # [K] Around 5905.5K
+    temperature_max: 6300            # [K] Around 5905.5K
     tolerance: 1e-3                   
     max_iterations: 50
 

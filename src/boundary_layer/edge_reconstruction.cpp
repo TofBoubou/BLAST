@@ -219,6 +219,9 @@ auto EdgeTemperatureReconstructor::reconstruct()
   std::cout << "Complete solution generated successfully!" << std::endl;
   std::cout << "Final heat flux verification: " << final_heat_flux << " W/m²" << std::endl;
   
+  // Restore GSI file before returning
+  gsi_manager_.restore_gsi_file();
+  
   return ReconstructedEdgeConditions{
       .temperature = T_edge,
       .pressure = config_.boundary_conditions.pressure,
