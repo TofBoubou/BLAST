@@ -170,6 +170,13 @@ auto EdgeTemperatureReconstructor::reconstruct()
         "Failed to compute viscosity at reconstructed edge temperature"));
   }
   
+  // Compute final heat flux at converged temperature
+  auto final_heat_flux_result = compute_heat_flux_at_temperature(T_edge);
+  if (!final_heat_flux_result) {
+    return std::unexpected(solver::SolverError(
+        "Failed to compute final heat flux at reconstructed edge temperature"));
+  }
+  
   return ReconstructedEdgeConditions{
       .temperature = T_edge,
       .pressure = config_.boundary_conditions.pressure,
@@ -177,7 +184,7 @@ auto EdgeTemperatureReconstructor::reconstruct()
       .mass_fractions = *mass_fractions_result,
       .density = density_edge,
       .viscosity = *viscosity_result,
-      .heat_flux_achieved = *qb_result + fb,
+      .heat_flux_achieved = *final_heat_flux_result,
       .iterations_used = count
   };
 }

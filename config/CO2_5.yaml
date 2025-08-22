@@ -1,7 +1,7 @@
 simulation:
   body_type: axisymmetric
   only_stagnation_point: true
-  finite_thickness: false
+  finite_thickness: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
   consider_dufour_effect: false
@@ -58,9 +58,9 @@ abacus:
   temperature_points: 30
 
 continuation:
-  wall_temperature_stable: 5000.0
+  wall_temperature_stable: 3000
   edge_temperature_stable: 5905.5
-  pressure_stable: 7000.0
+  pressure_stable: 7000
 
 # ./blast config/default.yaml test_output
 # python3 scripts/postprocess_blast.py --input test_outputs/simulation_20250713_232651.h5 --plots all --output results_h5

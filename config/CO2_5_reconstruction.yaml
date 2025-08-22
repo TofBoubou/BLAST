@@ -9,14 +9,14 @@ simulation:
   consider_thermal_diffusion: false
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium"
-  catalytic_wall: true
+  catalytic_wall: true              # Match reference case
   adiabatic: false
 
 numerical:
-  n_eta: 20                       
+  n_eta: 50                       
   eta_max: 6.0
-  convergence_tolerance: 1.0e-6
-  max_iterations: 1000
+  convergence_tolerance: 1.0e-10
+  max_iterations: 10000000
 
 mixture:
   name: CO2_5
@@ -38,7 +38,8 @@ outer_edge:
       temperature: 5000  # This will be calculated
       pressure: 7000
       boundary_override: 
-        enabled: false
+        enabled: true
+        mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]  # CO2, CO, O2, O, C
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429
@@ -50,8 +51,8 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [1700]  # Fixed wall temperature  
-  emissivity: 0.0       # No radiation
+  temperatures: [5000]  # Fixed wall temperature matching reference 
+  emissivity: 0.8       # Match reference case
   environment_temperature: 1
 
 # Edge reconstruction configuration
@@ -59,13 +60,13 @@ edge_reconstruction:
   enabled: true
   
   # Target heat flux we want to achieve
-  target_heat_flux: 450000  # [W/m²]
+  target_heat_flux: 571759  # [W/m²] From reference case
   
   # Boundary conditions for reconstruction
   boundary_conditions:
     pressure: 7000           # [Pa]
-    wall_temperature: 1700   # [K]
-    catalyticity: 0        # 0-1
+    wall_temperature: 5000   # [K] From reference case
+    catalyticity: 1.0        # Full catalytic wall like reference
   
   # Flow parameters
   flow_parameters:
@@ -81,16 +82,16 @@ edge_reconstruction:
   
   # Solver configuration
   solver:
-    initial_temperature_guess: 5200  # [K]
-    temperature_min: 4500            # [K]
-    temperature_max: 6000            # [K]
-    tolerance: 5000                   # 5000 W/m² tolerance (1% relative error)
-    max_iterations: 10
+    initial_temperature_guess: 5600  # [K] Near expected value
+    temperature_min: 5500            # [K] 
+    temperature_max: 6300            # [K] Around 5905.5K
+    tolerance: 1                   # 1000 W/m² tolerance
+    max_iterations: 15
 
 abacus:
   enabled: false
   
 continuation:
-  wall_temperature_stable: 300
-  edge_temperature_stable: 500
+  wall_temperature_stable: 3000
+  edge_temperature_stable: 5905.5
   pressure_stable: 7000
