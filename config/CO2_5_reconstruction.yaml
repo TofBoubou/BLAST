@@ -52,7 +52,7 @@ outer_edge:
 
 wall_parameters:
   temperatures: [5000]  # Fixed wall temperature matching reference 
-  emissivity: 0       # Match reference case
+  emissivity: 0.8       # Match reference case
   environment_temperature: 1
 
 # Edge reconstruction configuration
@@ -66,7 +66,7 @@ edge_reconstruction:
   boundary_conditions:
     pressure: 7000           # [Pa]
     wall_temperature: 5000   # [K] From reference case
-    catalyticity: 1.0        # Full catalytic wall like reference
+    catalyticity: 0.12        # Full catalytic wall like reference
   
   # Flow parameters
   flow_parameters:
@@ -83,8 +83,8 @@ edge_reconstruction:
   # Solver configuration
   solver:
     initial_temperature_guess: 5600  # [K] Near expected value
-    temperature_min: 5500            # [K] 
-    temperature_max: 6300            # [K] Around 5905.5K
+    temperature_min: 3500            # [K] 
+    temperature_max: 9300            # [K] Around 5905.5K
     tolerance: 1e-6                   # 1000 W/m² tolerance
     max_iterations: 20
 

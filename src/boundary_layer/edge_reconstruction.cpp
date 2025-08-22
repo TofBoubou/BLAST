@@ -8,6 +8,30 @@ namespace blast::boundary_layer {
 auto EdgeTemperatureReconstructor::reconstruct() 
     -> std::expected<ReconstructedEdgeConditions, solver::SolverError> {
   
+  // Backup and update GSI file with the catalyticity value
+  auto backup_result = gsi_manager_.backup_gsi_file();
+  if (!backup_result) {
+    std::cerr << "Warning: Failed to backup GSI file: " << backup_result.error() << std::endl;
+  }
+  
+  // Update GSI file with the specified catalyticity
+  if (config_.boundary_conditions.catalyticity > 0) {
+    auto update_result = gsi_manager_.update_gsi_catalyticity(config_.boundary_conditions.catalyticity);
+    if (!update_result) {
+      std::cerr << "Warning: Failed to update GSI catalyticity: " << update_result.error() << std::endl;
+    } else {
+      std::cout << "Updated GSI file with catalyticity = " << config_.boundary_conditions.catalyticity << std::endl;
+      
+      // Reload mixture with updated GSI
+      auto reload_result = mixture_.reload_gsi();
+      if (!reload_result) {
+        return std::unexpected(solver::SolverError(
+            std::format("Failed to reload mixture after GSI update: {}", reload_result.error())));
+      }
+      std::cout << "Mixture reloaded with updated GSI file" << std::endl;
+    }
+  }
+  
   // Brent's method parameters
   bool mflag = true;
   double a = config_.solver.temperature_min;

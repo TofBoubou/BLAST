@@ -12,7 +12,7 @@ namespace blast::core {
 
 auto SimulationRunner::run_simulation(
   boundary_layer::solver::BoundaryLayerSolver& solver,
-  const thermophysics::MixtureInterface& mixture,
+  thermophysics::MixtureInterface& mixture,
   const io::Configuration& config,
   const std::string& case_name,
   PerformanceMetrics& metrics) 
@@ -103,7 +103,7 @@ auto SimulationRunner::run_standard_simulation(
 
 auto SimulationRunner::run_abacus_generation(
   boundary_layer::solver::BoundaryLayerSolver& solver,
-  const thermophysics::MixtureInterface& mixture,
+  thermophysics::MixtureInterface& mixture,
   const io::Configuration& config,
   const std::string& case_name,
   PerformanceMetrics& metrics) 
@@ -216,7 +216,7 @@ auto SimulationRunner::display_abacus_info(const io::Configuration& config) cons
 }
 
 auto SimulationRunner::run_edge_reconstruction(
-  const thermophysics::MixtureInterface& mixture,
+  thermophysics::MixtureInterface& mixture,
   const io::Configuration& config,
   PerformanceMetrics& metrics) 
   -> std::expected<void, ApplicationError> {

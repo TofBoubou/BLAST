@@ -21,7 +21,7 @@ public:
   // Run simulation (either standard or abacus)
   [[nodiscard]] auto run_simulation(
     boundary_layer::solver::BoundaryLayerSolver& solver,
-    const thermophysics::MixtureInterface& mixture,
+    thermophysics::MixtureInterface& mixture,
     const io::Configuration& config,
     const std::string& case_name,
     PerformanceMetrics& metrics) 
@@ -42,7 +42,7 @@ private:
   // Run abacus generation
   [[nodiscard]] auto run_abacus_generation(
     boundary_layer::solver::BoundaryLayerSolver& solver,
-    const thermophysics::MixtureInterface& mixture,
+    thermophysics::MixtureInterface& mixture,
     const io::Configuration& config,
     const std::string& case_name,
     PerformanceMetrics& metrics) 
@@ -50,7 +50,7 @@ private:
     
   // Run edge reconstruction
   [[nodiscard]] auto run_edge_reconstruction(
-    const thermophysics::MixtureInterface& mixture,
+    thermophysics::MixtureInterface& mixture,
     const io::Configuration& config,
     PerformanceMetrics& metrics) 
     -> std::expected<void, ApplicationError>;

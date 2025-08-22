@@ -2,6 +2,7 @@
 
 #include "../core/containers.hpp"
 #include "config_types.hpp"
+#include "gsi_manager.hpp"
 #include <expected>
 #include <filesystem>
 #include <memory>
@@ -45,25 +46,10 @@ private:
   boundary_layer::solver::BoundaryLayerSolver& solver_;
   thermophysics::MixtureInterface& mixture_;
   const Configuration& config_;
-
-  std::filesystem::path gsi_file_path_;
-  std::string original_gsi_content_;
-  bool gsi_backed_up_ = false;
-
-  // Backup original GSI file content
-  [[nodiscard]] auto backup_gsi_file() -> std::expected<void, std::string>;
-
-  // Restore original GSI file
-  auto restore_gsi_file() -> void;
-
-  // Update GSI file with new gamma value
-  [[nodiscard]] auto update_gsi_catalyticity(double gamma) -> std::expected<void, std::string>;
+  GsiManager gsi_manager_;
 
   // Solve for a single temperature
   [[nodiscard]] auto solve_for_temperature(double wall_temperature) -> double;
-
-  // Build the GSI file path from mixture name
-  [[nodiscard]] auto construct_gsi_path() const -> std::filesystem::path;
 };
 
 } // namespace io

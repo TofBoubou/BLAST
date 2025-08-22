@@ -1,6 +1,7 @@
 #pragma once
 
 #include "blast/io/config_types.hpp"
+#include "blast/io/gsi_manager.hpp"
 #include "blast/core/exceptions.hpp"
 #include "blast/boundary_layer/conditions/boundary_conditions.hpp"
 #include "blast/thermophysics/mixture_interface.hpp"
@@ -27,10 +28,11 @@ public:
   EdgeTemperatureReconstructor(
       const io::EdgeReconstructionConfig& config,
       const io::Configuration& full_config,
-      const thermophysics::MixtureInterface& mixture)
+      thermophysics::MixtureInterface& mixture)
       : config_(config),
         full_config_(full_config),
-        mixture_(mixture) {}
+        mixture_(mixture),
+        gsi_manager_(full_config) {}
 
   auto reconstruct() -> std::expected<ReconstructedEdgeConditions, solver::SolverError>;
 
@@ -43,7 +45,8 @@ private:
 
   const io::EdgeReconstructionConfig& config_;
   const io::Configuration& full_config_;
-  const thermophysics::MixtureInterface& mixture_;
+  thermophysics::MixtureInterface& mixture_;
+  io::GsiManager gsi_manager_;
 };
 
 } // namespace blast::boundary_layer
