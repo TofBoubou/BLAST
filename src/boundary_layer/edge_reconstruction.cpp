@@ -65,9 +65,58 @@ auto EdgeTemperatureReconstructor::reconstruct()
   
   // Check if target is within bounds
   if (fa * fb > 0) {
-    return std::unexpected(solver::SolverError(
-        std::format("Target heat flux {} W/m² is outside the range [{}, {}] W/m²",
-                   config_.target_heat_flux, *qa_result, *qb_result)));
+    std::string error_msg = std::format(
+        "\n"
+        "═══════════════════════════════════════════════════════════════════════════════════\n"
+        "                        TEMPERATURE RANGE ERROR\n"
+        "═══════════════════════════════════════════════════════════════════════════════════\n"
+        "\n"
+        "Target heat flux cannot be achieved within the specified temperature range!\n"
+        "\n"
+        "  Target heat flux:        {} W/m²\n"
+        "  Flux at T_min ({} K):   {} W/m²\n"
+        "  Flux at T_max ({} K):   {} W/m²\n"
+        "  Current flux range:      [{}, {}] W/m²\n"
+        "\n"
+        "SOLUTION: Update your YAML configuration file\n"
+        "\n",
+        config_.target_heat_flux,
+        config_.solver.temperature_min, *qa_result,
+        config_.solver.temperature_max, *qb_result,
+        std::min(*qa_result, *qb_result), std::max(*qa_result, *qb_result));
+    
+/*     // Suggest new temperature bounds
+    double flux_range = std::abs(*qb_result - *qa_result);
+    double temp_range = config_.solver.temperature_max - config_.solver.temperature_min;
+    double flux_per_kelvin = flux_range / temp_range;
+    
+    if (config_.target_heat_flux < std::min(*qa_result, *qb_result)) {
+      // Target is below range - need lower temperatures
+      double new_t_min = config_.solver.temperature_min - 
+                         (std::min(*qa_result, *qb_result) - config_.target_heat_flux) / flux_per_kelvin * 1.2;
+      error_msg += std::format(
+          "  solver:\n"
+          "    temperature_min: {}    # [K] (reduced from {})\n"
+          "    temperature_max: {}    # [K] (keep current value)\n",
+          static_cast<int>(new_t_min),
+          static_cast<int>(config_.solver.temperature_min),
+          static_cast<int>(config_.solver.temperature_max));
+    } else {
+      // Target is above range - need higher temperatures  
+      double new_t_max = config_.solver.temperature_max + 
+                         (config_.target_heat_flux - std::max(*qa_result, *qb_result)) / flux_per_kelvin * 1.2;
+      error_msg += std::format(
+          "  solver:\n"
+          "    temperature_min: {}            # [K] (keep current value)\n"
+          "    temperature_max: {}    # [K] (increased from {})\n",
+          static_cast<int>(config_.solver.temperature_min),
+          static_cast<int>(new_t_max),
+          static_cast<int>(config_.solver.temperature_max));
+    } */
+    
+    error_msg += "\n═══════════════════════════════════════════════════════════════════════════════════\n";
+    
+    return std::unexpected(solver::SolverError(error_msg));
   }
   
   // Brent's method variables
