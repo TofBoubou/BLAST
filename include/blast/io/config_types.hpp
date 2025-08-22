@@ -130,6 +130,43 @@ struct ContinuationConfig {
   double pressure_stable = constants::defaults::stable_pressure;
 };
 
+struct EdgeReconstructionConfig {
+  bool enabled = false;
+  
+  // Target values
+  double target_heat_flux = 0.0;  // [W/m²] Target total heat flux at wall
+  
+  // Boundary conditions
+  struct BoundaryConditions {
+    double pressure = 0.0;           // [Pa] Pressure at edge (fixed)
+    double wall_temperature = 0.0;   // [K] Wall temperature
+    double catalyticity = 0.0;       // Catalytic efficiency (0-1)
+  } boundary_conditions;
+  
+  // Flow parameters
+  struct FlowParameters {
+    double velocity_gradient_stagnation = 0.0;  // [1/s]
+    double freestream_density = 0.0;            // [kg/m³]
+    double freestream_velocity = 0.0;           // [m/s]
+  } flow_parameters;
+  
+  // Finite thickness parameters (required for reconstruction)
+  struct FiniteThicknessParams {
+    double v_edge = 0.0;              // [m/s] Edge normal velocity
+    double d2_ue_dxdy = 0.0;          // [1/s²] Second derivative
+    double delta_bl = 0.0;            // [m] Boundary layer thickness
+  } finite_thickness_params;
+  
+  // Solver configuration
+  struct SolverSettings {
+    double initial_temperature_guess = 4000.0;  // [K] Initial guess
+    double temperature_min = 2000.0;            // [K] Lower bound
+    double temperature_max = 8000.0;            // [K] Upper bound
+    double tolerance = 1.0e-6;                  // Convergence tolerance
+    int max_iterations = 50;                    // Maximum iterations
+  } solver;
+};
+
 struct Configuration {
   SimulationConfig simulation;
   NumericalConfig numerical;
@@ -140,6 +177,7 @@ struct Configuration {
   WallParametersConfig wall_parameters;
   AbacusConfig abacus;
   ContinuationConfig continuation;
+  EdgeReconstructionConfig edge_reconstruction;
 };
 
 template <typename T>

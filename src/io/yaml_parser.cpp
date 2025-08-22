@@ -123,6 +123,20 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.continuation = std::move(cont_result.value());
 
+    // Edge reconstruction (optional)
+    if (root_["edge_reconstruction"]) {
+      auto edge_recon_result = parse_edge_reconstruction_config(root_["edge_reconstruction"]);
+      if (!edge_recon_result) {
+        return std::unexpected(edge_recon_result.error());
+      }
+      config.edge_reconstruction = std::move(edge_recon_result.value());
+      
+      // Force finite thickness when edge reconstruction is enabled
+      if (config.edge_reconstruction.enabled) {
+        config.simulation.finite_thickness = true;
+      }
+    }
+
     return config;
 
   } catch (const YAML::Exception& e) {
@@ -583,6 +597,128 @@ auto YamlParser::parse_continuation_config(const YAML::Node& node) const
   } catch (const YAML::Exception& e) {
     return std::unexpected(
         core::ConfigurationError(std::format("In 'continuation' section: failed to parse - {}", e.what())));
+  }
+}
+
+auto YamlParser::parse_edge_reconstruction_config(const YAML::Node& node) const
+    -> std::expected<EdgeReconstructionConfig, core::ConfigurationError> {
+
+  EdgeReconstructionConfig config;
+
+  if (!node) {
+    return config;
+  }
+
+  try {
+    if (node["enabled"]) {
+      config.enabled = node["enabled"].as<bool>();
+    }
+
+    if (config.enabled) {
+      // Target values
+      if (!node["target_heat_flux"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'target_heat_flux' in edge_reconstruction"));
+      }
+      config.target_heat_flux = node["target_heat_flux"].as<double>();
+
+      // Boundary conditions
+      if (!node["boundary_conditions"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'boundary_conditions' in edge_reconstruction"));
+      }
+      auto bc_node = node["boundary_conditions"];
+      if (!bc_node["pressure"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'pressure' in edge_reconstruction.boundary_conditions"));
+      }
+      config.boundary_conditions.pressure = bc_node["pressure"].as<double>();
+      
+      if (!bc_node["wall_temperature"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'wall_temperature' in edge_reconstruction.boundary_conditions"));
+      }
+      config.boundary_conditions.wall_temperature = bc_node["wall_temperature"].as<double>();
+      
+      if (!bc_node["catalyticity"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'catalyticity' in edge_reconstruction.boundary_conditions"));
+      }
+      config.boundary_conditions.catalyticity = bc_node["catalyticity"].as<double>();
+
+      // Flow parameters
+      if (!node["flow_parameters"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'flow_parameters' in edge_reconstruction"));
+      }
+      auto flow_node = node["flow_parameters"];
+      if (!flow_node["velocity_gradient_stagnation"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'velocity_gradient_stagnation' in edge_reconstruction.flow_parameters"));
+      }
+      config.flow_parameters.velocity_gradient_stagnation = flow_node["velocity_gradient_stagnation"].as<double>();
+      
+      if (!flow_node["freestream_density"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'freestream_density' in edge_reconstruction.flow_parameters"));
+      }
+      config.flow_parameters.freestream_density = flow_node["freestream_density"].as<double>();
+      
+      if (!flow_node["freestream_velocity"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'freestream_velocity' in edge_reconstruction.flow_parameters"));
+      }
+      config.flow_parameters.freestream_velocity = flow_node["freestream_velocity"].as<double>();
+
+      // Finite thickness params
+      if (!node["finite_thickness_params"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'finite_thickness_params' in edge_reconstruction"));
+      }
+      auto ft_node = node["finite_thickness_params"];
+      if (!ft_node["v_edge"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'v_edge' in edge_reconstruction.finite_thickness_params"));
+      }
+      config.finite_thickness_params.v_edge = ft_node["v_edge"].as<double>();
+      
+      if (!ft_node["d2_ue_dxdy"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'd2_ue_dxdy' in edge_reconstruction.finite_thickness_params"));
+      }
+      config.finite_thickness_params.d2_ue_dxdy = ft_node["d2_ue_dxdy"].as<double>();
+      
+      if (!ft_node["delta_bl"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'delta_bl' in edge_reconstruction.finite_thickness_params"));
+      }
+      config.finite_thickness_params.delta_bl = ft_node["delta_bl"].as<double>();
+
+      // Solver settings (optional with defaults)
+      if (node["solver"]) {
+        auto solver_node = node["solver"];
+        if (solver_node["initial_temperature_guess"]) {
+          config.solver.initial_temperature_guess = solver_node["initial_temperature_guess"].as<double>();
+        }
+        if (solver_node["temperature_min"]) {
+          config.solver.temperature_min = solver_node["temperature_min"].as<double>();
+        }
+        if (solver_node["temperature_max"]) {
+          config.solver.temperature_max = solver_node["temperature_max"].as<double>();
+        }
+        if (solver_node["tolerance"]) {
+          config.solver.tolerance = solver_node["tolerance"].as<double>();
+        }
+        if (solver_node["max_iterations"]) {
+          config.solver.max_iterations = solver_node["max_iterations"].as<int>();
+        }
+      }
+    }
+
+    return config;
+  } catch (const YAML::Exception& e) {
+    return std::unexpected(
+        core::ConfigurationError(std::format("In 'edge_reconstruction' section: failed to parse - {}", e.what())));
   }
 }
 

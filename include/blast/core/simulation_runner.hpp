@@ -14,6 +14,7 @@ public:
   struct SimulationResult {
     boundary_layer::solver::SolutionResult solution;
     bool is_abacus = false;
+    bool is_edge_reconstruction = false;
     std::string output_filename;
   };
 
@@ -46,6 +47,13 @@ private:
     const std::string& case_name,
     PerformanceMetrics& metrics) 
     -> std::expected<std::string, ApplicationError>;
+    
+  // Run edge reconstruction
+  [[nodiscard]] auto run_edge_reconstruction(
+    const thermophysics::MixtureInterface& mixture,
+    const io::Configuration& config,
+    PerformanceMetrics& metrics) 
+    -> std::expected<void, ApplicationError>;
     
   // Display standard simulation results
   auto display_standard_results(const boundary_layer::solver::SolutionResult& solution,

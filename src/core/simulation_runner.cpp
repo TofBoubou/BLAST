@@ -1,5 +1,6 @@
 #include "blast/core/simulation_runner.hpp"
 #include "blast/core/constants.hpp"
+#include "blast/boundary_layer/edge_reconstruction.hpp"
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -17,7 +18,20 @@ auto SimulationRunner::run_simulation(
   PerformanceMetrics& metrics) 
   -> std::expected<SimulationResult, ApplicationError> {
     
-  if (config.abacus.enabled) {
+  // Check if edge reconstruction mode is enabled
+  if (config.edge_reconstruction.enabled) {
+    auto reconstruction_result = run_edge_reconstruction(mixture, config, metrics);
+    if (!reconstruction_result) {
+      return std::unexpected(reconstruction_result.error());
+    }
+    
+    return SimulationResult{
+      .solution = {},
+      .is_abacus = false,
+      .is_edge_reconstruction = true,
+      .output_filename = ""
+    };
+  } else if (config.abacus.enabled) {
     auto abacus_filename = run_abacus_generation(solver, mixture, config, case_name, metrics);
     if (!abacus_filename) {
       return std::unexpected(abacus_filename.error());
@@ -26,6 +40,7 @@ auto SimulationRunner::run_simulation(
     return SimulationResult{
       .solution = {},
       .is_abacus = true,
+      .is_edge_reconstruction = false,
       .output_filename = abacus_filename.value()
     };
   } else {
@@ -37,6 +52,7 @@ auto SimulationRunner::run_simulation(
     return SimulationResult{
       .solution = std::move(solution.value()),
       .is_abacus = false,
+      .is_edge_reconstruction = false,
       .output_filename = ""
     };
   }
@@ -197,6 +213,58 @@ auto SimulationRunner::display_abacus_info(const io::Configuration& config) cons
     std::cout << config.abacus.catalyticity_values[i];
   }
   std::cout << std::endl;
+}
+
+auto SimulationRunner::run_edge_reconstruction(
+  const thermophysics::MixtureInterface& mixture,
+  const io::Configuration& config,
+  PerformanceMetrics& metrics) 
+  -> std::expected<void, ApplicationError> {
+    
+  std::cout << "\n=== EDGE TEMPERATURE RECONSTRUCTION ===" << std::endl;
+  
+  auto reconstruction_start = std::chrono::high_resolution_clock::now();
+  
+  // Create edge reconstructor
+  boundary_layer::EdgeTemperatureReconstructor reconstructor(
+      config.edge_reconstruction, config, mixture);
+  
+  // Run reconstruction
+  auto reconstruction_result = reconstructor.reconstruct();
+  
+  if (!reconstruction_result) {
+    return std::unexpected(ApplicationError{
+      "Edge reconstruction failed: " + reconstruction_result.error().message(),
+      constants::indexing::second
+    });
+  }
+  
+  auto reconstruction_end = std::chrono::high_resolution_clock::now();
+  auto reconstruction_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      reconstruction_end - reconstruction_start);
+  
+  // Display results
+  const auto& edge = reconstruction_result.value();
+  std::cout << "\n=== RECONSTRUCTION RESULTS ===" << std::endl;
+  std::cout << "Edge temperature: " << edge.temperature << " K" << std::endl;
+  std::cout << "Edge pressure: " << edge.pressure << " Pa" << std::endl;
+  std::cout << "Edge enthalpy: " << edge.enthalpy << " J/kg" << std::endl;
+  std::cout << "Edge density: " << edge.density << " kg/m³" << std::endl;
+  std::cout << "Edge viscosity: " << edge.viscosity << " Pa·s" << std::endl;
+  std::cout << "\nSpecies mass fractions at edge:" << std::endl;
+  
+  for (size_t i = 0; i < edge.mass_fractions.size(); ++i) {
+    std::cout << "  " << mixture.species_name(i) << ": " << edge.mass_fractions[i] << std::endl;
+  }
+  
+  std::cout << "\nTarget heat flux: " << config.edge_reconstruction.target_heat_flux << " W/m²" << std::endl;
+  std::cout << "Achieved heat flux: " << edge.heat_flux_achieved << " W/m²" << std::endl;
+  std::cout << "Relative error: " << std::abs(edge.heat_flux_achieved - config.edge_reconstruction.target_heat_flux) 
+            / config.edge_reconstruction.target_heat_flux * 100 << " %" << std::endl;
+  std::cout << "Iterations used: " << edge.iterations_used << std::endl;
+  std::cout << "Reconstruction time: " << reconstruction_duration.count() << " ms" << std::endl;
+  
+  return {};
 }
 
 } // namespace blast::core

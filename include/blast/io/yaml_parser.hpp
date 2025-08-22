@@ -51,6 +51,9 @@ private:
   [[nodiscard]] auto parse_continuation_config(const YAML::Node& node) const
       -> std::expected<ContinuationConfig, core::ConfigurationError>;
 
+  [[nodiscard]] auto parse_edge_reconstruction_config(const YAML::Node& node) const
+      -> std::expected<EdgeReconstructionConfig, core::ConfigurationError>;
+
 public:
   explicit YamlParser(std::string file_path) : file_path_(std::move(file_path)) {} // constructor so no ->
 
