@@ -13,7 +13,7 @@ simulation:
   adiabatic: false
 
 numerical:
-  n_eta: 50                       
+  n_eta: 20                       
   eta_max: 6.0
   convergence_tolerance: 1.0e-10
   max_iterations: 10000000
@@ -52,7 +52,7 @@ outer_edge:
 
 wall_parameters:
   temperatures: [5000]  # Fixed wall temperature matching reference 
-  emissivity: 0.8       # Match reference case
+  emissivity: 0       # Match reference case
   environment_temperature: 1
 
 # Edge reconstruction configuration
@@ -60,13 +60,13 @@ edge_reconstruction:
   enabled: true
   
   # Target heat flux we want to achieve
-  target_heat_flux: 571759  # [W/m²] From reference case
+  target_heat_flux: 500000  # [W/m²] From reference case
   
   # Boundary conditions for reconstruction
   boundary_conditions:
     pressure: 7000           # [Pa]
-    wall_temperature: 5000   # [K] From reference case
-    catalyticity: 0.12        # Full catalytic wall like reference
+    wall_temperature: 2000   # [K] From reference case
+    catalyticity: 0.1        # Full catalytic wall like reference
   
   # Flow parameters
   flow_parameters:
@@ -83,10 +83,10 @@ edge_reconstruction:
   # Solver configuration
   solver:
     initial_temperature_guess: 5600  # [K] Near expected value
-    temperature_min: 3500            # [K] 
-    temperature_max: 9300            # [K] Around 5905.5K
-    tolerance: 1e-6                   # 1000 W/m² tolerance
-    max_iterations: 20
+    temperature_min: 4500            # [K] 
+    temperature_max: 7300            # [K] Around 5905.5K
+    tolerance: 10                   # 1000 W/m² tolerance
+    max_iterations: 50
 
 abacus:
   enabled: false
