@@ -1,19 +1,16 @@
-# Edge reconstruction test configuration
-# Reconstructs edge temperature from target heat flux
-
 simulation:
   body_type: axisymmetric
   only_stagnation_point: true
-  finite_thickness: true  # Will be forced true by edge_reconstruction
+  finite_thickness: true
   diffusion_type: stefan_maxwell
   consider_thermal_diffusion: false
   consider_dufour_effect: false
   chemical_mode: "non_equilibrium"
-  catalytic_wall: true              # Match reference case
+  catalytic_wall: true
   adiabatic: false
 
 numerical:
-  n_eta: 20                       
+  n_eta: 20
   eta_max: 6.0
   convergence_tolerance: 1.0e-9
   max_iterations: 100000
@@ -29,17 +26,16 @@ output:
   x_stations: [0.0]
   output_directory: test_outputs
 
-# Standard outer_edge config (will be overridden by reconstruction)
 outer_edge:
   edge_points:
     - x: 0.0
       radius: 1
       velocity: 0
-      temperature: 5000  # This will be calculated
+      temperature: 5000
       pressure: 7000
       boundary_override: 
         enabled: false
-        mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]  # CO2, CO, O2, O, C
+        mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
   
   velocity_gradient_stagnation: 4027.1213622326
   freestream_density: 0.0019382429
@@ -51,41 +47,35 @@ outer_edge:
     delta_bl: 0.0105250000
 
 wall_parameters:
-  temperatures: [5000]  # Fixed wall temperature matching reference 
-  emissivity: 0       # Match reference case
+  temperatures: [5000]
+  emissivity: 0
   environment_temperature: 1
 
-# Edge reconstruction configuration
 edge_reconstruction:
   enabled: true
   
-  # Target heat flux we want to achieve
-  target_heat_flux: 400000  # [W/m²] From reference case
+  target_heat_flux: 400000
   
-  # Boundary conditions for reconstruction
   boundary_conditions:
-    pressure: 7000           # [Pa]
-    wall_temperature: 2000   # [K] From reference case
-    catalyticity: 0.1        # Full catalytic wall like reference
+    pressure: 7000
+    wall_temperature: 2000
+    catalyticity: 0.1
   
-  # Flow parameters
   flow_parameters:
-    velocity_gradient_stagnation: 4027.1213622326  # [1/s]
-    freestream_density: 0.0019382429               # [kg/m³]
-    freestream_velocity: 500000                    # [m/s]
+    velocity_gradient_stagnation: 4027.1213622326
+    freestream_density: 0.0019382429
+    freestream_velocity: 500000
   
-  # Finite thickness parameters (required)
   finite_thickness_params:
-    v_edge: -111.31796000           # [m/s]
-    d2_ue_dxdy: -290979.9698604651  # [1/s²]
-    delta_bl: 0.0105250000          # [m]
+    v_edge: -111.31796000
+    d2_ue_dxdy: -290979.9698604651
+    delta_bl: 0.0105250000
   
-  # Solver configuration
   solver:
-    initial_temperature_guess: 5600  # [K] Near expected value
-    temperature_min: 3312            # [K] 
-    temperature_max: 6000            # [K] Around 5905.5K
-    tolerance: 1e-3                   
+    initial_temperature_guess: 5600
+    temperature_min: 3312
+    temperature_max: 6000
+    tolerance: 1e-3
     max_iterations: 50
 
 abacus:
