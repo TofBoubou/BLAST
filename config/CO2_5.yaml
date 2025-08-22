@@ -48,7 +48,7 @@ outer_edge:
 
 wall_parameters:
   temperatures: [5000]
-  emissivity: 0.8
+  emissivity: 0
   environment_temperature: 1
 
 abacus:
