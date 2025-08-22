@@ -494,10 +494,6 @@ class BLASTPlotter:
         q_diff_dim = np.array(heat_flux['dimensional']['q_diffusive']) 
         q_total_dim = np.array(heat_flux['dimensional']['q_total'])
         
-        # DEBUG: Print heat flux values read from H5
-        print(f"[H5_READ] Station {station_index}: q_cond_dim={q_cond_dim[0]:.2e} W/m², q_diff_dim={q_diff_dim[0]:.2e} W/m², q_total_dim={q_total_dim[0]:.2e} W/m² (at wall)")
-        print(f"[H5_READ] Station {station_index}: q_total_dim range: min={q_total_dim.min():.2e}, max={q_total_dim.max():.2e} W/m²")
-        
         axes[0, 0].plot(q_cond_dim, eta, 'black', linestyle='-', linewidth=2, label='Conductive')
         axes[0, 0].plot(q_diff_dim, eta, 'black', linestyle='--', linewidth=2, label='Diffusive')
         axes[0, 0].plot(q_total_dim, eta, 'black', linestyle='-.', linewidth=2, label='Total')
