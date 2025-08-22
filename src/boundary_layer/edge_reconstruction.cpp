@@ -77,7 +77,7 @@ auto EdgeTemperatureReconstructor::reconstruct()
   int count = 0;
   int max_iter = config_.solver.max_iterations;
   double conv = std::pow(config_.solver.tolerance, 1.0/3.0);
-  double step_tol = std::pow(config_.solver.tolerance, 2.0/3.0);
+  double step_tol = std::max(1.0, std::pow(config_.solver.tolerance, 2.0/3.0));
   
   while (count < max_iter && std::abs(fb) > conv) {
     count++;
@@ -102,15 +102,13 @@ auto EdgeTemperatureReconstructor::reconstruct()
       std::cout << "  Using secant method → T_candidate=" << s << " K" << std::endl;
     }
     
-    // Check conditions for bisection
-    bool condition1 = (s < (3 * a + b) / 4) || (s > b);
-    bool condition2 = mflag && (std::abs(s - b) >= std::abs(b - c_brent) / 2);
-    bool condition3 = !mflag && (std::abs(s - b) >= std::abs(c_brent - d) / 2);
+    bool condition2 = mflag && (std::abs(s - b) >= std::abs(b - c_brent) * 0.75);
+    bool condition3 = !mflag && (std::abs(s - b) >= std::abs(c_brent - d) * 0.75);
     bool condition4 = mflag && (std::abs(b - c_brent) < std::abs(step_tol));
     bool condition5 = !mflag && (std::abs(c_brent - d) < std::abs(step_tol));
     
-    if (condition1 || condition2 || condition3 || condition4 || condition5) {
-      s = (a + b) / 2;  // Bisection
+    if (condition2 || condition3 || condition4 || condition5) {
+      s = (a + b) / 2;
       std::cout << "  Switching to bisection → T_candidate=" << s << " K" << std::endl;
       mflag = true;
     } else {
