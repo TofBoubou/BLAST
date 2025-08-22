@@ -23,6 +23,7 @@ public:
     double viscosity;             // [Pa·s] Edge viscosity
     double heat_flux_achieved;    // [W/m²] Actual heat flux achieved
     int iterations_used;          // Number of iterations needed
+    solver::SolutionResult full_solution;  // Complete boundary layer solution at optimal T_edge
   };
 
   EdgeTemperatureReconstructor(

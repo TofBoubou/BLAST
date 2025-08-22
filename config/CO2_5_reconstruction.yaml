@@ -60,12 +60,12 @@ edge_reconstruction:
   enabled: true
   
   # Target heat flux we want to achieve
-  target_heat_flux: 500000  # [W/m²] From reference case
+  target_heat_flux: 100000  # [W/m²] From reference case
   
   # Boundary conditions for reconstruction
   boundary_conditions:
     pressure: 7000           # [Pa]
-    wall_temperature: 2000   # [K] From reference case
+    wall_temperature: 5000   # [K] From reference case
     catalyticity: 0.1        # Full catalytic wall like reference
   
   # Flow parameters
@@ -85,7 +85,7 @@ edge_reconstruction:
     initial_temperature_guess: 5600  # [K] Near expected value
     temperature_min: 4500            # [K] 
     temperature_max: 7300            # [K] Around 5905.5K
-    tolerance: 10                   # 1000 W/m² tolerance
+    tolerance: 1e-3                   
     max_iterations: 50
 
 abacus:

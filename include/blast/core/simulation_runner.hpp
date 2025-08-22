@@ -53,7 +53,7 @@ private:
     thermophysics::MixtureInterface& mixture,
     const io::Configuration& config,
     PerformanceMetrics& metrics) 
-    -> std::expected<void, ApplicationError>;
+    -> std::expected<boundary_layer::solver::SolutionResult, ApplicationError>;
     
   // Display standard simulation results
   auto display_standard_results(const boundary_layer::solver::SolutionResult& solution,

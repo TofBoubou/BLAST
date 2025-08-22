@@ -31,6 +31,7 @@ struct PerformanceMetrics {
   std::chrono::milliseconds total_time{0};
   std::chrono::milliseconds solve_time{0};
   std::chrono::milliseconds output_time{0};
+  std::chrono::milliseconds reconstruction_time{0};
   std::vector<std::filesystem::path> output_files;
 };
 

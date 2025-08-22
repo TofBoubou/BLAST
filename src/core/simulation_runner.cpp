@@ -26,10 +26,10 @@ auto SimulationRunner::run_simulation(
     }
     
     return SimulationResult{
-      .solution = {},
+      .solution = std::move(reconstruction_result.value()),
       .is_abacus = false,
       .is_edge_reconstruction = true,
-      .output_filename = ""
+      .output_filename = case_name
     };
   } else if (config.abacus.enabled) {
     auto abacus_filename = run_abacus_generation(solver, mixture, config, case_name, metrics);
@@ -219,7 +219,7 @@ auto SimulationRunner::run_edge_reconstruction(
   thermophysics::MixtureInterface& mixture,
   const io::Configuration& config,
   PerformanceMetrics& metrics) 
-  -> std::expected<void, ApplicationError> {
+  -> std::expected<boundary_layer::solver::SolutionResult, ApplicationError> {
     
   std::cout << "\n=== EDGE TEMPERATURE RECONSTRUCTION ===" << std::endl;
   
@@ -264,7 +264,10 @@ auto SimulationRunner::run_edge_reconstruction(
   std::cout << "Iterations used: " << edge.iterations_used << std::endl;
   std::cout << "Reconstruction time: " << reconstruction_duration.count() << " ms" << std::endl;
   
-  return {};
+  // Update performance metrics
+  metrics.reconstruction_time = reconstruction_duration;
+  
+  return std::move(edge.full_solution);
 }
 
 } // namespace blast::core

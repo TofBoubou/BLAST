@@ -194,12 +194,30 @@ auto EdgeTemperatureReconstructor::reconstruct()
         "Failed to compute viscosity at reconstructed edge temperature"));
   }
   
-  // Compute final heat flux at converged temperature
-  auto final_heat_flux_result = compute_heat_flux_at_temperature(T_edge);
-  if (!final_heat_flux_result) {
-    return std::unexpected(solver::SolverError(
-        "Failed to compute final heat flux at reconstructed edge temperature"));
+  // Generate complete boundary layer solution at optimal T_edge
+  std::cout << "\n=== Generating Complete Solution ===" << std::endl;
+  std::cout << "Computing full boundary layer solution at T_edge = " << T_edge << " K..." << std::endl;
+  
+  auto final_config_result = setup_boundary_conditions(T_edge);
+  if (!final_config_result) {
+    return std::unexpected(final_config_result.error());
   }
+  
+  solver::BoundaryLayerSolver final_solver(mixture_, final_config_result.value());
+  auto final_solution_result = final_solver.solve();
+  if (!final_solution_result) {
+    return std::unexpected(solver::SolverError(
+        std::format("Failed to generate complete solution at T_edge={} K: {}", 
+                   T_edge, final_solution_result.error().message())));
+  }
+  
+  double final_heat_flux = 0.0;
+  if (!final_solution_result->heat_flux_data.empty()) {
+    final_heat_flux = final_solution_result->heat_flux_data[0].q_wall_total_dim;
+  }
+  
+  std::cout << "Complete solution generated successfully!" << std::endl;
+  std::cout << "Final heat flux verification: " << final_heat_flux << " W/m²" << std::endl;
   
   return ReconstructedEdgeConditions{
       .temperature = T_edge,
@@ -208,8 +226,9 @@ auto EdgeTemperatureReconstructor::reconstruct()
       .mass_fractions = *mass_fractions_result,
       .density = density_edge,
       .viscosity = *viscosity_result,
-      .heat_flux_achieved = *final_heat_flux_result,
-      .iterations_used = count
+      .heat_flux_achieved = final_heat_flux,
+      .iterations_used = count,
+      .full_solution = std::move(final_solution_result.value())
   };
 }
 
