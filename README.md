@@ -23,7 +23,7 @@ BLAST is a computational fluid dynamics solver specifically designed for analyzi
 ### Flow Physics
 - **Boundary Layer Equations**: Full Navier-Stokes boundary layer equations
 - **Chemical Non-Equilibrium**: Finite-rate chemistry with species transport
-- **Advanced Diffusion Models**: Stefan-Maxwell multicomponent diffusion
+- **Multicomponent Diffusion**: Stefan-Maxwell multicomponent diffusion
 - **Thermal Diffusion Effects**: Soret effect (thermal diffusion) and Dufour effect
 - **Catalytic Walls**: Surface chemical reactions with controllable catalyticity
 - **Multiple Chemical Modes**: Equilibrium, frozen, or non-equilibrium chemistry
@@ -31,7 +31,7 @@ BLAST is a computational fluid dynamics solver specifically designed for analyzi
 ### Numerical Methods
 - **Finite Difference Discretization**: High-order accurate schemes
 - **Stagnation Point Method**: Main numerical method to ensure convergence
-- **Continuation Method**: Advanced numerical stabilization for difficult cases
+- **Continuation Method**: Numerical stabilization for convergence
 - **Adaptive Relaxation**: Automatic convergence acceleration
 - **Tridiagonal Solvers**: Efficient linear system solution
 
@@ -61,8 +61,8 @@ BLAST is a computational fluid dynamics solver specifically designed for analyzi
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/TofBoubou/BLAST.git
-cd BLAST
+git clone <repository_url>
+cd BLAST_MODERN
 ```
 
 2. **Clone external libraries:**
@@ -177,9 +177,10 @@ make profile
 BLAST supports both thermal diffusion (Soret effect) and Dufour effect for accurate modeling of species transport in high-temperature flows:
 
 ```yaml
-simulation:
-  consider_thermal_diffusion: true   # Species migration due to temperature gradients
-  consider_dufour_effect: true       # Energy transport due to concentration gradients
+base:
+  simulation:
+    consider_thermal_diffusion: true   # Species migration due to temperature gradients
+    consider_dufour_effect: true       # Energy transport due to concentration gradients
 ```
 
 These effects are particularly important for hypersonic flows where strong temperature gradients exist.
@@ -220,8 +221,9 @@ q_convective = ε⋅σ⋅(T_wall⁴ - T_env⁴)
 Choose the appropriate chemistry model for your application:
 
 ```yaml
-simulation:
-  chemical_mode: "non_equilibrium"   # Options: "equilibrium", "frozen", "non_equilibrium"
+base:
+  simulation:
+    chemical_mode: "non_equilibrium"   # Options: "equilibrium", "frozen", "non_equilibrium"
 ```
 
 - **Equilibrium**: Instantaneous chemical equilibrium (fast chemistry limit)
@@ -418,7 +420,9 @@ abacus:
 
 ### Key Configuration Sections
 
-#### Simulation Parameters
+All parameters below are within their respective mode sections (`base:`, `edge_reconstruction:`, `abacus:`).
+
+#### Simulation Parameters (in base: section)
 - `body_type`: Geometry type (`axisymmetric`)
 - `only_stagnation_point`: Boolean for stagnation point analysis only
 - `finite_thickness`: Enable finite boundary layer thickness effects
@@ -518,7 +522,10 @@ python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots all
 # Specific station analysis
 python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots profiles --station 0
 
-# Heat flux maps only
+# Heat flux analysis only
+python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots heat_flux --station 0
+
+# Heat flux maps (f_g contours)
 python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots f_g_map
 ```
 
@@ -666,3 +673,10 @@ This project builds upon several excellent open-source libraries:
 - **[HDF5](https://www.hdfgroup.org/solutions/hdf5/)**: High-performance data format (BSD-style)
 
 **BLAST** - Boundary Layer Analysis & Simulation Tool
+
+## Authors
+
+- **Théophane Bourdon** - ENSTA Paris
+- **Domenico Lanza** - Politecnico Milano  
+
+*Work conducted at: University of Illinois*
