@@ -17,16 +17,16 @@ base:
   simulation:
     body_type: axisymmetric
     only_stagnation_point: true
-    finite_thickness: true
+    finite_thickness: false
     diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
     consider_thermal_diffusion: false
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
-    catalytic_wall: true
+    catalytic_wall: false
     adiabatic: false
 
   numerical:
-    n_eta: 20
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 100000
@@ -47,7 +47,7 @@ base:
       - x: 0.0
         radius: 1
         velocity: 0
-        temperature: 5000
+        temperature: 5905.5
         pressure: 7000
         boundary_override: 
           enabled: false
@@ -63,8 +63,8 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [5000]
-    emissivity: 0.8  
+    temperatures: [3000]
+    emissivity: 0  
     environment_temperature: 300  
 
 # =============================================================================
