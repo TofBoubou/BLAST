@@ -188,11 +188,33 @@ These effects are particularly important for hypersonic flows where strong tempe
 For atmospheric entry applications, surface catalysis significantly affects heat transfer:
 
 ```yaml
-simulation:
-  catalytic_wall: true               # Enable surface chemistry
+base:
+  simulation:
+    catalytic_wall: true               # Enable surface chemistry
 ```
 
 This enables finite-rate surface reactions where dissociated species can recombine at the wall, releasing chemical energy and increasing heat flux.
+
+#### Radiative Equilibrium Walls
+For high-temperature applications, walls can reach radiative equilibrium where convective heat flux balances radiative heat loss:
+
+```yaml
+base:
+  wall_parameters:
+    emissivity: 0.8                    # Surface emissivity (0-1)
+    environment_temperature: 300       # Environment temperature for radiation [K]
+```
+
+**Physics**: The solver computes wall temperature using Stefan-Boltzmann law:
+```
+q_convective = ε⋅σ⋅(T_wall⁴ - T_env⁴)
+```
+
+**When to use**: 
+- High-temperature environments (> 1500K)
+- Thermal protection system analysis
+- Reentry vehicle heat shields
+- Cases where wall temperature is unknown but emissivity is known
 
 #### Chemical Modes
 Choose the appropriate chemistry model for your application:
@@ -225,6 +247,39 @@ continuation:
 - High-pressure flows
 - Cases where direct solving fails to converge
 
+### Edge Reconstruction
+
+BLAST includes an advanced capability to reconstruct edge conditions from target heat flux values:
+
+```yaml
+edge_reconstruction:
+  enabled: true
+  target_heat_flux: 400000              # Target heat flux [W/m²]
+  
+  boundary_conditions:
+    pressure: 7000                      # Pressure [Pa]
+    wall_temperature: 2000              # Wall temperature [K]
+    catalyticity: 0.1                   # Wall catalyticity
+    radius: 1                           # Geometry [m]
+  
+  solver:
+    initial_temperature_guess: 5600     # Initial guess [K]
+    temperature_min: 3312               # Search bounds [K]
+    temperature_max: 6000
+    tolerance: 1e-3                     # Convergence tolerance
+    max_iterations: 50
+```
+
+**Purpose**: Given a target heat flux and wall conditions, the solver determines the required edge temperature and composition that produces that heat flux.
+
+**Algorithm**: Uses bisection method to iteratively adjust edge temperature until computed heat flux matches target within specified tolerance.
+
+**Applications**:
+- Design verification: "What edge conditions produce this heat flux?"
+- Inverse problem solving for boundary layer analysis
+- Calibration of CFD results with measured heat flux data
+- Mission planning: determining required edge conditions for thermal constraints
+
 ### Abacus Generation
 
 BLAST can automatically generate abacuses (heat flux maps) for thermal protection system design:
@@ -232,73 +287,139 @@ BLAST can automatically generate abacuses (heat flux maps) for thermal protectio
 ```yaml
 abacus:
   enabled: true
-  catalyticity_values: [0.0, 0.01, 0.1, 1.0]     # Range of catalytic efficiencies
-  temperature_range: [300, 3000]                  # Wall temperature range [K]
-  temperature_points: 50                          # Resolution
+  boundary_conditions:
+    pressure: 7000                           # Pressure [Pa]
+    temperature_range: [4500, 5000]         # Edge temperature range [K]
+    catalyticity_values: [0.0, 0.1]         # Range of catalytic efficiencies
+  temperature_points: 3                      # Resolution
 ```
 
-**Purpose**: Abacuses provide heat flux as a function of wall temperature and catalyticity, essential for:
+**Purpose**: Abacuses provide heat flux as a function of edge temperature and catalyticity, essential for:
 - Thermal protection system sizing
 - Material selection
 - Mission design optimization
 - Parametric studies
 
-**Output**: 2D maps showing how heat flux varies with wall conditions, allowing engineers to quickly assess thermal loads across different scenarios.
+**Output**: 2D maps showing how heat flux varies with edge conditions, allowing engineers to quickly assess thermal loads across different scenarios.
 
 ## Configuration
 
-### Complete YAML Configuration Structure
+### Modular Configuration Structure
+
+BLAST now uses a **modular configuration system** with three distinct operational modes. The configuration file `CO2_5_reconstruction.yaml` serves as the reference implementation showing all modes.
+
+#### Base Mode (Required)
+The primary solver configuration:
 
 ```yaml
-simulation:
-  body_type: axisymmetric
-  only_stagnation_point: true
-  diffusion_type: stefan_maxwell
-  consider_thermal_diffusion: false
-  consider_dufour_effect: false
-  chemical_mode: "non_equilibrium"     # "frozen" or "equilibrium" or "non_equilibrium"
-  catalytic_wall: false
-
-numerical:
-  n_eta: 200                       
-  eta_max: 6.0
-  convergence_tolerance: 1.0e-9    
-  max_iterations: 100000
-
-mixture:
-  name: CO2_5
-  thermodynamic_database: RRHO
-  viscosity_algorithm: chapman_enskog_ldlt
-
-output:
-  x_stations: [0.0]
-  output_directory: test_outputs
-
-outer_edge:
-  edge_points:
-    - x: 0.0
-      radius: 1
-      velocity: 0
-      temperature: 5905.5
-      pressure: 7000
+base:
+  enabled: true
   
-  velocity_gradient_stagnation: 4027.1213622326
-  freestream_density: 0.0019382429
-  freestream_velocity: 500000
+  simulation:
+    body_type: axisymmetric
+    only_stagnation_point: true
+    finite_thickness: false
+    diffusion_type: stefan_maxwell
+    consider_thermal_diffusion: false
+    consider_dufour_effect: false
+    chemical_mode: "non_equilibrium"     # "frozen", "equilibrium", "non_equilibrium"
+    catalytic_wall: false
+    adiabatic: false
 
-wall_parameters:
-  temperatures: [300]
+  numerical:
+    n_eta: 200                       
+    eta_max: 6.0
+    convergence_tolerance: 1.0e-9    
+    max_iterations: 100000
 
-abacus:
-  enabled: false
-  catalyticity_values: [0.0, 0.01]
-  temperature_range: [3500, 5500]
-  temperature_points: 20
+  mixture:
+    name: CO2_5
+    thermodynamic_database: RRHO        # "RRHO", "NASA9"
+    viscosity_algorithm: chapman_enskog_ldlt
+    thermal_conductivity_algorithm: chapman_enskog_ldlt
+    state_model: ChemNonEq1T
 
+  output:
+    x_stations: [0.0]
+    output_directory: test_outputs
+
+  outer_edge:
+    edge_points:
+      - x: 0.0
+        radius: 1
+        velocity: 0
+        temperature: 5905.5
+        pressure: 7000
+        boundary_override: 
+          enabled: false
+          mass_fraction_condition: [0.027, 0.539, 0.000, 0.419, 0.042]
+    
+    velocity_gradient_stagnation: 4027.1213622326
+    freestream_density: 0.0019382429
+    freestream_velocity: 500000
+    
+    finite_thickness_params:
+      v_edge: -111.31796000
+      d2_ue_dxdy: -290979.9698604651
+      delta_bl: 0.0105250000
+
+  wall_parameters:
+    temperatures: [3000]
+    emissivity: 0                        # Surface emissivity for radiative walls
+    environment_temperature: 300         # Environment temperature for radiation
+
+# Global continuation parameters
 continuation:
   wall_temperature_stable: 3000.0
   edge_temperature_stable: 5905.5
   pressure_stable: 7000.0
+```
+
+#### Edge Reconstruction Mode (Optional)
+For enthalpy reconstruction from target heat flux:
+
+```yaml
+edge_reconstruction:
+  enabled: false
+  
+  # Solver configuration (simplified)
+  numerical:
+    n_eta: 25
+    eta_max: 7.0
+    convergence_tolerance: 1.0e-6
+    max_iterations: 10000
+  
+  # Target heat flux to match [W/m²]
+  target_heat_flux: 400000
+  
+  boundary_conditions:
+    pressure: 7000
+    wall_temperature: 2000
+    catalyticity: 0.1
+    radius: 1
+  
+  solver:
+    initial_temperature_guess: 5600
+    temperature_min: 3312
+    temperature_max: 6000
+    tolerance: 1e-3
+    max_iterations: 50
+```
+
+#### Abacus Mode (Optional)
+For generating heat flux maps:
+
+```yaml
+abacus:
+  enabled: false
+  
+  boundary_conditions:
+    pressure: 7000
+    temperature_range: [4500, 5000]
+    catalyticity_values: [0.0, 0.1]
+    radius: 1.0
+  
+  temperature_points: 3
 ```
 
 ### Key Configuration Sections
@@ -306,13 +427,24 @@ continuation:
 #### Simulation Parameters
 - `body_type`: Geometry type (`axisymmetric`)
 - `only_stagnation_point`: Boolean for stagnation point analysis only
+- `finite_thickness`: Enable finite boundary layer thickness effects
 - `chemical_mode`: Chemistry treatment (`equilibrium`, `frozen`, `non_equilibrium`)
 - `consider_thermal_diffusion`: Enable Soret effect
 - `consider_dufour_effect`: Enable Dufour effect
 - `catalytic_wall`: Enable surface chemical reactions
+- `adiabatic`: Adiabatic wall condition (alternative to fixed temperature)
+
+#### Wall Parameters
+- `temperatures`: Wall temperature values [K]
+- `emissivity`: Surface emissivity (0-1) for radiative equilibrium
+- `environment_temperature`: Environment temperature for radiation [K]
+
+#### Boundary Override
+- `boundary_override.enabled`: Use custom species composition at edge
+- `mass_fraction_condition`: Species mass fractions [CO2, CO, O2, O, C]
 
 #### Physical Effects Control
-- `diffusion_type`: Multicomponent diffusion model (`stefan_maxwell`)
+- `diffusion_type`: Multicomponent diffusion model (`stefan_maxwell`, `fickian`, `hirschfelder_curtiss`)
 - `thermal_diffusion`/`dufour_effect`: Coupled heat and mass transfer
 - `catalytic_wall`: Surface chemistry for atmospheric entry applications
 
@@ -321,6 +453,49 @@ continuation:
 - `eta_max`: Boundary layer edge location (similarity coordinate)
 - `convergence_tolerance`: Residual tolerance for convergence
 - `max_iterations`: Maximum solver iterations
+
+## Engineering Tools
+
+### Temperature-Enthalpy Converter
+
+BLAST includes a standalone tool for thermodynamic property calculations:
+
+```bash
+cd tools
+make
+./temp_enthalpy_converter <mixture> <pressure_Pa> <mode> <value> [mass_fractions]
+```
+
+**Modes:**
+- `T2H`: Convert temperature [K] to enthalpy [J/kg] using equilibrium composition
+- `H2T`: Convert enthalpy [J/kg] to temperature [K] using iterative equilibrium method
+
+**Features:**
+- Automatic equilibrium composition calculation at given (T,P) conditions
+- Custom composition override with mass fractions
+- Iterative solver for enthalpy-to-temperature conversion
+- Complete thermodynamic property output (density, Cp, Cv, γ)
+
+**Examples:**
+```bash
+# Temperature to enthalpy with equilibrium composition
+./temp_enthalpy_converter air_5 101325 T2H 300
+
+# Enthalpy to temperature with equilibrium calculation
+./temp_enthalpy_converter air_5 101325 H2T 300000
+
+# With custom composition (N, O, NO, N2, O2 for air_5)
+./temp_enthalpy_converter air_5 101325 T2H 300 0 0 0 0.767 0.233
+
+# High temperature showing dissociation effects
+./temp_enthalpy_converter air_5 101325 T2H 2000
+```
+
+**Use cases:**
+- Boundary condition preparation for BLAST simulations
+- Post-processing of results to understand equilibrium states
+- Validation of thermodynamic calculations
+- Educational tool for understanding high-temperature gas behavior
 
 ## Post-Processing
 
@@ -387,68 +562,78 @@ python3 postprocess_abacus.py --input simulation_abacus.h5
 
 ## Examples
 
-### Example 1: CO2 Stagnation Point Flow with Catalytic Wall
+### Example 1: Standard Base Mode Simulation
 
 ```yaml
-simulation:
-  body_type: axisymmetric
-  only_stagnation_point: true
-  chemical_mode: "non_equilibrium"
-  catalytic_wall: true
-  consider_thermal_diffusion: true
+base:
+  enabled: true
+  
+  simulation:
+    body_type: axisymmetric
+    only_stagnation_point: true
+    chemical_mode: "non_equilibrium"
+    catalytic_wall: false
+  
+  wall_parameters:
+    temperatures: [3000]
 
-wall_parameters:
-  temperatures: [300, 500, 1000, 1500, 2000]
+# Run simulation
+./blast config/CO2_5_reconstruction.yaml
+```
+
+### Example 2: Edge Reconstruction for Heat Flux Matching
+
+```yaml
+base:
+  enabled: true
+  # ... base configuration
+
+edge_reconstruction:
+  enabled: true
+  target_heat_flux: 400000
+  boundary_conditions:
+    pressure: 7000
+    wall_temperature: 2000
+    catalyticity: 0.1
+
+# The solver finds edge temperature that produces 400 kW/m² heat flux
+./blast config/CO2_5_reconstruction.yaml
+```
+
+### Example 3: Abacus Generation for Design Charts
+
+```yaml
+base:
+  enabled: true
+  # ... base configuration
 
 abacus:
   enabled: true
-  catalyticity_values: [0.0, 0.01, 0.1, 1.0]
-  temperature_range: [300, 2500]
-  temperature_points: 50
-```
-
-```bash
-# Run simulation
-./blast config/CO2_catalytic.yaml
+  boundary_conditions:
+    pressure: 7000
+    temperature_range: [4500, 5000]
+    catalyticity_values: [0.0, 0.1, 0.2]
+  temperature_points: 10
 
 # Process results
 python3 scripts/postprocess_abacus.py --input test_outputs/simulation_abacus.h5
 ```
 
-### Example 2: High-Temperature Case with Continuation
+### Example 4: High-Temperature Case with Continuation
 
 ```yaml
-simulation:
-  chemical_mode: "non_equilibrium"
-  catalytic_wall: true
-
-outer_edge:
-  edge_points:
-    - temperature: 8000.0    # Very high temperature
-      pressure: 50000.0     # High pressure
+base:
+  enabled: true
+  
+  outer_edge:
+    edge_points:
+      - temperature: 8000.0    # Very high temperature
+        pressure: 50000.0     # High pressure
 
 continuation:
   wall_temperature_stable: 1000.0
   edge_temperature_stable: 4000.0
   pressure_stable: 5000.0
-```
-
-### Example 3: Multi-Station Analysis
-
-```yaml
-simulation:
-  only_stagnation_point: false
-
-output:
-  x_stations: [0.0, 0.002, 0.004, 0.006, 0.008, 0.01]
-```
-
-```bash
-# Run multi-station simulation
-./blast config/multi_station.yaml
-
-# Analyze temperature profiles
-python3 scripts/postprocess_blast_temperatures.py --input test_outputs/simulation_*.h5 --plots all
 ```
 
 ## Output
