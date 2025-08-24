@@ -23,7 +23,6 @@ mixture:
   thermodynamic_database: RRHO         # Thermodynamic data: RRHO, NASA7, NASA9
   viscosity_algorithm: chapman_enskog_ldlt      # Viscosity calculation method
   thermal_conductivity_algorithm: chapman_enskog_ldlt  # Thermal conductivity method
-  state_model: ChemNonEq1T             # Energy model: ChemNonEq1T, ChemNonEqTTv
 
 output:
   x_stations: [0.0]                    # Axial positions [m] for detailed output

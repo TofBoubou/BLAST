@@ -227,13 +227,10 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 
       if (result.temperature_mode_names.empty()) {
         const auto n_modes = mixture_.get_number_energy_modes();
-        if (n_modes == 2) {
-          result.temperature_mode_names = {"T_translation_rotation", "T_vibrational_electronic"};
-        } else {
-          result.temperature_mode_names.resize(n_modes);
-          for (std::size_t m = 0; m < n_modes; ++m) {
-            result.temperature_mode_names[m] = std::format("T_mode_{}", m);
-          }
+        // ChemNonEq1T only has one energy mode
+        result.temperature_mode_names.resize(n_modes);
+        for (std::size_t m = 0; m < n_modes; ++m) {
+          result.temperature_mode_names[m] = std::format("T_mode_{}", m);
         }
       }
     }

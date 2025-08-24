@@ -65,15 +65,8 @@ viscosity_algo_to_string(io::MixtureConfig::ViscosityAlgorithm algo) -> std::exp
   // Configure Mutation++ options
   Mutation::MixtureOptions opts(config.name);
 
-  // Set state model from configuration
-  switch (config.state_model) {
-  case io::MixtureConfig::StateModel::ChemNonEq1T:
-    opts.setStateModel("ChemNonEq1T");
-    break;
-  case io::MixtureConfig::StateModel::ChemNonEqTTv:
-    opts.setStateModel("ChemNonEqTTv");
-    break;
-  }
+  // Set state model to ChemNonEq1T (only option)
+  opts.setStateModel("ChemNonEq1T");
 
   // Set thermodynamic database
   auto db_result = database_to_string(config.thermodynamic_database);

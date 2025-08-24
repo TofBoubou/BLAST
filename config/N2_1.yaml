@@ -18,7 +18,7 @@ mixture:
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
   thermal_conductivity_algorithm: chapman_enskog_ldlt
-  state_model: ChemNonEq1T 
+ 
 
 output:
   x_stations: [0.0]

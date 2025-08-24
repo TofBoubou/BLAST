@@ -92,7 +92,6 @@ edge_reconstruction:
     thermodynamic_database: RRHO  # "RRHO", "NASA9"
     viscosity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "sutherland"
     thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
-    state_model: ChemNonEq1T
   
   output:
     output_directory: test_outputs_edge_reconstruction
@@ -148,7 +147,6 @@ abacus:
     thermodynamic_database: RRHO  # "RRHO", "NASA9"
     viscosity_algorithm: chapman_enskog_ldlt 
     thermal_conductivity_algorithm: chapman_enskog_ldlt 
-    state_model: ChemNonEq1T
   
   output:
     output_directory: test_outputs_abacus

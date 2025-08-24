@@ -55,9 +55,7 @@ struct MixtureConfig {
   enum class ThermalConductivityAlgorithm { chapmanEnskog_CG, chapmanEnskog_LDLT, Wilke };
   ThermalConductivityAlgorithm thermal_conductivity_algorithm = ThermalConductivityAlgorithm::chapmanEnskog_CG;
 
-  // State model controlling energy mode treatment
-  enum class StateModel { ChemNonEq1T, ChemNonEqTTv };
-  StateModel state_model = StateModel::ChemNonEq1T;
+  // State model is now fixed to ChemNonEq1T only
 };
 
 struct OutputConfig {

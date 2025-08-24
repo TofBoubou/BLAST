@@ -269,7 +269,6 @@ mixture:
   name: CO2_5
   thermodynamic_database: RRHO
   viscosity_algorithm: chapman_enskog_ldlt
-  state_model: ChemNonEq1T
 
 output:
   x_stations: [0.0]
