@@ -52,6 +52,8 @@ outer_edge:
 
 wall_parameters:
   temperatures: [5000]
+  emissivity: 0
+  environment_temperature: 1
 
 # =============================================================================
 # CONTINUATION METHOD PARAMETERS FOR CONVERGENCE
@@ -93,15 +95,17 @@ edge_reconstruction:
     thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
     state_model: ChemNonEq1T
   
-  target_heat_flux: 400000
+  output:
+    x_stations: [0.0]
+    output_directory: test_outputs_edge_reconstruction
   
-  edge_point:
-    radius: 1
-    velocity: 0
-    pressure: 7000
-    boundary_override: 
-      enabled: false
-      mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
+  wall_parameters:
+    temperatures: [2000]  # From boundary_conditions
+    emissivity: 0
+    environment_temperature: 1
+  
+  # Edge reconstruction specific parameters
+  target_heat_flux: 400000
   
   boundary_conditions:
     pressure: 7000
@@ -130,7 +134,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -156,27 +160,13 @@ abacus:
     thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
     state_model: ChemNonEq1T
   
-  edge_point:
-    radius: 1
-    velocity: 0
-    temperature: 5905.5
-    pressure: 7000
-    boundary_override: 
-      enabled: false
-      mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
-  
-  flow_parameters:
-    velocity_gradient_stagnation: 4027.1213622326
-    freestream_density: 0.0019382429
-    freestream_velocity: 500000
-    
-    finite_thickness_params:
-      v_edge: -111.31796000
-      d2_ue_dxdy: -290979.9698604651
-      delta_bl: 0.0105250000
+  output:
+    x_stations: [0.0]
+    output_directory: test_outputs_abacus
   
   wall_parameters:
     temperatures: [4500, 5000]  # Range for abacus
-  
-  catalyticity_values: [0.0, 0.1]
+    emissivity: 0
+    environment_temperature: 1
+    catalyticity_values: [0.0, 0.1]
   temperature_points: 3

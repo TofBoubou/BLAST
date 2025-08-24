@@ -49,83 +49,136 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
           "Cannot enable both edge_reconstruction and abacus modes simultaneously. Please enable only one."));
     }
 
-    // Determine which configuration sections to use based on active mode
-    YAML::Node sim_node = root_["simulation"];
-    YAML::Node num_node = root_["numerical"]; 
-    YAML::Node mix_node = root_["mixture"];
+    // Determine which configuration sections to use based on active mode (strict mode - no fallbacks)
+    YAML::Node sim_node, num_node, mix_node, out_node, edge_node, wall_node;
     
-    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["simulation"]) {
+    if (edge_reconstruction_enabled) {
+      // Edge reconstruction mode - only basic sections, no outer_edge (uses specialized config)
+      if (!root_["edge_reconstruction"]["simulation"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'simulation' section in edge_reconstruction mode."));
+      }
+      if (!root_["edge_reconstruction"]["numerical"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'numerical' section in edge_reconstruction mode."));
+      }
+      if (!root_["edge_reconstruction"]["mixture"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'mixture' section in edge_reconstruction mode."));
+      }
+      if (!root_["edge_reconstruction"]["output"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'output' section in edge_reconstruction mode."));
+      }
+      if (!root_["edge_reconstruction"]["wall_parameters"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'wall_parameters' section in edge_reconstruction mode."));
+      }
+      
       sim_node = root_["edge_reconstruction"]["simulation"];
-    } else if (abacus_enabled && root_["abacus"]["simulation"]) {
-      sim_node = root_["abacus"]["simulation"];
-    }
-    
-    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["numerical"]) {
       num_node = root_["edge_reconstruction"]["numerical"];
-    } else if (abacus_enabled && root_["abacus"]["numerical"]) {
-      num_node = root_["abacus"]["numerical"];
-    }
-    
-    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["mixture"]) {
       mix_node = root_["edge_reconstruction"]["mixture"];
-    } else if (abacus_enabled && root_["abacus"]["mixture"]) {
+      out_node = root_["edge_reconstruction"]["output"];
+      wall_node = root_["edge_reconstruction"]["wall_parameters"];
+      edge_node = YAML::Node(); // Empty - edge reconstruction uses specialized config
+      
+    } else if (abacus_enabled) {
+      // Abacus mode - only basic sections, no outer_edge (uses specialized config)
+      if (!root_["abacus"]["simulation"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'simulation' section in abacus mode."));
+      }
+      if (!root_["abacus"]["numerical"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'numerical' section in abacus mode."));
+      }
+      if (!root_["abacus"]["mixture"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'mixture' section in abacus mode."));
+      }
+      if (!root_["abacus"]["output"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'output' section in abacus mode."));
+      }
+      if (!root_["abacus"]["wall_parameters"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'wall_parameters' section in abacus mode."));
+      }
+      
+      sim_node = root_["abacus"]["simulation"];
+      num_node = root_["abacus"]["numerical"];
       mix_node = root_["abacus"]["mixture"];
+      out_node = root_["abacus"]["output"];
+      wall_node = root_["abacus"]["wall_parameters"];
+      edge_node = YAML::Node(); // Empty - abacus uses specialized config
+      
+    } else {
+      // Base mode - use root level sections
+      if (!root_["simulation"]) {
+        return std::unexpected(core::ConfigurationError("Missing required 'simulation' section"));
+      }
+      if (!root_["numerical"]) {
+        return std::unexpected(core::ConfigurationError("Missing required 'numerical' section"));
+      }
+      if (!root_["mixture"]) {
+        return std::unexpected(core::ConfigurationError("Missing required 'mixture' section"));
+      }
+      if (!root_["output"]) {
+        return std::unexpected(core::ConfigurationError("Missing required 'output' section"));
+      }
+      if (!root_["outer_edge"]) {
+        return std::unexpected(core::ConfigurationError("Missing required 'outer_edge' section"));
+      }
+      if (!root_["wall_parameters"]) {
+        return std::unexpected(core::ConfigurationError("Missing required 'wall_parameters' section"));
+      }
+      
+      sim_node = root_["simulation"];
+      num_node = root_["numerical"];
+      mix_node = root_["mixture"];
+      out_node = root_["output"];
+      edge_node = root_["outer_edge"];
+      wall_node = root_["wall_parameters"];
     }
 
-    // Parse simulation config from the determined node
-    if (!sim_node) {
-      return std::unexpected(core::ConfigurationError("Missing required 'simulation' section"));
-    }
+    // Parse configuration from the determined nodes
     auto sim_result = parse_simulation_config(sim_node);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
     config.simulation = std::move(sim_result.value());
 
-    // Parse numerical config from the determined node
-    if (!num_node) {
-      return std::unexpected(core::ConfigurationError("Missing required 'numerical' section"));
-    }
     auto num_result = parse_numerical_config(num_node);
     if (!num_result) {
       return std::unexpected(num_result.error());
     }
     config.numerical = std::move(num_result.value());
 
-    // Parse mixture config from the determined node
-    if (!mix_node) {
-      return std::unexpected(core::ConfigurationError("Missing required 'mixture' section"));
-    }
     auto mix_result = parse_mixture_config(mix_node);
     if (!mix_result) {
       return std::unexpected(mix_result.error());
     }
     config.mixture = std::move(mix_result.value());
 
-    // Output
-    if (!root_["output"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'output' section"));
-    }
-    auto out_result = parse_output_config(root_["output"]);
+    auto out_result = parse_output_config(out_node);
     if (!out_result) {
       return std::unexpected(out_result.error());
     }
     config.output = std::move(out_result.value());
 
-    // outer_edge
-    if (!root_["outer_edge"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'outer_edge' section"));
+    // Parse outer_edge only for base mode (edge_reconstruction and abacus use specialized configs)
+    if (!edge_reconstruction_enabled && !abacus_enabled) {
+      auto edge_result = parse_outer_edge_config(edge_node, edge_reconstruction_enabled, abacus_enabled);
+      if (!edge_result) {
+        return std::unexpected(edge_result.error());
+      }
+      config.outer_edge = std::move(edge_result.value());
+    } else {
+      // For specialized modes, outer_edge will be populated from their specific configs
+      config.outer_edge = OuterEdgeConfig{};
     }
-    auto edge_result = parse_outer_edge_config(root_["outer_edge"]);
-    if (!edge_result) {
-      return std::unexpected(edge_result.error());
-    }
-    config.outer_edge = std::move(edge_result.value());
 
-    if (!root_["wall_parameters"]) {
-      return std::unexpected(core::ConfigurationError("Missing required 'wall_parameters' section"));
-    }
-    auto wall_result = parse_wall_parameters_config(root_["wall_parameters"]);
+    auto wall_result = parse_wall_parameters_config(wall_node);
     if (!wall_result) {
       return std::unexpected(wall_result.error());
     }
@@ -140,6 +193,16 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     // Force catalytic wall when abacus generation is enabled
     if (config.abacus.enabled) {
       config.simulation.catalytic_wall = true;
+      config.simulation.only_stagnation_point = true;
+      config.simulation.adiabatic = false;
+      
+      // Extract catalyticity values from wall_parameters for abacus
+      if (wall_node["catalyticity_values"]) {
+        config.abacus.catalyticity_values = wall_node["catalyticity_values"].as<std::vector<double>>();
+        if (config.abacus.catalyticity_values.empty()) {
+          return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty in abacus mode"));
+        }
+      }
     }
 
     // Force non-equilibrium chemistry when boundary override is used
@@ -174,7 +237,45 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       // Force finite thickness when edge reconstruction is enabled
       if (config.edge_reconstruction.enabled) {
         config.simulation.finite_thickness = true;
+        config.simulation.only_stagnation_point = true;
+        config.simulation.catalytic_wall = true;
+        config.simulation.adiabatic = false;
+        
+        // Populate outer_edge with edge_reconstruction parameters
+        OuterEdgeConfig::EdgePoint point;
+        point.x = 0.0; // Always stagnation point
+        point.radius = 1.0; // Default for stagnation point
+        point.velocity = 0.0; // Default for stagnation point
+        point.temperature = config.edge_reconstruction.solver.initial_temperature_guess;
+        point.pressure = config.edge_reconstruction.boundary_conditions.pressure;
+        
+        config.outer_edge.edge_points.push_back(point);
+        config.outer_edge.velocity_gradient_stagnation = config.edge_reconstruction.flow_parameters.velocity_gradient_stagnation;
+        config.outer_edge.freestream_density = config.edge_reconstruction.flow_parameters.freestream_density;
+        config.outer_edge.freestream_velocity = config.edge_reconstruction.flow_parameters.freestream_velocity;
+        config.outer_edge.finite_thickness_params.v_edge = config.edge_reconstruction.finite_thickness_params.v_edge;
+        config.outer_edge.finite_thickness_params.d2_ue_dxdy = config.edge_reconstruction.finite_thickness_params.d2_ue_dxdy;
+        config.outer_edge.finite_thickness_params.delta_bl = config.edge_reconstruction.finite_thickness_params.delta_bl;
       }
+    }
+    
+    // Same for abacus mode if enabled
+    if (abacus_enabled && config.abacus.enabled) {
+      // Populate outer_edge with abacus parameters (similar logic needed)
+      OuterEdgeConfig::EdgePoint point;
+      point.x = 0.0; // Always stagnation point
+      point.radius = 1.0; // Default for stagnation point  
+      point.velocity = 0.0; // Default for stagnation point
+      // For abacus, temperature will be varied, use base wall temp as initial
+      if (!config.wall_parameters.wall_temperatures.empty()) {
+        point.temperature = config.wall_parameters.wall_temperatures[0];
+      } else {
+        point.temperature = 5000.0; // Default fallback
+      }
+      point.pressure = 7000.0; // Default pressure for abacus
+      
+      config.outer_edge.edge_points.push_back(point);
+      // Note: Abacus mode would need its own flow parameters setup
     }
 
     return config;
@@ -370,7 +471,7 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
   }
 }
 
-auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
+auto YamlParser::parse_outer_edge_config(const YAML::Node& node, bool edge_reconstruction_mode, bool abacus_mode) const
     -> std::expected<OuterEdgeConfig, core::ConfigurationError> {
 
   OuterEdgeConfig config;
@@ -384,10 +485,21 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node) const
     for (const auto& point_node : points_node) {
       OuterEdgeConfig::EdgePoint point;
 
-      auto x_result = extract_value<double>(point_node, "x");
-      if (!x_result)
-        return std::unexpected(x_result.error());
-      point.x = x_result.value();
+      // Handle x coordinate with mode-specific implicit values
+      if (edge_reconstruction_mode || abacus_mode) {
+        // For edge reconstruction and abacus modes, always use stagnation point (x=0)
+        point.x = 0.0;
+        // Warn if x is specified in config but will be ignored
+        if (point_node["x"]) {
+          std::cout << "INFO: Ignoring 'x' value in edge_points for " << (edge_reconstruction_mode ? "edge_reconstruction" : "abacus") << " mode. Using x=0.0 (stagnation point)." << std::endl;
+        }
+      } else {
+        // Base mode - x is required
+        auto x_result = extract_value<double>(point_node, "x");
+        if (!x_result)
+          return std::unexpected(x_result.error());
+        point.x = x_result.value();
+      }
 
       auto radius_result = extract_value<double>(point_node, "radius");
       if (!radius_result)
@@ -573,16 +685,10 @@ auto YamlParser::parse_abacus_config(const YAML::Node& node) const
 
     // Only parse other fields if enabled
     if (config.enabled) {
-      // Parse catalyticity values
-      if (!node["catalyticity_values"]) {
-        return std::unexpected(
-            core::ConfigurationError("Missing required 'catalyticity_values' when abacus is enabled"));
-      }
-      config.catalyticity_values = node["catalyticity_values"].as<std::vector<double>>();
-
-      if (config.catalyticity_values.empty()) {
-        return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty"));
-      }
+      // For abacus mode, catalyticity_values are now in wall_parameters
+      // This is handled separately in the main parse function
+      // Just set a default here, will be overridden
+      config.catalyticity_values = {0.0, 0.1}; // Default fallback
 
       // Parse temperature range
       if (node["temperature_range"]) {
