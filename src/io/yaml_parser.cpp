@@ -184,11 +184,17 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.wall_parameters = std::move(wall_result.value());
 
-    auto abacus_result = parse_abacus_config(root_["abacus"]);
-    if (!abacus_result) {
-      return std::unexpected(abacus_result.error());
+    // Parse abacus config only if in abacus mode
+    if (abacus_enabled) {
+      auto abacus_result = parse_abacus_config(root_["abacus"]);
+      if (!abacus_result) {
+        return std::unexpected(abacus_result.error());
+      }
+      config.abacus = std::move(abacus_result.value());
+    } else {
+      // Default abacus config for non-abacus modes
+      config.abacus = AbacusConfig{};
     }
-    config.abacus = std::move(abacus_result.value());
 
     // Force catalytic wall when abacus generation is enabled
     if (config.abacus.enabled) {
@@ -220,14 +226,24 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       }
     }
 
-    auto cont_result = parse_continuation_config(root_["continuation"]);
+    // Parse continuation from mode-specific section if available, otherwise from root
+    YAML::Node cont_node;
+    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["continuation"]) {
+      cont_node = root_["edge_reconstruction"]["continuation"];
+    } else if (abacus_enabled && root_["abacus"]["continuation"]) {
+      cont_node = root_["abacus"]["continuation"];
+    } else {
+      cont_node = root_["continuation"];
+    }
+    
+    auto cont_result = parse_continuation_config(cont_node);
     if (!cont_result) {
       return std::unexpected(cont_result.error());
     }
     config.continuation = std::move(cont_result.value());
 
-    // Edge reconstruction (optional)
-    if (root_["edge_reconstruction"]) {
+    // Parse edge reconstruction config only if in edge_reconstruction mode
+    if (edge_reconstruction_enabled) {
       auto edge_recon_result = parse_edge_reconstruction_config(root_["edge_reconstruction"]);
       if (!edge_recon_result) {
         return std::unexpected(edge_recon_result.error());
@@ -257,10 +273,13 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         config.outer_edge.finite_thickness_params.d2_ue_dxdy = config.edge_reconstruction.finite_thickness_params.d2_ue_dxdy;
         config.outer_edge.finite_thickness_params.delta_bl = config.edge_reconstruction.finite_thickness_params.delta_bl;
       }
+    } else {
+      // Default edge reconstruction config for non-edge_reconstruction modes
+      config.edge_reconstruction = EdgeReconstructionConfig{};
     }
     
     // Same for abacus mode if enabled
-    if (abacus_enabled && config.abacus.enabled) {
+    if (abacus_enabled) {
       // Populate outer_edge with abacus parameters (similar logic needed)
       OuterEdgeConfig::EdgePoint point;
       point.x = 0.0; // Always stagnation point
