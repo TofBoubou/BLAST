@@ -164,14 +164,14 @@ make profile
 
 **Examples:**
 ```bash
-# Run with standard CO2 configuration
-./blast config/CO2_5.yaml
+# Run with configuration file
+./blast config/simulation.yaml
 
 # Run with custom configuration
 ./blast config/my_simulation.yaml
 ```
 
-### Advanced Physical Modeling
+### Physical Modeling
 
 #### Thermal Diffusion Effects
 BLAST supports both thermal diffusion (Soret effect) and Dufour effect for accurate modeling of species transport in high-temperature flows:
@@ -230,7 +230,7 @@ simulation:
 
 ### Continuation Method
 
-For challenging cases with extreme conditions (high temperatures, pressures, or strong catalytic effects), BLAST includes a continuation method that helps achieve convergence:
+BLAST includes a continuation method that helps achieve convergence:
 
 ```yaml
 continuation:
@@ -241,15 +241,9 @@ continuation:
 
 **How it works**: The solver first converges a "stable" case with moderate conditions, then gradually transitions to your target conditions. This prevents numerical instabilities that can occur when starting directly with extreme parameters.
 
-**When to use**: 
-- Very high wall temperatures (> 2500K)
-- Strong catalytic walls
-- High-pressure flows
-- Cases where direct solving fails to converge
-
 ### Edge Reconstruction
 
-BLAST includes an advanced capability to reconstruct edge conditions from target heat flux values:
+BLAST includes a capability to reconstruct edge conditions from target heat flux values:
 
 ```yaml
 edge_reconstruction:
@@ -519,19 +513,19 @@ python3 postprocess_blast.py --input ../test_outputs/simulation_YYYYMMDD_HHMMSS.
 **Usage options:**
 ```bash
 # Generate all plots and summary
-python3 postprocess_blast.py --input simulation.h5 --plots all
+python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots all
 
 # Specific station analysis
-python3 postprocess_blast.py --input simulation.h5 --plots profiles --station 0
+python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots profiles --station 0
 
 # Heat flux maps only
-python3 postprocess_blast.py --input simulation.h5 --plots f_g_map
+python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots f_g_map
 ```
 
 ### Temperature Analysis Script
 
 ```bash
-python3 postprocess_blast_temperatures.py --input simulation.h5 --plots all
+python3 postprocess_blast_temperatures.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots all
 ```
 
 **Specialized for:**
@@ -544,7 +538,7 @@ python3 postprocess_blast_temperatures.py --input simulation.h5 --plots all
 ### Abacus Processing Script
 
 ```bash
-python3 postprocess_abacus.py --input simulation_abacus.h5
+python3 postprocess_abacus.py --input simulation_abacus_YYYYMMDD_HHMMSS.h5
 ```
 
 **Purpose:**
@@ -578,7 +572,7 @@ base:
     temperatures: [3000]
 
 # Run simulation
-./blast config/CO2_5_reconstruction.yaml
+./blast config/simulation.yaml
 ```
 
 ### Example 2: Edge Reconstruction for Heat Flux Matching
@@ -597,7 +591,7 @@ edge_reconstruction:
     catalyticity: 0.1
 
 # The solver finds edge temperature that produces 400 kW/m² heat flux
-./blast config/CO2_5_reconstruction.yaml
+./blast config/simulation.yaml
 ```
 
 ### Example 3: Abacus Generation for Design Charts
@@ -616,25 +610,9 @@ abacus:
   temperature_points: 10
 
 # Process results
-python3 scripts/postprocess_abacus.py --input test_outputs/simulation_abacus.h5
+python3 scripts/postprocess_abacus.py --input test_outputs/simulation_abacus_YYYYMMDD_HHMMSS.h5
 ```
 
-### Example 4: High-Temperature Case with Continuation
-
-```yaml
-base:
-  enabled: true
-  
-  outer_edge:
-    edge_points:
-      - temperature: 8000.0    # Very high temperature
-        pressure: 50000.0     # High pressure
-
-continuation:
-  wall_temperature_stable: 1000.0
-  edge_temperature_stable: 4000.0
-  pressure_stable: 5000.0
-```
 
 ## Output
 
@@ -645,7 +623,7 @@ The solver generates HDF5 output files containing:
 - Thermodynamic properties and transport coefficients
 - Convergence metrics and simulation metadata
 
-Output files are saved as `simulation_YYYYMMDD_HHMMSS.h5` in the configured output directory.
+Output files are saved with timestamps as `simulation_YYYYMMDD_HHMMSS.h5` in the configured output directory.
 
 ## Development
 
