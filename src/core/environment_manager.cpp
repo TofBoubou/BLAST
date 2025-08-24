@@ -24,7 +24,6 @@ auto EnvironmentManager::configure_mutation_pp(const std::filesystem::path& exe_
     if (std::filesystem::exists(mpp_data_path)) {
       std::string mpp_data_str = std::filesystem::canonical(mpp_data_path).string();
       setenv("MPP_DATA_DIRECTORY", mpp_data_str.c_str(), constants::indexing::second);
-      std::cout << "MPP_DATA_DIRECTORY auto-set to: " << mpp_data_str << std::endl;
     } else {
       std::cerr << "Warning: Mutation++ data directory not found at: " << mpp_data_path << std::endl;
       std::cerr << "Looking for MPP_DATA_DIRECTORY in environment..." << std::endl;

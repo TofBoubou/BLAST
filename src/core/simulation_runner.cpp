@@ -149,18 +149,11 @@ auto SimulationRunner::display_standard_results(const boundary_layer::solver::So
                                                const thermophysics::MixtureInterface& mixture) const -> void {
   std::cout << "\n=== SOLUTION SUMMARY ===" << std::endl;
   std::cout << "Stations solved: " << solution.stations.size() << std::endl;
-  std::cout << "Total iterations: " << solution.total_iterations << std::endl;
-  std::cout << "Converged: " << (solution.converged ? "Yes" : "No") << std::endl;
 
   if (!solution.stations.empty()) {
     const auto& final_station = solution.stations.back();
     const auto n_eta = final_station.F.size();
 
-    std::cout << "\nFinal station results:" << std::endl;
-    std::cout << "  ξ = " << solution.xi_solved.back() << std::endl;
-    std::cout << "  F at edge: " << final_station.F.back() << std::endl;
-    std::cout << "  g at wall: " << final_station.g[constants::indexing::first] << std::endl;
-    std::cout << "  g at edge: " << final_station.g.back() << std::endl;
 
     // Print species concentrations at wall and edge
     std::cout << "\nSpecies concentrations:" << std::endl;

@@ -56,9 +56,7 @@ auto ApplicationRunner::run(int argc, char* argv[]) -> ApplicationResult {
     }
     
     // Create solver
-    std::cout << "Creating BoundaryLayerSolver..." << std::endl;
     boundary_layer::solver::BoundaryLayerSolver solver(*mixture, config);
-    std::cout << "BoundaryLayerSolver created successfully." << std::endl;
     
     // Run simulation
     auto simulation_result = simulation_runner_->run_simulation(solver, *mixture, config, args.output_name, metrics);

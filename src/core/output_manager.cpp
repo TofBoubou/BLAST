@@ -27,8 +27,8 @@ auto OutputManager::initialize_output_system(const io::Configuration& config,
     });
   }
   
-  std::cout << "✓ Output system configured" << std::endl;
-  display_planned_outputs(case_name);
+  std::cout << constants::string_processing::colors::green << "✓ Output system configured" 
+            << constants::string_processing::colors::reset << std::endl;
   
   return {};
 }
@@ -63,7 +63,8 @@ auto OutputManager::write_simulation_results(
   auto output_files = std::move(output_result.value());
   metrics.output_files = output_files;
   
-  std::cout << "✓ Output written successfully!" << std::endl;
+  std::cout << constants::string_processing::colors::green << "✓ Output written successfully!" 
+            << constants::string_processing::colors::reset << std::endl;
   std::cout << "  Output time: " << metrics.output_time.count() << " ms" << std::endl;
   std::cout << "\nGenerated files:" << std::endl;
   
@@ -91,7 +92,7 @@ auto OutputManager::display_planned_outputs(const std::string& case_name) const 
       format_name = "Unknown";
       break;
     }
-    std::cout << "  " << format_name << ": " << path.string() << std::endl;
+    std::cout << "  " << format_name << ": " << path.filename().string() << " (timestamp will be set at write time)" << std::endl;
   }
 }
 
@@ -100,7 +101,8 @@ auto OutputManager::initialize_hdf5() -> std::expected<void, ApplicationError> {
     std::cerr << "Warning: Failed to initialize HDF5: " << hdf5_init.error().message() << std::endl;
   } else {
     if (auto version = io::output::hdf5::check_version()) {
-      std::cout << "✓ HDF5 library version: " << version.value() << std::endl;
+      std::cout << constants::string_processing::colors::green << "✓ HDF5 library version: " 
+                << constants::string_processing::colors::reset << version.value() << std::endl;
     }
   }
   return {};

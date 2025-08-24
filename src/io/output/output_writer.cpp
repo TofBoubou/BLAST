@@ -262,6 +262,7 @@ auto OutputWriter::get_output_info(const std::string& case_name) const
 
   std::vector<std::pair<OutputFormat, std::filesystem::path>> info;
 
+  // Use a placeholder timestamp for display purposes
   auto timestamp = std::chrono::system_clock::now();
   auto paths = generate_file_paths(case_name, timestamp);
 

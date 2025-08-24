@@ -251,6 +251,16 @@ inline constexpr int narrow_field_width = 6;
 inline constexpr int medium_field_width = 8;
 inline constexpr int wide_field_width = 10;
 inline constexpr int separator_width = 36;
+
+/// ANSI Color codes for terminal output
+namespace colors {
+inline constexpr const char* reset = "\033[0m";
+inline constexpr const char* green = "\033[32m";
+inline constexpr const char* yellow = "\033[33m";
+inline constexpr const char* blue = "\033[34m";
+inline constexpr const char* cyan = "\033[36m";
+inline constexpr const char* bold = "\033[1m";
+}  // namespace colors
 }  // namespace string_processing
 
 // ================================================================================================
