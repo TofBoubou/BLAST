@@ -12,7 +12,7 @@ continuation:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -76,12 +76,10 @@ edge_reconstruction:
   
   simulation:
     body_type: axisymmetric
-    only_stagnation_point: true
     finite_thickness: true
     diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
     consider_thermal_diffusion: false
     consider_dufour_effect: false
-    chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
   
   numerical:
     n_eta: 25
@@ -97,7 +95,6 @@ edge_reconstruction:
     state_model: ChemNonEq1T
   
   output:
-    x_stations: [0.0]
     output_directory: test_outputs_edge_reconstruction
   
   # Edge reconstruction specific parameters
@@ -131,16 +128,14 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
-    only_stagnation_point: true
     finite_thickness: false
     diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
     consider_thermal_diffusion: false
     consider_dufour_effect: false
-    chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
   
   numerical:
     n_eta: 30

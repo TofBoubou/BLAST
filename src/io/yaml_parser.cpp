@@ -236,6 +236,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.simulation.catalytic_wall = true;
       config.simulation.only_stagnation_point = true;
       config.simulation.adiabatic = false;
+      config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
       // Force x_stations = [0.0] for stagnation point
       config.output.x_stations = {0.0};
       
@@ -311,6 +312,9 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         config.simulation.only_stagnation_point = true;
         config.simulation.catalytic_wall = true;
         config.simulation.adiabatic = false;
+        config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
+        // Force x_stations = [0.0] for stagnation point
+        config.output.x_stations = {0.0};
         
         // Edge reconstruction has its own specialized config, no outer_edge needed
       }
