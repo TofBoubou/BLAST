@@ -1,61 +1,4 @@
 # =============================================================================
-# BASE CONFIGURATION
-# =============================================================================
-
-simulation:
-  body_type: axisymmetric
-  only_stagnation_point: true
-  finite_thickness: true
-  diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
-  consider_thermal_diffusion: false
-  consider_dufour_effect: false
-  chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
-  catalytic_wall: true
-  adiabatic: false
-
-numerical:
-  n_eta: 20
-  eta_max: 6.0
-  convergence_tolerance: 1.0e-9
-  max_iterations: 100000
-
-mixture:
-  name: CO2_5
-  thermodynamic_database: RRHO  # "RRHO", "NASA9"
-  viscosity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "sutherland"
-  thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
-  state_model: ChemNonEq1T 
-
-output:
-  x_stations: [0.0]
-  output_directory: test_outputs
-
-outer_edge:
-  edge_points:
-    - x: 0.0
-      radius: 1
-      velocity: 0
-      temperature: 5000
-      pressure: 7000
-      boundary_override: 
-        enabled: false
-        mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
-  
-  velocity_gradient_stagnation: 4027.1213622326
-  freestream_density: 0.0019382429
-  freestream_velocity: 500000
-  
-  finite_thickness_params:
-    v_edge: -111.31796000
-    d2_ue_dxdy: -290979.9698604651
-    delta_bl: 0.0105250000
-
-wall_parameters:
-  temperatures: [5000]
-  emissivity: 0
-  environment_temperature: 1
-
-# =============================================================================
 # CONTINUATION METHOD PARAMETERS FOR CONVERGENCE
 # =============================================================================
 
@@ -63,6 +6,66 @@ continuation:
   wall_temperature_stable: 3000
   edge_temperature_stable: 5905.5
   pressure_stable: 7000
+
+# =============================================================================
+# BASE MODE
+# =============================================================================
+
+base:
+  enabled: true
+  
+  simulation:
+    body_type: axisymmetric
+    only_stagnation_point: true
+    finite_thickness: true
+    diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
+    consider_thermal_diffusion: false
+    consider_dufour_effect: false
+    chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
+    catalytic_wall: true
+    adiabatic: false
+
+  numerical:
+    n_eta: 20
+    eta_max: 6.0
+    convergence_tolerance: 1.0e-9
+    max_iterations: 100000
+
+  mixture:
+    name: CO2_5
+    thermodynamic_database: RRHO  # "RRHO", "NASA9"
+    viscosity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "sutherland"
+    thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
+    state_model: ChemNonEq1T 
+
+  output:
+    x_stations: [0.0]
+    output_directory: test_outputs
+
+  outer_edge:
+    edge_points:
+      - x: 0.0
+        radius: 1
+        velocity: 0
+        temperature: 5000
+        pressure: 7000
+        boundary_override: 
+          enabled: false
+          mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
+    
+    velocity_gradient_stagnation: 4027.1213622326
+    freestream_density: 0.0019382429
+    freestream_velocity: 500000
+    
+    finite_thickness_params:
+      v_edge: -111.31796000
+      d2_ue_dxdy: -290979.9698604651
+      delta_bl: 0.0105250000
+
+  wall_parameters:
+    temperatures: [5000]
+    emissivity: 0
+    environment_temperature: 1
 
 # =============================================================================
 # EDGE RECONSTRUCTION MODE
@@ -134,7 +137,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric

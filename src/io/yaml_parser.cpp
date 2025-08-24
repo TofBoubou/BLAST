@@ -31,9 +31,14 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     Configuration config;
 
-    // First, check which modes are enabled to determine which config sections to use
+    // Check which modes are enabled to determine which config sections to use
+    bool base_enabled = false;
     bool edge_reconstruction_enabled = false;
     bool abacus_enabled = false;
+    
+    if (root_["base"] && root_["base"]["enabled"]) {
+      base_enabled = root_["base"]["enabled"].as<bool>();
+    }
     
     if (root_["edge_reconstruction"] && root_["edge_reconstruction"]["enabled"]) {
       edge_reconstruction_enabled = root_["edge_reconstruction"]["enabled"].as<bool>();
@@ -43,16 +48,57 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       abacus_enabled = root_["abacus"]["enabled"].as<bool>();
     }
     
-    // Check for conflicting modes early
-    if (edge_reconstruction_enabled && abacus_enabled) {
+    // Check for conflicting modes - only one can be enabled at a time
+    int enabled_count = (base_enabled ? 1 : 0) + (edge_reconstruction_enabled ? 1 : 0) + (abacus_enabled ? 1 : 0);
+    
+    if (enabled_count == 0) {
       return std::unexpected(core::ConfigurationError(
-          "Cannot enable both edge_reconstruction and abacus modes simultaneously. Please enable only one."));
+          "No simulation mode enabled. Please enable exactly one mode: base.enabled, edge_reconstruction.enabled, or abacus.enabled."));
+    }
+    
+    if (enabled_count > 1) {
+      return std::unexpected(core::ConfigurationError(
+          "Multiple simulation modes enabled. Please enable only one mode at a time: base, edge_reconstruction, or abacus."));
     }
 
     // Determine which configuration sections to use based on active mode (strict mode - no fallbacks)
     YAML::Node sim_node, num_node, mix_node, out_node, edge_node, wall_node;
     
-    if (edge_reconstruction_enabled) {
+    if (base_enabled) {
+      // Base mode - use base sections
+      if (!root_["base"]["simulation"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'simulation' section in base mode."));
+      }
+      if (!root_["base"]["numerical"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'numerical' section in base mode."));
+      }
+      if (!root_["base"]["mixture"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'mixture' section in base mode."));
+      }
+      if (!root_["base"]["output"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'output' section in base mode."));
+      }
+      if (!root_["base"]["outer_edge"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'outer_edge' section in base mode."));
+      }
+      if (!root_["base"]["wall_parameters"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'wall_parameters' section in base mode."));
+      }
+      
+      sim_node = root_["base"]["simulation"];
+      num_node = root_["base"]["numerical"];
+      mix_node = root_["base"]["mixture"];
+      out_node = root_["base"]["output"];
+      edge_node = root_["base"]["outer_edge"];
+      wall_node = root_["base"]["wall_parameters"];
+      
+    } else if (edge_reconstruction_enabled) {
       // Edge reconstruction mode - only basic sections, no outer_edge (uses specialized config)
       if (!root_["edge_reconstruction"]["simulation"]) {
         return std::unexpected(core::ConfigurationError(
@@ -111,34 +157,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       out_node = root_["abacus"]["output"];
       wall_node = root_["abacus"]["wall_parameters"];
       edge_node = YAML::Node(); // Empty - abacus uses specialized config
-      
-    } else {
-      // Base mode - use root level sections
-      if (!root_["simulation"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'simulation' section"));
-      }
-      if (!root_["numerical"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'numerical' section"));
-      }
-      if (!root_["mixture"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'mixture' section"));
-      }
-      if (!root_["output"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'output' section"));
-      }
-      if (!root_["outer_edge"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'outer_edge' section"));
-      }
-      if (!root_["wall_parameters"]) {
-        return std::unexpected(core::ConfigurationError("Missing required 'wall_parameters' section"));
-      }
-      
-      sim_node = root_["simulation"];
-      num_node = root_["numerical"];
-      mix_node = root_["mixture"];
-      out_node = root_["output"];
-      edge_node = root_["outer_edge"];
-      wall_node = root_["wall_parameters"];
     }
 
     // Parse configuration from the determined nodes
@@ -167,8 +185,8 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     config.output = std::move(out_result.value());
 
     // Parse outer_edge only for base mode (edge_reconstruction and abacus use specialized configs)
-    if (!edge_reconstruction_enabled && !abacus_enabled) {
-      auto edge_result = parse_outer_edge_config(edge_node, edge_reconstruction_enabled, abacus_enabled);
+    if (base_enabled) {
+      auto edge_result = parse_outer_edge_config(edge_node, false, false);
       if (!edge_result) {
         return std::unexpected(edge_result.error());
       }
@@ -228,7 +246,9 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Parse continuation from mode-specific section if available, otherwise from root
     YAML::Node cont_node;
-    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["continuation"]) {
+    if (base_enabled && root_["base"]["continuation"]) {
+      cont_node = root_["base"]["continuation"];
+    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["continuation"]) {
       cont_node = root_["edge_reconstruction"]["continuation"];
     } else if (abacus_enabled && root_["abacus"]["continuation"]) {
       cont_node = root_["abacus"]["continuation"];
