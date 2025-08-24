@@ -116,16 +116,13 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         return std::unexpected(core::ConfigurationError(
             "Missing required 'output' section in edge_reconstruction mode."));
       }
-      if (!root_["edge_reconstruction"]["wall_parameters"]) {
-        return std::unexpected(core::ConfigurationError(
-            "Missing required 'wall_parameters' section in edge_reconstruction mode."));
-      }
+      // edge_reconstruction uses boundary_conditions instead of wall_parameters
       
       sim_node = root_["edge_reconstruction"]["simulation"];
       num_node = root_["edge_reconstruction"]["numerical"];
       mix_node = root_["edge_reconstruction"]["mixture"];
       out_node = root_["edge_reconstruction"]["output"];
-      wall_node = root_["edge_reconstruction"]["wall_parameters"];
+      wall_node = YAML::Node(); // Empty - edge_reconstruction uses boundary_conditions
       edge_node = YAML::Node(); // Empty - edge reconstruction uses specialized config
       
     } else if (abacus_enabled) {
@@ -200,14 +197,27 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.outer_edge = OuterEdgeConfig{};
     }
 
-    auto wall_result = parse_wall_parameters_config(wall_node);
-    if (!wall_result) {
-      return std::unexpected(wall_result.error());
+    // Parse wall_parameters for modes that need it
+    if (!edge_reconstruction_enabled) {
+      auto wall_result = parse_wall_parameters_config(wall_node);
+      if (!wall_result) {
+        return std::unexpected(wall_result.error());
+      }
+      config.wall_parameters = std::move(wall_result.value());
+    } else {
+      // Default wall parameters for edge_reconstruction (uses boundary_conditions)
+      config.wall_parameters = WallParametersConfig{};
+      // Set temperature from boundary_conditions for edge_reconstruction
+      if (edge_reconstruction_enabled && root_["edge_reconstruction"]["boundary_conditions"]["wall_temperature"]) {
+        config.wall_parameters.wall_temperatures = {root_["edge_reconstruction"]["boundary_conditions"]["wall_temperature"].as<double>()};
+      }
     }
-    config.wall_parameters = std::move(wall_result.value());
     
-    // Force emissivity = 0 for all modes (no radiative mode needed)
-    config.wall_parameters.emissivity = 0.0;
+    // Force emissivity = 0 for edge_reconstruction and abacus modes (no radiative mode)
+    // Base mode can have radiative wall
+    if (edge_reconstruction_enabled || abacus_enabled) {
+      config.wall_parameters.emissivity = 0.0;
+    }
 
     // Parse abacus config only if in abacus mode
     if (abacus_enabled) {
@@ -226,8 +236,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.simulation.catalytic_wall = true;
       config.simulation.only_stagnation_point = true;
       config.simulation.adiabatic = false;
-      // Force emissivity = 0 (no radiative mode needed)
-      config.wall_parameters.emissivity = 0.0;
       // Force x_stations = [0.0] for stagnation point
       config.output.x_stations = {0.0};
       
@@ -287,8 +295,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         config.simulation.only_stagnation_point = true;
         config.simulation.catalytic_wall = true;
         config.simulation.adiabatic = false;
-        // Force emissivity = 0 (no radiative mode needed)
-        config.wall_parameters.emissivity = 0.0;
         
         // Edge reconstruction has its own specialized config, no outer_edge needed
       }

@@ -12,7 +12,7 @@ continuation:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -64,8 +64,8 @@ base:
 
   wall_parameters:
     temperatures: [5000]
-    emissivity: 0
-    environment_temperature: 1
+    emissivity: 0.8  
+    environment_temperature: 300  
 
 # =============================================================================
 # EDGE RECONSTRUCTION MODE
@@ -100,10 +100,6 @@ edge_reconstruction:
     x_stations: [0.0]
     output_directory: test_outputs_edge_reconstruction
   
-  wall_parameters:
-    temperatures: [2000]  # From boundary_conditions
-    environment_temperature: 1
-  
   # Edge reconstruction specific parameters
   target_heat_flux: 400000
   
@@ -134,7 +130,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
@@ -163,7 +159,6 @@ abacus:
   
   wall_parameters:
     temperatures: [4500, 5000]  # Range for abacus
-    environment_temperature: 1
     catalyticity_values: [0.0, 0.1]
   
   boundary_conditions:
