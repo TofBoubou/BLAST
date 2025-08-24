@@ -77,7 +77,7 @@ edge_reconstruction:
   simulation:
     body_type: axisymmetric
     finite_thickness: true
-    diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
+    diffusion_type: stefan_maxwell 
     consider_thermal_diffusion: false
     consider_dufour_effect: false
   
@@ -133,7 +133,7 @@ abacus:
   simulation:
     body_type: axisymmetric
     finite_thickness: false
-    diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
+    diffusion_type: stefan_maxwell
     consider_thermal_diffusion: false
     consider_dufour_effect: false
   
@@ -146,16 +146,12 @@ abacus:
   mixture:
     name: CO2_5
     thermodynamic_database: RRHO  # "RRHO", "NASA9"
-    viscosity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "sutherland"
-    thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
+    viscosity_algorithm: chapman_enskog_ldlt 
+    thermal_conductivity_algorithm: chapman_enskog_ldlt 
     state_model: ChemNonEq1T
   
   output:
     output_directory: test_outputs_abacus
-  
-  wall_parameters:
-    temperatures: [4500, 5000]  # Range for abacus
-    catalyticity_values: [0.0, 0.1]
   
   boundary_conditions:
     pressure: 7000  # Pressure for abacus mode (Pa)

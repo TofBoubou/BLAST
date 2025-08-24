@@ -143,10 +143,6 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         return std::unexpected(core::ConfigurationError(
             "Missing required 'output' section in abacus mode."));
       }
-      if (!root_["abacus"]["wall_parameters"]) {
-        return std::unexpected(core::ConfigurationError(
-            "Missing required 'wall_parameters' section in abacus mode."));
-      }
       if (!root_["abacus"]["boundary_conditions"]) {
         return std::unexpected(core::ConfigurationError(
             "Missing required 'boundary_conditions' section in abacus mode."));
@@ -156,7 +152,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       num_node = root_["abacus"]["numerical"];
       mix_node = root_["abacus"]["mixture"];
       out_node = root_["abacus"]["output"];
-      wall_node = root_["abacus"]["wall_parameters"];
+      wall_node = YAML::Node(); // Empty - abacus uses boundary_conditions instead
       edge_node = YAML::Node(); // Empty - abacus uses specialized config
     }
 
@@ -197,20 +193,23 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.outer_edge = OuterEdgeConfig{};
     }
 
-    // Parse wall_parameters for modes that need it
-    if (!edge_reconstruction_enabled) {
+    // Parse wall_parameters for modes that need it (only base mode)
+    if (base_enabled) {
       auto wall_result = parse_wall_parameters_config(wall_node);
       if (!wall_result) {
         return std::unexpected(wall_result.error());
       }
       config.wall_parameters = std::move(wall_result.value());
-    } else {
+    } else if (edge_reconstruction_enabled) {
       // Default wall parameters for edge_reconstruction (uses boundary_conditions)
       config.wall_parameters = WallParametersConfig{};
       // Set temperature from boundary_conditions for edge_reconstruction
       if (edge_reconstruction_enabled && root_["edge_reconstruction"]["boundary_conditions"]["wall_temperature"]) {
         config.wall_parameters.wall_temperatures = {root_["edge_reconstruction"]["boundary_conditions"]["wall_temperature"].as<double>()};
       }
+    } else if (abacus_enabled) {
+      // Default wall parameters for abacus (uses boundary_conditions)
+      config.wall_parameters = WallParametersConfig{};
     }
     
     // Force emissivity = 0 for edge_reconstruction and abacus modes (no radiative mode)
@@ -256,9 +255,9 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         config.outer_edge.edge_points[0].velocity = config.abacus.velocity;
       }
       
-      // Extract catalyticity values from wall_parameters for abacus
-      if (wall_node["catalyticity_values"]) {
-        config.abacus.catalyticity_values = wall_node["catalyticity_values"].as<std::vector<double>>();
+      // Extract catalyticity values from boundary_conditions for abacus
+      if (root_["abacus"]["boundary_conditions"]["catalyticity_values"]) {
+        config.abacus.catalyticity_values = root_["abacus"]["boundary_conditions"]["catalyticity_values"].as<std::vector<double>>();
         if (config.abacus.catalyticity_values.empty()) {
           return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty in abacus mode"));
         }
