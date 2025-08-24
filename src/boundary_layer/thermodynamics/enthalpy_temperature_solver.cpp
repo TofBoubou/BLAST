@@ -105,7 +105,7 @@ auto EnthalpyTemperatureSolver::solve(std::span<const double> enthalpy_field, co
   TemperatureField result;
   result.temperatures.resize(n_points);
   
-  bool is_adiabatic = bc.simulation_config().adiabatic;
+  bool is_adiabatic = bc.simulation_config().wall_mode == io::SimulationConfig::WallMode::Adiabatic;
   
   int start_index;
   if (is_adiabatic) {

@@ -19,6 +19,7 @@ struct SimulationConfig {
   enum class BodyType { Axisymmetric, Cone, TwoD, FlatPlate };
   enum class DiffusionType { Ramshaw, StefanMaxwell, MPP };
   enum class ChemicalMode { Equilibrium, Frozen, NonEquilibrium };
+  enum class WallMode { Adiabatic, ImposedTemperature, Radiative };
   BodyType body_type = BodyType::Axisymmetric;
   bool only_stagnation_point = true;
   bool finite_thickness = false;
@@ -27,7 +28,7 @@ struct SimulationConfig {
   bool consider_dufour_effect = false;
   ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
   bool catalytic_wall = false;
-  bool adiabatic = false;
+  WallMode wall_mode = WallMode::ImposedTemperature;  // Default to imposed temperature
 };
 
 struct NumericalConfig {

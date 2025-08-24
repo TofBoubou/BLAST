@@ -156,8 +156,8 @@ build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs,
   
   EnergyBoundaryConditions boundary_conds;
   
-  if (!sim_config.adiabatic) {
-    // Given temperature at the wall
+  if (sim_config.wall_mode != io::SimulationConfig::WallMode::Adiabatic) {
+    // Given temperature at the wall (imposed or radiative)
     boundary_conds.f_bc = 0.0;
     boundary_conds.g_bc = 1.0;
     boundary_conds.h_bc = coeffs.thermodynamic.h_wall / bc.he();

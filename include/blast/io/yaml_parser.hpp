@@ -157,6 +157,12 @@ inline const std::unordered_map<std::string, SimulationConfig::ChemicalMode> che
     {"non_equilibrium", SimulationConfig::ChemicalMode::NonEquilibrium},
     {"nonequilibrium", SimulationConfig::ChemicalMode::NonEquilibrium}};
 
+inline const std::unordered_map<std::string, SimulationConfig::WallMode> wall_modes = {
+    {"adiabatic", SimulationConfig::WallMode::Adiabatic},
+    {"imposed_temperature", SimulationConfig::WallMode::ImposedTemperature},
+    {"imposed", SimulationConfig::WallMode::ImposedTemperature},
+    {"radiative", SimulationConfig::WallMode::Radiative},
+    {"radiative_wall", SimulationConfig::WallMode::Radiative}};
 
 } // namespace enum_mappings
 

@@ -92,10 +92,10 @@ public:
 
     /**
      * @brief Check if radiative equilibrium is enabled
-     * @return True if emissivity > 0
+     * @return True if wall mode is Radiative
      */
     [[nodiscard]] auto is_radiative_equilibrium_enabled() const noexcept -> bool {
-        return config_.wall_parameters.emissivity > 0.0;
+        return config_.simulation.wall_mode == io::SimulationConfig::WallMode::Radiative;
     }
 
     /**

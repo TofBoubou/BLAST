@@ -177,7 +177,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         std::format("Failed to get boundary conditions for heat flux at station {}", station));
     
     // Update wall temperature if radiative equilibrium was used
-    if (config_.wall_parameters.emissivity > 0.0) {
+    if (config_.simulation.wall_mode == io::SimulationConfig::WallMode::Radiative) {
       bc.wall.temperature = result.stations.back().T[0];  // T at wall (eta=0)
     }
     

@@ -255,6 +255,7 @@ inline constexpr int separator_width = 36;
 /// ANSI Color codes for terminal output
 namespace colors {
 inline constexpr const char* reset = "\033[0m";
+inline constexpr const char* red = "\033[31m";
 inline constexpr const char* green = "\033[32m";
 inline constexpr const char* yellow = "\033[33m";
 inline constexpr const char* blue = "\033[34m";

@@ -23,7 +23,7 @@ base:
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
     catalytic_wall: false
-    adiabatic: false
+    wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
 
   numerical:
     n_eta: 200
@@ -64,8 +64,8 @@ base:
 
   wall_parameters:
     temperatures: [3000]
-    emissivity: 0  
-    environment_temperature: 300  
+    emissivity: 0  # Only used when wall_mode is "radiative"
+    environment_temperature: 300  # Only used when wall_mode is "radiative"  
 
 # =============================================================================
 # EDGE RECONSTRUCTION MODE

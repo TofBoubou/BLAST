@@ -212,10 +212,29 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.wall_parameters = WallParametersConfig{};
     }
     
-    // Force emissivity = 0 for edge_reconstruction and abacus modes (no radiative mode)
-    // Base mode can have radiative wall
+    // Force emissivity based on mode and wall_mode
     if (edge_reconstruction_enabled || abacus_enabled) {
+      // Edge reconstruction and abacus modes always use imposed temperature (no radiative)
       config.wall_parameters.emissivity = 0.0;
+    } else if (base_enabled) {
+      // Base mode: emissivity depends on wall_mode
+      if (config.simulation.wall_mode == SimulationConfig::WallMode::Adiabatic ||
+          config.simulation.wall_mode == SimulationConfig::WallMode::ImposedTemperature) {
+        if (config.wall_parameters.emissivity > 0.0) {
+          std::cerr << constants::string_processing::colors::red 
+                    << "Warning: emissivity=" << config.wall_parameters.emissivity 
+                    << " is ignored for wall_mode='" 
+                    << (config.simulation.wall_mode == SimulationConfig::WallMode::Adiabatic ? "adiabatic" : "imposed_temperature")
+                    << "'. Setting emissivity=0." 
+                    << constants::string_processing::colors::reset << std::endl;
+        }
+        config.wall_parameters.emissivity = 0.0;
+      } else if (config.simulation.wall_mode == SimulationConfig::WallMode::Radiative) {
+        // Check that emissivity is valid for radiative mode
+        if (config.wall_parameters.emissivity <= 0.0) {
+          return std::unexpected(core::ConfigurationError("Radiative wall mode requires emissivity > 0"));
+        }
+      }
     }
 
     // Parse abacus config only if in abacus mode
@@ -234,7 +253,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     if (config.abacus.enabled) {
       config.simulation.catalytic_wall = true;
       config.simulation.only_stagnation_point = true;
-      config.simulation.adiabatic = false;
+      config.simulation.wall_mode = SimulationConfig::WallMode::ImposedTemperature;
       config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
       // Force x_stations = [0.0] for stagnation point
       config.output.x_stations = {0.0};
@@ -310,7 +329,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         config.simulation.finite_thickness = true;
         config.simulation.only_stagnation_point = true;
         config.simulation.catalytic_wall = true;
-        config.simulation.adiabatic = false;
+        config.simulation.wall_mode = SimulationConfig::WallMode::ImposedTemperature;
         config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
         // Force x_stations = [0.0] for stagnation point
         config.output.x_stations = {0.0};
@@ -396,12 +415,27 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
       config.catalytic_wall = true;  // Default to catalytic
     }
 
+    // Parse wall_mode - optional parameter, defaults to ImposedTemperature
+    if (node["wall_mode"]) {
+      auto wall_mode_result = extract_enum(node, "wall_mode", enum_mappings::wall_modes);
+      if (!wall_mode_result) {
+        return std::unexpected(wall_mode_result.error());
+      }
+      config.wall_mode = wall_mode_result.value();
+    }
+    
+    // Legacy support: if old "adiabatic" parameter is present, convert to wall_mode
     if (node["adiabatic"]) {
       auto adiabatic_result = extract_value<bool>(node, "adiabatic");
       if (!adiabatic_result) {
         return std::unexpected(adiabatic_result.error());
       }
-      config.adiabatic = adiabatic_result.value();
+      // Convert legacy adiabatic flag to wall_mode
+      if (adiabatic_result.value()) {
+        config.wall_mode = SimulationConfig::WallMode::Adiabatic;
+      } else {
+        config.wall_mode = SimulationConfig::WallMode::ImposedTemperature;
+      }
     }
 
     return config;
