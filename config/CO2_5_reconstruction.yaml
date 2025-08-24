@@ -134,7 +134,7 @@ abacus:
   simulation:
     body_type: axisymmetric
     only_stagnation_point: true
-    finite_thickness: true
+    finite_thickness: false
     diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
     consider_thermal_diffusion: false
     consider_dufour_effect: false
@@ -175,7 +175,7 @@ abacus:
       delta_bl: 0.0105250000
   
   wall_parameters:
-    temperatures: [3000, 5000]  # Range for abacus
+    temperatures: [4500, 5000]  # Range for abacus
   
-  catalyticity_values: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
-  temperature_points: 30
+  catalyticity_values: [0.0, 0.1]
+  temperature_points: 3
