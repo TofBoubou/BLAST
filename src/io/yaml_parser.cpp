@@ -150,6 +150,10 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         return std::unexpected(core::ConfigurationError(
             "Missing required 'wall_parameters' section in abacus mode."));
       }
+      if (!root_["abacus"]["boundary_conditions"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'boundary_conditions' section in abacus mode."));
+      }
       
       sim_node = root_["abacus"]["simulation"];
       num_node = root_["abacus"]["numerical"];
@@ -201,6 +205,9 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       return std::unexpected(wall_result.error());
     }
     config.wall_parameters = std::move(wall_result.value());
+    
+    // Force emissivity = 0 for all modes (no radiative mode needed)
+    config.wall_parameters.emissivity = 0.0;
 
     // Parse abacus config only if in abacus mode
     if (abacus_enabled) {
@@ -214,11 +221,15 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.abacus = AbacusConfig{};
     }
 
-    // Force catalytic wall when abacus generation is enabled
+    // Force parameters for abacus mode
     if (config.abacus.enabled) {
       config.simulation.catalytic_wall = true;
       config.simulation.only_stagnation_point = true;
       config.simulation.adiabatic = false;
+      // Force emissivity = 0 (no radiative mode needed)
+      config.wall_parameters.emissivity = 0.0;
+      // Force x_stations = [0.0] for stagnation point
+      config.output.x_stations = {0.0};
       
       // Extract catalyticity values from wall_parameters for abacus
       if (wall_node["catalyticity_values"]) {
@@ -270,52 +281,23 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       }
       config.edge_reconstruction = std::move(edge_recon_result.value());
       
-      // Force finite thickness when edge reconstruction is enabled
+      // Force parameters for edge reconstruction mode
       if (config.edge_reconstruction.enabled) {
         config.simulation.finite_thickness = true;
         config.simulation.only_stagnation_point = true;
         config.simulation.catalytic_wall = true;
         config.simulation.adiabatic = false;
+        // Force emissivity = 0 (no radiative mode needed)
+        config.wall_parameters.emissivity = 0.0;
         
-        // Populate outer_edge with edge_reconstruction parameters
-        OuterEdgeConfig::EdgePoint point;
-        point.x = 0.0; // Always stagnation point
-        point.radius = 1.0; // Default for stagnation point
-        point.velocity = 0.0; // Default for stagnation point
-        point.temperature = config.edge_reconstruction.solver.initial_temperature_guess;
-        point.pressure = config.edge_reconstruction.boundary_conditions.pressure;
-        
-        config.outer_edge.edge_points.push_back(point);
-        config.outer_edge.velocity_gradient_stagnation = config.edge_reconstruction.flow_parameters.velocity_gradient_stagnation;
-        config.outer_edge.freestream_density = config.edge_reconstruction.flow_parameters.freestream_density;
-        config.outer_edge.freestream_velocity = config.edge_reconstruction.flow_parameters.freestream_velocity;
-        config.outer_edge.finite_thickness_params.v_edge = config.edge_reconstruction.finite_thickness_params.v_edge;
-        config.outer_edge.finite_thickness_params.d2_ue_dxdy = config.edge_reconstruction.finite_thickness_params.d2_ue_dxdy;
-        config.outer_edge.finite_thickness_params.delta_bl = config.edge_reconstruction.finite_thickness_params.delta_bl;
+        // Edge reconstruction has its own specialized config, no outer_edge needed
       }
     } else {
       // Default edge reconstruction config for non-edge_reconstruction modes
       config.edge_reconstruction = EdgeReconstructionConfig{};
     }
     
-    // Same for abacus mode if enabled
-    if (abacus_enabled) {
-      // Populate outer_edge with abacus parameters (similar logic needed)
-      OuterEdgeConfig::EdgePoint point;
-      point.x = 0.0; // Always stagnation point
-      point.radius = 1.0; // Default for stagnation point  
-      point.velocity = 0.0; // Default for stagnation point
-      // For abacus, temperature will be varied, use base wall temp as initial
-      if (!config.wall_parameters.wall_temperatures.empty()) {
-        point.temperature = config.wall_parameters.wall_temperatures[0];
-      } else {
-        point.temperature = 5000.0; // Default fallback
-      }
-      point.pressure = 7000.0; // Default pressure for abacus
-      
-      config.outer_edge.edge_points.push_back(point);
-      // Note: Abacus mode would need its own flow parameters setup
-    }
+    // Abacus mode has its own specialized config, no outer_edge needed
 
     return config;
 
@@ -378,11 +360,16 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.chemical_mode = chemical_result.value();
 
-    auto catalytic_result = extract_value<bool>(node, "catalytic_wall");
-    if (!catalytic_result) {
-      return std::unexpected(catalytic_result.error());
+    // Parse catalytic_wall - optional parameter, defaults to true
+    if (node["catalytic_wall"]) {
+      auto catalytic_result = extract_value<bool>(node, "catalytic_wall");
+      if (!catalytic_result) {
+        return std::unexpected(catalytic_result.error());
+      }
+      config.catalytic_wall = catalytic_result.value();
+    } else {
+      config.catalytic_wall = true;  // Default to catalytic
     }
-    config.catalytic_wall = catalytic_result.value();
 
     if (node["adiabatic"]) {
       auto adiabatic_result = extract_value<bool>(node, "adiabatic");
@@ -482,20 +469,25 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
   OutputConfig config;
 
   try {
-    auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
-    if (!x_stations_result)
-      return std::unexpected(x_stations_result.error());
-    config.x_stations = x_stations_result.value();
-    if (config.x_stations.empty()) {
-      return std::unexpected(core::ConfigurationError("x_stations cannot be empty"));
-    }
-    if (std::any_of(config.x_stations.begin(), config.x_stations.end(), [](double x) { return x < 0; })) {
-      return std::unexpected(core::ConfigurationError("x_stations must be non-negative"));
-    }
-    for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
-      if (config.x_stations[i] <= config.x_stations[i - 1]) {
-        return std::unexpected(core::ConfigurationError("x_stations must be in strictly increasing order"));
+    // Parse x_stations - optional parameter, defaults to [0.0] for stagnation modes
+    if (node["x_stations"]) {
+      auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
+      if (!x_stations_result)
+        return std::unexpected(x_stations_result.error());
+      config.x_stations = x_stations_result.value();
+      if (config.x_stations.empty()) {
+        return std::unexpected(core::ConfigurationError("x_stations cannot be empty"));
       }
+      if (std::any_of(config.x_stations.begin(), config.x_stations.end(), [](double x) { return x < 0; })) {
+        return std::unexpected(core::ConfigurationError("x_stations must be non-negative"));
+      }
+      for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
+        if (config.x_stations[i] <= config.x_stations[i - 1]) {
+          return std::unexpected(core::ConfigurationError("x_stations must be in strictly increasing order"));
+        }
+      }
+    } else {
+      config.x_stations = {0.0};  // Default for stagnation modes
     }
 
     auto output_dir_result = extract_value<std::string>(node, "output_directory");
@@ -729,25 +721,29 @@ auto YamlParser::parse_abacus_config(const YAML::Node& node) const
       // Just set a default here, will be overridden
       config.catalyticity_values = {0.0, 0.1}; // Default fallback
 
-      // Parse temperature range
-      if (node["temperature_range"]) {
-        auto range = node["temperature_range"].as<std::vector<double>>();
-        if (range.size() != constants::indexing::min_range_size) {
-          return std::unexpected(core::ConfigurationError(std::format("temperature_range must have exactly {} values", constants::indexing::min_range_size)));
-        }
-        config.temperature_min = range[constants::indexing::first];
-        config.temperature_max = range[constants::indexing::second];
-
-        if (config.temperature_min >= config.temperature_max) {
-          return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
-        }
-      }
+      // temperature_range now parsed in boundary_conditions section
 
       // Parse temperature points
       if (node["temperature_points"]) {
         config.temperature_points = node["temperature_points"].as<int>();
         if (config.temperature_points < constants::indexing::min_range_size) {
           return std::unexpected(core::ConfigurationError(std::format("temperature_points must be at least {}", constants::indexing::min_range_size)));
+        }
+      }
+      
+      // Parse boundary conditions for abacus mode (for future use)
+      if (node["boundary_conditions"]) {
+        auto bc_node = node["boundary_conditions"];
+        if (bc_node["temperature_range"]) {
+          auto range = bc_node["temperature_range"].as<std::vector<double>>();
+          if (range.size() != constants::indexing::min_range_size) {
+            return std::unexpected(core::ConfigurationError(std::format("temperature_range must have exactly {} values", constants::indexing::min_range_size)));
+          }
+          config.temperature_min = range[constants::indexing::first];
+          config.temperature_max = range[constants::indexing::second];
+          if (config.temperature_min >= config.temperature_max) {
+            return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
+          }
         }
       }
     }
