@@ -239,6 +239,22 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       // Force x_stations = [0.0] for stagnation point
       config.output.x_stations = {0.0};
       
+      // Force edge_points with configured radius and velocity
+      if (config.outer_edge.edge_points.empty()) {
+        OuterEdgeConfig::EdgePoint point;
+        point.x = 0.0;
+        point.radius = config.abacus.radius;
+        point.velocity = config.abacus.velocity;
+        // Temperature and pressure will be set during abacus generation
+        point.temperature = 5000.0;  // Default, will be overridden
+        point.pressure = 7000.0;     // Default, will be overridden
+        config.outer_edge.edge_points.push_back(point);
+      } else {
+        // Update existing edge_point with abacus parameters
+        config.outer_edge.edge_points[0].radius = config.abacus.radius;
+        config.outer_edge.edge_points[0].velocity = config.abacus.velocity;
+      }
+      
       // Extract catalyticity values from wall_parameters for abacus
       if (wall_node["catalyticity_values"]) {
         config.abacus.catalyticity_values = wall_node["catalyticity_values"].as<std::vector<double>>();
@@ -737,7 +753,7 @@ auto YamlParser::parse_abacus_config(const YAML::Node& node) const
         }
       }
       
-      // Parse boundary conditions for abacus mode (for future use)
+      // Parse boundary conditions for abacus mode
       if (node["boundary_conditions"]) {
         auto bc_node = node["boundary_conditions"];
         if (bc_node["temperature_range"]) {
@@ -750,6 +766,14 @@ auto YamlParser::parse_abacus_config(const YAML::Node& node) const
           if (config.temperature_min >= config.temperature_max) {
             return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
           }
+        }
+        // Optional radius (defaults to 1.0)
+        if (bc_node["radius"]) {
+          config.radius = bc_node["radius"].as<double>();
+        }
+        // Optional velocity (defaults to 0.0)
+        if (bc_node["velocity"]) {
+          config.velocity = bc_node["velocity"].as<double>();
         }
       }
     }
@@ -832,6 +856,11 @@ auto YamlParser::parse_edge_reconstruction_config(const YAML::Node& node) const
             core::ConfigurationError("Missing required 'catalyticity' in edge_reconstruction.boundary_conditions"));
       }
       config.boundary_conditions.catalyticity = bc_node["catalyticity"].as<double>();
+      
+      // Optional radius (defaults to 1.0)
+      if (bc_node["radius"]) {
+        config.boundary_conditions.radius = bc_node["radius"].as<double>();
+      }
 
       // Flow parameters
       if (!node["flow_parameters"]) {

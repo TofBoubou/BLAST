@@ -12,7 +12,7 @@ continuation:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
@@ -86,8 +86,8 @@ edge_reconstruction:
   numerical:
     n_eta: 25
     eta_max: 7.0
-    convergence_tolerance: 1.0e-8
-    max_iterations: 50000
+    convergence_tolerance: 1.0e-6  # Plus permissif
+    max_iterations: 10000  # Moins d'itérations max
   
   mixture:
     name: CO2_5
@@ -107,6 +107,7 @@ edge_reconstruction:
     pressure: 7000
     wall_temperature: 2000
     catalyticity: 0.1
+    radius: 1
   
   flow_parameters:
     velocity_gradient_stagnation: 4027.1213622326
@@ -130,7 +131,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -165,5 +166,7 @@ abacus:
     pressure: 7000  # Pressure for abacus mode (Pa)
     temperature_range: [4500, 5000]  # Range for abacus
     catalyticity_values: [0.0, 0.1]
+    radius: 1.0 
+    velocity: 0.0
   
   temperature_points: 3

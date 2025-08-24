@@ -122,6 +122,8 @@ struct AbacusConfig {
   double temperature_min = constants::defaults::abacus::temperature_min;
   double temperature_max = constants::defaults::abacus::temperature_max;
   int temperature_points = constants::grid::default_temperature_points;
+  double radius = 1.0;     // [m] Radius for abacus
+  double velocity = 0.0;   // [m/s] Velocity for abacus
 };
 
 struct ContinuationConfig {
@@ -141,6 +143,7 @@ struct EdgeReconstructionConfig {
     double pressure = 0.0;           // [Pa] Pressure at edge (fixed)
     double wall_temperature = 0.0;   // [K] Wall temperature
     double catalyticity = 0.0;       // Catalytic efficiency (0-1)
+    double radius = 1.0;              // [m] Radius at stagnation point
   } boundary_conditions;
   
   // Flow parameters

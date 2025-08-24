@@ -339,10 +339,21 @@ auto EdgeTemperatureReconstructor::setup_boundary_conditions(double T_edge)
   temp_config.wall_parameters.catalytic_wall = (config_.boundary_conditions.catalyticity > 0);
   
   // Set edge conditions
-  temp_config.outer_edge.edge_points[0].temperature = T_edge;
-  temp_config.outer_edge.edge_points[0].pressure = config_.boundary_conditions.pressure;
-  temp_config.outer_edge.edge_points[0].enthalpy = *enthalpy_result;
-  temp_config.outer_edge.edge_points[0].velocity = 0.0;  // Stagnation point
+  if (temp_config.outer_edge.edge_points.empty()) {
+    io::OuterEdgeConfig::EdgePoint edge_point;
+    edge_point.x = 0.0;  // Stagnation point
+    edge_point.temperature = T_edge;
+    edge_point.pressure = config_.boundary_conditions.pressure;
+    edge_point.enthalpy = *enthalpy_result;
+    edge_point.velocity = 0.0;  // Always 0 for edge_reconstruction
+    edge_point.radius = config_.boundary_conditions.radius;  // Use configured radius
+    temp_config.outer_edge.edge_points.push_back(edge_point);
+  } else {
+    temp_config.outer_edge.edge_points[0].temperature = T_edge;
+    temp_config.outer_edge.edge_points[0].pressure = config_.boundary_conditions.pressure;
+    temp_config.outer_edge.edge_points[0].enthalpy = *enthalpy_result;
+    temp_config.outer_edge.edge_points[0].velocity = 0.0;  // Stagnation point
+  }
   
   // Set flow parameters
   temp_config.outer_edge.velocity_gradient_stagnation = 
@@ -361,8 +372,13 @@ auto EdgeTemperatureReconstructor::setup_boundary_conditions(double T_edge)
       config_.finite_thickness_params.delta_bl;
   
   // Set wall conditions
-  temp_config.wall_parameters.wall_temperatures[0] = 
-      config_.boundary_conditions.wall_temperature;
+  if (temp_config.wall_parameters.wall_temperatures.empty()) {
+    temp_config.wall_parameters.wall_temperatures.push_back(
+        config_.boundary_conditions.wall_temperature);
+  } else {
+    temp_config.wall_parameters.wall_temperatures[0] = 
+        config_.boundary_conditions.wall_temperature;
+  }
   
   return temp_config;
 }
