@@ -81,3 +81,6 @@ libs/*/.git
 # Cache directories
 .cache/
 *.cache
+
+# Claude Code directory
+.claude/
