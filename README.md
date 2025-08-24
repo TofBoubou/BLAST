@@ -522,23 +522,10 @@ python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots profi
 python3 postprocess_blast.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots f_g_map
 ```
 
-### Temperature Analysis Script
-
-```bash
-python3 postprocess_blast_temperatures.py --input simulation_YYYYMMDD_HHMMSS.h5 --plots all
-```
-
-**Specialized for:**
-- Detailed temperature profile analysis
-- Thermal boundary layer characteristics
-- Temperature gradient visualization
-- Multi-station temperature comparison
-- Wall temperature effects
-
 ### Abacus Processing Script
 
 ```bash
-python3 postprocess_abacus.py --input simulation_abacus_YYYYMMDD_HHMMSS.h5
+python3 postprocess_abacus.py --input simulation_abacus.h5
 ```
 
 **Purpose:**
@@ -610,7 +597,7 @@ abacus:
   temperature_points: 10
 
 # Process results
-python3 scripts/postprocess_abacus.py --input test_outputs/simulation_abacus_YYYYMMDD_HHMMSS.h5
+python3 scripts/postprocess_abacus.py --input test_outputs/simulation_abacus.h5
 ```
 
 
@@ -641,9 +628,13 @@ BLAST_MODERN/
 │   ├── eigen/              # Linear algebra
 │   ├── mutationpp/         # Thermophysics
 │   └── yaml-cpp/           # Configuration parsing
+├── tools/                  # Engineering utilities
+│   ├── temp_enthalpy_converter.cpp  # Temperature/enthalpy conversion tool
+│   └── Makefile            # Tool compilation
 ├── config/                 # Example configurations
 ├── scripts/                # Post-processing tools
-└── test_outputs/           # Simulation results
+├── test_outputs/           # Simulation results
+└── Makefile                # Main build system
 ```
 
 ### Building and Testing
@@ -655,7 +646,7 @@ make format
 
 **Performance profiling:**
 ```bash
-make profile CONFIG=config/CO2_5.yaml
+make profile CONFIG=config/simulation.yaml
 # Results in profile_report.txt
 ```
 
