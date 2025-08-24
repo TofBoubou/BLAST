@@ -31,32 +31,72 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     Configuration config;
 
-    // Simulation
-    if (!root_["simulation"]) { // !root_ is override in YAML so we check if
-                                // it's empty
+    // First, check which modes are enabled to determine which config sections to use
+    bool edge_reconstruction_enabled = false;
+    bool abacus_enabled = false;
+    
+    if (root_["edge_reconstruction"] && root_["edge_reconstruction"]["enabled"]) {
+      edge_reconstruction_enabled = root_["edge_reconstruction"]["enabled"].as<bool>();
+    }
+    
+    if (root_["abacus"] && root_["abacus"]["enabled"]) {
+      abacus_enabled = root_["abacus"]["enabled"].as<bool>();
+    }
+    
+    // Check for conflicting modes early
+    if (edge_reconstruction_enabled && abacus_enabled) {
+      return std::unexpected(core::ConfigurationError(
+          "Cannot enable both edge_reconstruction and abacus modes simultaneously. Please enable only one."));
+    }
+
+    // Determine which configuration sections to use based on active mode
+    YAML::Node sim_node = root_["simulation"];
+    YAML::Node num_node = root_["numerical"]; 
+    YAML::Node mix_node = root_["mixture"];
+    
+    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["simulation"]) {
+      sim_node = root_["edge_reconstruction"]["simulation"];
+    } else if (abacus_enabled && root_["abacus"]["simulation"]) {
+      sim_node = root_["abacus"]["simulation"];
+    }
+    
+    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["numerical"]) {
+      num_node = root_["edge_reconstruction"]["numerical"];
+    } else if (abacus_enabled && root_["abacus"]["numerical"]) {
+      num_node = root_["abacus"]["numerical"];
+    }
+    
+    if (edge_reconstruction_enabled && root_["edge_reconstruction"]["mixture"]) {
+      mix_node = root_["edge_reconstruction"]["mixture"];
+    } else if (abacus_enabled && root_["abacus"]["mixture"]) {
+      mix_node = root_["abacus"]["mixture"];
+    }
+
+    // Parse simulation config from the determined node
+    if (!sim_node) {
       return std::unexpected(core::ConfigurationError("Missing required 'simulation' section"));
     }
-    auto sim_result = parse_simulation_config(root_["simulation"]);
+    auto sim_result = parse_simulation_config(sim_node);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
-    config.simulation = std::move(sim_result.value()); // emptying sim_result, avoid a copy
+    config.simulation = std::move(sim_result.value());
 
-    // Numerical parameters
-    if (!root_["numerical"]) {
+    // Parse numerical config from the determined node
+    if (!num_node) {
       return std::unexpected(core::ConfigurationError("Missing required 'numerical' section"));
     }
-    auto num_result = parse_numerical_config(root_["numerical"]); // The root changes
+    auto num_result = parse_numerical_config(num_node);
     if (!num_result) {
       return std::unexpected(num_result.error());
     }
     config.numerical = std::move(num_result.value());
 
-    // Mixture
-    if (!root_["mixture"]) {
+    // Parse mixture config from the determined node
+    if (!mix_node) {
       return std::unexpected(core::ConfigurationError("Missing required 'mixture' section"));
     }
-    auto mix_result = parse_mixture_config(root_["mixture"]);
+    auto mix_result = parse_mixture_config(mix_node);
     if (!mix_result) {
       return std::unexpected(mix_result.error());
     }

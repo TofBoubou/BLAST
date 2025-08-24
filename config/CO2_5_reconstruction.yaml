@@ -67,7 +67,7 @@ continuation:
 # =============================================================================
 
 edge_reconstruction:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
@@ -81,10 +81,10 @@ edge_reconstruction:
     adiabatic: false
   
   numerical:
-    n_eta: 20
-    eta_max: 6.0
-    convergence_tolerance: 1.0e-9
-    max_iterations: 100000
+    n_eta: 25
+    eta_max: 7.0
+    convergence_tolerance: 1.0e-8
+    max_iterations: 50000
   
   mixture:
     name: CO2_5
@@ -104,6 +104,7 @@ edge_reconstruction:
       mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
   
   boundary_conditions:
+    pressure: 7000
     wall_temperature: 2000
     catalyticity: 0.1
   
@@ -143,10 +144,10 @@ abacus:
     adiabatic: false
   
   numerical:
-    n_eta: 20
-    eta_max: 6.0
-    convergence_tolerance: 1.0e-9
-    max_iterations: 100000
+    n_eta: 30
+    eta_max: 8.0
+    convergence_tolerance: 1.0e-7
+    max_iterations: 75000
   
   mixture:
     name: CO2_5

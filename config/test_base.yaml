@@ -1,0 +1,81 @@
+# =============================================================================
+# BASE CONFIGURATION ONLY - NO SPECIAL MODES
+# =============================================================================
+
+simulation:
+  body_type: axisymmetric
+  only_stagnation_point: false
+  finite_thickness: false
+  diffusion_type: stefan_maxwell
+  consider_thermal_diffusion: false
+  consider_dufour_effect: false
+  chemical_mode: "non_equilibrium"
+  catalytic_wall: true
+  adiabatic: false
+
+numerical:
+  n_eta: 20
+  eta_max: 6.0
+  convergence_tolerance: 1.0e-9
+  max_iterations: 100000
+
+mixture:
+  name: CO2_5
+  thermodynamic_database: RRHO
+  viscosity_algorithm: chapman_enskog_ldlt
+  thermal_conductivity_algorithm: chapman_enskog_ldlt
+  state_model: ChemNonEq1T 
+
+output:
+  x_stations: [0.0, 0.001, 0.01]
+  output_directory: test_outputs
+
+outer_edge:
+  edge_points:
+    - x: 0.0
+      radius: 1
+      velocity: 0
+      temperature: 5000
+      pressure: 7000
+      boundary_override: 
+        enabled: false
+    - x: 0.001
+      radius: 1
+      velocity: 100
+      temperature: 4900
+      pressure: 6900
+      boundary_override: 
+        enabled: false
+    - x: 0.01
+      radius: 1
+      velocity: 200
+      temperature: 4800
+      pressure: 6800
+      boundary_override: 
+        enabled: false
+  
+  velocity_gradient_stagnation: 4027.1213622326
+  freestream_density: 0.0019382429
+  freestream_velocity: 500000
+
+wall_parameters:
+  temperatures: [2000, 2500, 3000]
+
+continuation:
+  wall_temperature_stable: 3000
+  edge_temperature_stable: 5905.5
+  pressure_stable: 7000
+
+# =============================================================================
+# EDGE RECONSTRUCTION MODE - DISABLED
+# =============================================================================
+
+edge_reconstruction:
+  enabled: false
+
+# =============================================================================
+# ABACUS MODE - DISABLED
+# =============================================================================
+
+abacus:
+  enabled: false
