@@ -9,8 +9,8 @@ import numpy as np
 from pathlib import Path
 
 def generate_config(
-    num_points=101,
-    x_range=(0.0, 0.1),  # Start from 0.001 to avoid x=0 issue
+    num_points=5,
+    x_range=(0.0, 1),  # Start from 0.001 to avoid x=0 issue
     temperature_range=(5905.5, 3000),
     pressure_range=(7000, 7000),
     velocity_range=(0, 100),  # Non-zero velocities
