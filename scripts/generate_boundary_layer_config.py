@@ -10,10 +10,10 @@ from pathlib import Path
 
 def generate_config(
     num_points=101,
-    x_range=(0.0, 0.1),
-    temperature_range=(5905.5, 5000),
+    x_range=(0.0, 0.1),  # Start from 0.001 to avoid x=0 issue
+    temperature_range=(5905.5, 3000),
     pressure_range=(7000, 7000),
-    velocity_range=(0, 0),
+    velocity_range=(0, 100),  # Non-zero velocities
     radius_range=(1, 1),
     wall_temperature_range=(3000, 3000),
     output_file="boundary_layer_config.yaml"

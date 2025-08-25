@@ -59,6 +59,10 @@ class BLASTReader:
     REQUIRED_HEAT_FLUX_FIELDS = {'eta', 'heat_flux'}
     
     def __init__(self, input_path: Union[str, Path]):
+        print("\n" + "="*60)
+        print("BLAST POST-PROCESSING TOOL")
+        print("="*60)
+        print(f"\nInitializing HDF5 reader for: {input_path}")
         self.input_path = Path(input_path)
         self.format = self._detect_format()
         self.data = None
@@ -142,9 +146,9 @@ class BLASTReader:
                 if len(data['stations']) == 0:
                     raise BLASTFileError("No valid station data could be loaded")
                 
-                print(f"Loaded {len(data['stations'])} stations")
-                print(f"- {len(self.valid_stations)} valid for profile plotting")
-                print(f"- {len(self.valid_heat_flux_stations)} valid for heat flux plotting")
+                print(f"\nLoaded {len(data['stations'])} stations:")
+                print(f"   - {len(self.valid_stations)} valid for profile plotting")
+                print(f"   - {len(self.valid_heat_flux_stations)} valid for heat flux plotting")
                 
                 self.data = data
                 self.metadata = data.get('metadata', {})
@@ -450,7 +454,6 @@ class BLASTPlotter:
         
         if save_path:
             plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
-            print(f"Profiles for station {station_index:03d} saved to: {save_path}")
         else:
             plt.show()
         
@@ -614,7 +617,6 @@ class BLASTPlotter:
         
         if save_path:
             plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
-            print(f"Heat flux analysis for station {station_index:03d} saved to: {save_path}")
         else:
             plt.show()
         
@@ -742,7 +744,7 @@ class BLASTPlotter:
             
             if save_path:
                 plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
-                print(f"F and g map using {len(stations_used)} stations saved to: {save_path}")
+                print(f"   [OK] F and g map ({len(stations_used)} stations): {save_path.name}")
             else:
                 plt.show()
             
@@ -759,7 +761,8 @@ class BLASTPlotter:
         output_dir = Path(output_dir)
         output_dir.mkdir(exist_ok=True)
         
-        print(f"Creating summary report in: {output_dir}")
+        print(f"\nCreating summary report in: {output_dir}")
+        print("-" * 60)
         
         valid_stations = sorted(self.reader.get_valid_stations())
         valid_heat_flux_stations = sorted(self.reader.get_valid_heat_flux_stations())
@@ -779,6 +782,7 @@ class BLASTPlotter:
             profile_path = output_dir / f'profiles_station_{station_idx:03d}'
             if self.plot_profiles(station_idx, save_path=profile_path):
                 plotted_stations.append(station_idx)
+                print(f"   [OK] Profile station {station_idx:03d}: {profile_path.name}")
         
         # Plot heat flux for valid stations (same logic: first 5)
         heat_flux_stations_to_plot = valid_heat_flux_stations[:5]
@@ -787,6 +791,7 @@ class BLASTPlotter:
             heat_flux_path = output_dir / f'heat_flux_station_{station_idx:03d}'
             if self.plot_heat_flux(station_idx, save_path=heat_flux_path):
                 plotted_heat_flux_stations.append(station_idx)
+                print(f"   [OK] Heat flux station {station_idx:03d}: {heat_flux_path.name}")
         
         # Create F and g map if possible
         f_g_map_path = output_dir / 'F_g_eta_xi_map.png'
@@ -804,14 +809,16 @@ class BLASTPlotter:
                 'all_valid_heat_flux_stations': valid_heat_flux_stations
             }
             self._create_summary_json(output_dir / 'summary.json', summary_data)
+            print(f"   [OK] Summary JSON: summary.json")
         except Exception as e:
             print(f"Warning: Could not create summary JSON file: {e}")
         
-        print(f"Summary report completed!")
-        print(f"Successfully plotted {len(plotted_stations)} profile stations: {plotted_stations}")
-        print(f"Successfully plotted {len(plotted_heat_flux_stations)} heat flux stations: {plotted_heat_flux_stations}")
+        print("-" * 60)
+        print(f"\nSummary report completed:")
+        print(f"   - Profile plots: {len(plotted_stations)} stations")
+        print(f"   - Heat flux plots: {len(plotted_heat_flux_stations)} stations")
         if f_g_map_created:
-            print("F and g mapping plot created successfully")
+            print(f"   - F and g mapping: created")
     
     def _create_summary_json(self, file_path: Path, plot_summary: Dict) -> None:
         """Create JSON summary with consistent plot information"""
@@ -864,7 +871,6 @@ class BLASTPlotter:
         with open(file_path, 'w') as f:
             json.dump(summary, f, indent=2)
         
-        print(f"Summary JSON saved to: {file_path}")
 
 
 def main():
@@ -897,12 +903,10 @@ def main():
         valid_stations = reader.get_valid_stations()
         valid_heat_flux_stations = reader.get_valid_heat_flux_stations()
         
-        print(f"Data loaded successfully:")
-        print(f"  - Total stations: {len(reader.data['stations'])}")
-        print(f"  - Valid stations for profile plotting: {len(valid_stations)}")
-        print(f"  - Valid stations for heat flux plotting: {len(valid_heat_flux_stations)}")
-        print(f"  - Valid profile station indices: {sorted(valid_stations)}")
-        print(f"  - Valid heat flux station indices: {sorted(valid_heat_flux_stations)}")
+        print(f"\nData loaded successfully:")
+        print(f"   - Total stations: {len(reader.data['stations'])}")
+        print(f"   - Valid for profile plotting: {len(valid_stations)}")
+        print(f"   - Valid for heat flux plotting: {len(valid_heat_flux_stations)}")
         
         if not valid_stations and not valid_heat_flux_stations:
             print("Error: No stations have the required fields for any type of plotting")
@@ -920,7 +924,8 @@ def main():
     output_path = Path(args.output) if not args.show else None
     if output_path:
         output_path.mkdir(exist_ok=True)
-        print(f"Output directory: {output_path}")
+        print(f"\nOutput directory: {output_path}")
+        print("-" * 60)
     
     # Generate plots with error handling
     try:
@@ -972,7 +977,9 @@ def main():
             if not success:
                 return 1
         
+        print("\n" + "="*60)
         print("Post-processing completed successfully!")
+        print("="*60)
         
     except Exception as e:
         print(f"Error during plotting: {e}")
