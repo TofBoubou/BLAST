@@ -55,21 +55,21 @@ auto InputValidator::validate_solution_state(const equations::SolutionState& sol
 auto InputValidator::validate_xi_coordinate(int station, double xi) const noexcept
     -> std::expected<void, SolverError> {
 
-    // For downstream stations, check consistency with grid
+    // For downstream stations, perform basic validation only
+    // Note: We skip the exact coordinate matching check to support adaptive refinement
     if (station > 0) {
         const auto& xi_coords = grid_.xi_coordinates();
-        if (station >= static_cast<int>(xi_coords.size())) {
-            return std::unexpected(InitializationError(
-                std::format("Station {} exceeds available xi coordinates (max: {})", 
-                           station, xi_coords.size() - 1)));
-        }
-
-        // Allow some tolerance for floating point comparison
-        const double expected_xi = xi_coords[station];
-        if (std::abs(xi - expected_xi) > 1e-10) {
-            return std::unexpected(InitializationError(
-                std::format("Xi coordinate mismatch for station {}: provided {}, expected {}", 
-                           station, xi, expected_xi)));
+        
+        // Validate xi is within reasonable bounds relative to the original grid
+        if (!xi_coords.empty()) {
+            const double xi_min = xi_coords[0];
+            const double xi_max = xi_coords.back();
+            
+            if (xi < xi_min || xi > xi_max) {
+                return std::unexpected(InitializationError(
+                    std::format("Xi coordinate {} out of bounds for station {} (range: [{}, {}])", 
+                               xi, station, xi_min, xi_max)));
+            }
         }
     }
 

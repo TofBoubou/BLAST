@@ -101,25 +101,29 @@ auto BoundaryLayerSolver::initialize_solver_components() -> void {
 auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> {
 
   SolutionResult result;
-  result.xi_solved.reserve(grid_->xi_coordinates().size());
-  result.stations.reserve(grid_->xi_coordinates().size());
-  result.temperature_fields.reserve(grid_->xi_coordinates().size());
-  result.heat_flux_data.reserve(grid_->xi_coordinates().size());
-
-  const auto xi_stations = grid_->xi_coordinates();
+  
+  // Copy xi coordinates to a modifiable vector for adaptive refinement
+  const auto original_xi = grid_->xi_coordinates();
+  std::vector<double> xi_stations(original_xi.begin(), original_xi.end());
+  
+  result.xi_solved.reserve(xi_stations.size() * 4); // Reserve extra space for adaptive refinement
+  result.stations.reserve(xi_stations.size() * 4);
+  result.temperature_fields.reserve(xi_stations.size() * 4);
+  result.heat_flux_data.reserve(xi_stations.size() * 4);
 
   // Variables to store previous station results for xi derivatives
   double prev_xi = 0.0;
   std::vector<double> prev_F, prev_g;
   core::Matrix<double> prev_c;
 
-  // Solve each xi station
-  for (std::size_t station_idx = 0; station_idx < xi_stations.size(); ++station_idx) {
-    const int station = static_cast<int>(station_idx);
+  // Solve each xi station with adaptive refinement
+  std::size_t station_idx = 0;
+  while (station_idx < xi_stations.size()) {
+    const int station = static_cast<int>(result.stations.size());
     const double xi = xi_stations[station_idx];
 
     // CRITICAL: Update xi derivatives BEFORE solving (except for station 0)
-    if (station_idx > 0) {
+    if (station > 0) {
       xi_derivatives_->update_station(station, xi, prev_F, prev_g, prev_c);
     }
 
@@ -147,11 +151,50 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
       initial_guess = result.stations.back();
     }
 
+    // DEBUG: Print boundary conditions at this station
+    auto debug_bc_result = (station == 0)
+        ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation, mixture_)
+        : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
+                                                      config_.wall_parameters, config_.simulation, mixture_);
+    
+    if (debug_bc_result) {
+      const auto& bc = debug_bc_result.value();
+      std::cout << std::format("Station {}: xi={:.6e}, h_edge={:.2f}, P_edge={:.2f}, u_edge={:.2f}, rho_edge={:.6e}\n", 
+                               station, xi, bc.he(), bc.P_e(), bc.ue(), bc.rho_e());
+    }
+
     // Solve this station
     auto station_result = solve_station(station, xi, initial_guess);
     if (!station_result) {
+      std::cout << std::format("CONVERGENCE FAILURE at station {} (xi={:.6e}): {}\n", 
+                               station, xi, station_result.error().message());
+      
+      // Adaptive refinement: try to insert an intermediate station
+      if (station > 0 && station_idx > 0) {
+        const double prev_xi_station = xi_stations[station_idx - 1];
+        const double xi_spacing = xi - prev_xi_station;
+        
+        // Only refine if spacing is large enough (avoid infinite refinement)
+        if (xi_spacing > 1e-10) {
+          const double mid_xi = prev_xi_station + xi_spacing * 0.5;
+          
+          // Insert the intermediate xi
+          xi_stations.insert(xi_stations.begin() + station_idx, mid_xi);
+          
+          std::cout << std::format("Inserting intermediate station at xi={:.6e} (spacing was {:.6e})\n", 
+                                   mid_xi, xi_spacing);
+          
+          // Continue with the intermediate station (don't increment station_idx)
+          continue;
+        } else {
+          std::cout << std::format("Cannot refine further: spacing too small ({:.6e})\n", xi_spacing);
+        }
+      }
+      
       return std::unexpected(NumericError(
-          std::format("Failed to solve station {} (xi={}): {}", station, xi, station_result.error().message())));
+          std::format("Failed to solve station {} (xi={:.6e}): {}", station, xi, station_result.error().message())));
+    } else {
+      std::cout << std::format("SUCCESS at station {} (xi={:.6e})\n", station, xi);
     }
 
     // Store results
@@ -234,6 +277,9 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         }
       }
     }
+    
+    // Move to next station
+    ++station_idx;
   }
 
   result.converged = true; // All stations solved successfully
