@@ -2,6 +2,7 @@
 #include "blast/boundary_layer/solver/heat_flux_computer.hpp"
 #include "blast/boundary_layer/solver/initial_guess_factory.hpp"
 #include "blast/boundary_layer/solver/expected_utils.hpp"
+#include "blast/boundary_layer/conditions/boundary_interpolator.hpp"
 #include "blast/core/constants.hpp"
 #include "blast/boundary_layer/coefficients/coefficient_calculator.hpp"
 #include "blast/boundary_layer/coefficients/heat_flux_calculator.hpp"
@@ -151,11 +152,83 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
       initial_guess = result.stations.back();
     }
 
+    // Create boundary conditions with proper interpolation for adaptive stations
+    auto create_adaptive_boundary_conditions = [&](int sta, double xi_val) -> std::expected<conditions::BoundaryConditions, conditions::BoundaryConditionError> {
+      if (sta == 0) {
+        return conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation, mixture_);
+      }
+      
+      // For adaptive stations, find the original grid interval and interpolate
+      const auto& original_xi = grid_->xi_coordinates();
+      
+      // Find which original interval this adaptive xi falls into
+      std::size_t i1 = 0, i2 = 0;
+      for (std::size_t i = 0; i < original_xi.size() - 1; ++i) {
+        if (xi_val >= original_xi[i] && xi_val <= original_xi[i + 1]) {
+          i1 = i;
+          i2 = i + 1;
+          break;
+        }
+      }
+      
+      // If xi is beyond the last original point, use the last interval
+      if (xi_val > original_xi.back()) {
+        i1 = original_xi.size() - 2;
+        i2 = original_xi.size() - 1;
+      }
+      
+      // Get boundary conditions at both endpoints
+      auto bc1_result = conditions::interpolate_boundary_conditions(static_cast<int>(i1), original_xi[i1], original_xi, config_.outer_edge,
+                                                                    config_.wall_parameters, config_.simulation, mixture_);
+      auto bc2_result = conditions::interpolate_boundary_conditions(static_cast<int>(i2), original_xi[i2], original_xi, config_.outer_edge,
+                                                                    config_.wall_parameters, config_.simulation, mixture_);
+      
+      if (!bc1_result || !bc2_result) {
+        return std::unexpected(conditions::BoundaryConditionError("Failed to get endpoint boundary conditions for interpolation"));
+      }
+      
+      const auto& bc1 = bc1_result.value();
+      const auto& bc2 = bc2_result.value();
+      
+      // Linear interpolation factor
+      const double alpha = (xi_val - original_xi[i1]) / (original_xi[i2] - original_xi[i1]);
+      
+      // Create interpolated boundary conditions
+      conditions::EdgeConditions edge_interp;
+      edge_interp.pressure = bc1.edge.pressure + alpha * (bc2.edge.pressure - bc1.edge.pressure);
+      edge_interp.viscosity = bc1.edge.viscosity + alpha * (bc2.edge.viscosity - bc1.edge.viscosity);
+      edge_interp.velocity = bc1.edge.velocity + alpha * (bc2.edge.velocity - bc1.edge.velocity);
+      edge_interp.enthalpy = bc1.edge.enthalpy + alpha * (bc2.edge.enthalpy - bc1.edge.enthalpy);
+      edge_interp.density = bc1.edge.density + alpha * (bc2.edge.density - bc1.edge.density);
+      edge_interp.d_xi_dx = bc1.edge.d_xi_dx + alpha * (bc2.edge.d_xi_dx - bc1.edge.d_xi_dx);
+      edge_interp.d_ue_dx = bc1.edge.d_ue_dx + alpha * (bc2.edge.d_ue_dx - bc1.edge.d_ue_dx);
+      edge_interp.d_he_dx = bc1.edge.d_he_dx + alpha * (bc2.edge.d_he_dx - bc1.edge.d_he_dx);
+      edge_interp.d_he_dxi = bc1.edge.d_he_dxi + alpha * (bc2.edge.d_he_dxi - bc1.edge.d_he_dxi);
+      edge_interp.body_radius = bc1.edge.body_radius + alpha * (bc2.edge.body_radius - bc1.edge.body_radius);
+      edge_interp.boundary_override = bc1.edge.boundary_override;
+      
+      // Interpolate species fractions
+      edge_interp.species_fractions.resize(bc1.edge.species_fractions.size());
+      for (std::size_t j = 0; j < bc1.edge.species_fractions.size(); ++j) {
+        edge_interp.species_fractions[j] = bc1.edge.species_fractions[j] + alpha * (bc2.edge.species_fractions[j] - bc1.edge.species_fractions[j]);
+      }
+      
+      conditions::WallConditions wall_interp;
+      wall_interp.temperature = bc1.wall.temperature + alpha * (bc2.wall.temperature - bc1.wall.temperature);
+      
+      // Interpolate beta as well
+      const double beta_interp = bc1.beta + alpha * (bc2.beta - bc1.beta);
+      
+      return conditions::BoundaryConditions{.edge = std::move(edge_interp),
+                                            .wall = std::move(wall_interp),
+                                            .beta = beta_interp,
+                                            .station = sta,
+                                            .xi = xi_val,
+                                            .sim_config = &config_.simulation};
+    };
+    
     // DEBUG: Print boundary conditions at this station
-    auto debug_bc_result = (station == 0)
-        ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation, mixture_)
-        : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
-                                                      config_.wall_parameters, config_.simulation, mixture_);
+    auto debug_bc_result = create_adaptive_boundary_conditions(station, xi);
     
     if (debug_bc_result) {
       const auto& bc = debug_bc_result.value();
@@ -211,10 +284,7 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     result.total_iterations++;
 
     // Calculate heat flux for this converged station using unified computer
-    auto bc_result = (station == 0)
-        ? conditions::create_stagnation_conditions(config_.outer_edge, config_.wall_parameters, config_.simulation, mixture_)
-        : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
-                                                      config_.wall_parameters, config_.simulation, mixture_);
+    auto bc_result = create_adaptive_boundary_conditions(station, xi);
 
     auto bc = BLAST_TRY_WITH_CONTEXT(bc_result, 
         std::format("Failed to get boundary conditions for heat flux at station {}", station));
