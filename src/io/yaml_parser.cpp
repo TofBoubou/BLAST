@@ -813,6 +813,12 @@ auto YamlParser::parse_continuation_config(const YAML::Node& node) const
     if (node["pressure_stable"]) {
       config.pressure_stable = node["pressure_stable"].as<double>();
     }
+    if (node["radius_stable"]) {
+      config.radius_stable = node["radius_stable"].as<double>();
+    }
+    if (node["velocity_stable"]) {
+      config.velocity_stable = node["velocity_stable"].as<double>();
+    }
     return config;
   } catch (const YAML::Exception& e) {
     return std::unexpected(

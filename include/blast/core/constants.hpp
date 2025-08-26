@@ -147,6 +147,12 @@ inline constexpr double stable_edge_temperature = 3100.0;
 /// Default pressure for stable conditions [Pa]
 inline constexpr double stable_pressure = 7000.0;
 
+/// Default body radius for stable conditions [m]
+inline constexpr double stable_radius = 1.0;
+
+/// Default edge velocity for stable conditions [m/s]
+inline constexpr double stable_velocity = 0.0;
+
 /// Default emissivity for non-radiating surfaces
 inline constexpr double default_emissivity = 0.0;
 
