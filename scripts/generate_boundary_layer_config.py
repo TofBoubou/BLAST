@@ -9,7 +9,7 @@ import numpy as np
 from pathlib import Path
 
 def generate_config(
-    num_points=5,
+    num_points=101,
     x_range=(0.0, 1),  # Start from 0.001 to avoid x=0 issue
     temperature_range=(5905.5, 3000),
     pressure_range=(7000, 7000),
@@ -178,5 +178,5 @@ def generate_config(
 if __name__ == "__main__":
     # Use default parameters - modify if needed
     generate_config(
-        output_file="config/boundary_layer_auto.yaml"
+        output_file="config/boundary_layer_auto_tout.yaml"
     )

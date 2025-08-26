@@ -89,8 +89,8 @@ private:
   [[nodiscard]] auto interpolate_edge_conditions(double xi) const
       -> conditions::BoundaryConditions;
 
-  static constexpr std::size_t MAX_SUBDIVISION_DEPTH = 5;
-  static constexpr double MIN_INTERVAL_SIZE = 0.01;
+  static constexpr std::size_t MAX_SUBDIVISION_DEPTH = 20;
+  static constexpr double MIN_INTERVAL_SIZE = 1e-12;
 
 public:
   friend class ContinuationMethod;

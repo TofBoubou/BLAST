@@ -20,7 +20,7 @@ base:
     diffusion_type: stefan_maxwell
     consider_thermal_diffusion: false
     consider_dufour_effect: false
-    chemical_mode: non_equilibrium
+    chemical_mode: equilibrium
     catalytic_wall: false
     wall_mode: imposed_temperature
   numerical:

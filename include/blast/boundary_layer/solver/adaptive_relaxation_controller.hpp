@@ -37,8 +37,8 @@ public:
     double divergence_threshold = 1; // Threshold for divergence (> 1.0)
 
     // Adaptation factors
-    double strong_increase = 1.01;   // Strong increase for ratio < 0.8
-    double moderate_increase = 1.01; // Moderate increase for [0.8, 1.0]
+    double strong_increase = 1.0;   // Strong increase for ratio < 0.8
+    double moderate_increase = 1.0; // Moderate increase for [0.8, 1.0]
     double decrease_factor = 0.7;      // Decrease for ratio > X
     double oscillation_penalty = 0.9;  // Penalty factor for oscillations
 

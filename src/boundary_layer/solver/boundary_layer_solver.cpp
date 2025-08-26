@@ -116,6 +116,18 @@ auto BoundaryLayerSolver::solve()
 
   SolutionResult result;
   const auto xi_stations_original = grid_->xi_coordinates();
+  
+  // Debug: Print both xi grids with high precision
+  std::cout << "[DEBUG] Initial xi grid (xi_coordinates) with scientific notation: \n";
+  for (size_t i = 0; i < xi_stations_original.size(); ++i) {
+    std::cout << std::format("  xi[{}] = {:.15e}", i, xi_stations_original[i]) << std::endl;
+  }
+  
+  const auto xi_output = grid_->xi_output_coordinates();
+  std::cout << "[DEBUG] Output xi grid (xi_output_coordinates) with scientific notation: \n";
+  for (size_t i = 0; i < xi_output.size(); ++i) {
+    std::cout << std::format("  xi_output[{}] = {:.15e}", i, xi_output[i]) << std::endl;
+  }
 
   double prev_xi = 0.0;
   std::vector<double> prev_F, prev_g, prev_T;
@@ -128,7 +140,7 @@ auto BoundaryLayerSolver::solve()
         config_.outer_edge, config_.wall_parameters, config_.simulation,
         mixture_);
     if (!bc_result) {
-      return std::unexpected(bc_result.error());
+      return std::unexpected(solver::BoundaryConditionError(bc_result.error().message()));
     }
 
     const auto &edge_point = config_.outer_edge.edge_points[0];
@@ -200,7 +212,16 @@ auto BoundaryLayerSolver::solve_interval_adaptive(
   xi_derivatives_->update_station(station_idx, interval.xi_end, prev_F, prev_g,
                                   prev_c);
 
+  // Debug: Print xi creation/usage
+  std::cout << std::format("[DEBUG] Creating/using xi={:.12f} at depth={} (interval [{:.12f}, {:.12f}])\n",
+                          interval.xi_end, interval.depth, interval.xi_start, interval.xi_end);
+  
   auto bc = interpolate_edge_conditions(interval.xi_end);
+  
+  // Debug: Print interpolated boundary conditions
+  std::cout << std::format("[DEBUG] Subdivision at xi={:.6f}, depth={}: "
+                          "u_e={:.3f} m/s, P_e={:.1f} Pa, h_e={:.1f} J/kg\n",
+                          interval.xi_end, interval.depth, bc.ue(), bc.P_e(), bc.he());
 
   auto initial_guess =
       initial_guess_factory_->create_initial_guess_from_previous(
