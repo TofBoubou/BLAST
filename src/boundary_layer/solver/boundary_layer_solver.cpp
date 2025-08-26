@@ -256,8 +256,8 @@ auto BoundaryLayerSolver::solve_interval_adaptive(
         interval.xi_start, interval.xi_end, interval.depth, interval_size)));
   }
 
-  std::cout << std::format("Station at xi={:.4f} failed to converge. "
-                           "Subdividing interval [{:.4f}, {:.4f}]...\n",
+  std::cout << std::format("Station at xi={:.12f} failed to converge. "
+                           "Subdividing interval [{:.12f}, {:.12f}]...\n",
                            interval.xi_end, interval.xi_start, interval.xi_end);
 
   const double xi_mid = interval.midpoint();
