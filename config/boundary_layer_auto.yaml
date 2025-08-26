@@ -35,18 +35,6 @@ base:
     thermal_conductivity_algorithm: chapman_enskog_ldlt
     state_model: ChemNonEq1T
   output:
-    x_stations:
-      - 0.0
-      - 0.1
-      - 0.2
-      - 0.3
-      - 0.4
-      - 0.5
-      - 0.6
-      - 0.7
-      - 0.8
-      - 0.9
-      - 1.0
     output_directory: test_outputs
   outer_edge:
     edge_points:

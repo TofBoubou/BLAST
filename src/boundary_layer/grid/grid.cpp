@@ -67,7 +67,7 @@ template <typename CoordGrid>
 
 template <GridConfigType NumericalConfig>
 constexpr auto BoundaryLayerGrid::create_downstream_grid(
-    NumericalConfig&& numerical_config, const io::OuterEdgeConfig& edge_config, const io::OutputConfig& output_config,
+    NumericalConfig&& numerical_config, const io::OuterEdgeConfig& edge_config,
     const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError> {
 
   auto grid = BoundaryLayerGrid(numerical_config.n_eta, numerical_config.eta_max);
@@ -78,14 +78,7 @@ constexpr auto BoundaryLayerGrid::create_downstream_grid(
     return std::unexpected(xi_result.error());
   }
 
-  auto x_edge_range = edge_config.edge_points | std::views::transform([](const auto& point) { return point.x; });
-
-  std::vector<double> x_edge;
-  std::ranges::copy(x_edge_range, std::back_inserter(x_edge));
-
-  if (auto output_result = grid.generate_xi_output_distribution(output_config, x_edge); !output_result) {
-    return std::unexpected(output_result.error());
-  }
+  // xi_output is now the same as xi since output is at same locations as edge_points
 
   return grid;
 }
@@ -148,39 +141,6 @@ auto BoundaryLayerGrid::generate_xi_distribution(const io::OuterEdgeConfig& edge
   return {};
 }
 
-auto BoundaryLayerGrid::generate_xi_output_distribution(
-    const io::OutputConfig& output_config, std::span<const double> x_edge) -> std::expected<void, GridError> {
-
-  xi_output_.clear();
-  xi_output_.reserve(output_config.x_stations.size());
-
-  for (const auto x_out : output_config.x_stations) {
-    auto interval_result = coordinate_transform::search_interval(x_edge, x_out);
-    if (!interval_result) {
-      return std::unexpected(GridError(std::format("Output station x={} is outside edge domain", x_out)));
-    }
-
-    const auto [i1, i2] = interval_result.value();
-
-    // Use Hermite interpolation for coordinate transformation (higher geometric
-    // accuracy)
-    const auto xi_out = [&]() -> double {
-      if (i1 == i2)
-        return xi_[i1];
-
-      // Compute derivatives for Hermite interpolation
-      std::vector<double> x_edge_vec(x_edge.begin(), x_edge.end());
-      auto xi_derivatives = compute_coordinate_derivatives(xi_, x_edge_vec);
-
-      return coordinate_transform::hermite_interpolate(x_out, x_edge[i1], x_edge[i2], xi_[i1], xi_[i2],
-                                                       xi_derivatives[i1], xi_derivatives[i2]);
-    }();
-
-    xi_output_.emplace_back(xi_out);
-  }
-
-  return {};
-}
 
 auto BoundaryLayerGrid::find_xi_interval(double xi_target) const noexcept
     -> std::expected<std::pair<int, int>, GridError> {
@@ -191,35 +151,10 @@ auto BoundaryLayerGrid::find_xi_interval(double xi_target) const noexcept
   return result.value();
 }
 
-template <NumericRange XGrid>
-auto BoundaryLayerGrid::interpolate_x_from_xi(double xi_target,
-                                              XGrid&& x_grid) const -> std::expected<double, GridError> {
-
-  auto interval_result = find_xi_interval(xi_target);
-  if (!interval_result) {
-    return std::unexpected(interval_result.error());
-  }
-
-  const auto [i1, i2] = interval_result.value();
-
-  // Use Hermite interpolation for coordinate transformation (higher geometric
-  // accuracy)
-  if (i1 == i2)
-    return x_grid[i1];
-
-  // Compute derivatives for Hermite interpolation
-  std::vector<double> x_values(x_grid.size());
-  std::copy(x_grid.begin(), x_grid.end(), x_values.begin());
-  auto x_derivatives = compute_coordinate_derivatives(x_values, xi_);
-
-  return coordinate_transform::hermite_interpolate(xi_target, xi_[i1], xi_[i2], x_grid[i1], x_grid[i2],
-                                                   x_derivatives[i1], x_derivatives[i2]);
-}
 
 // Explicit instantiations for common use cases
 template auto BoundaryLayerGrid::create_downstream_grid<const io::NumericalConfig&>(
     const io::NumericalConfig& numerical_config, const io::OuterEdgeConfig& edge_config,
-    const io::OutputConfig& output_config,
     const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError>;
 
 } // namespace blast::boundary_layer::grid

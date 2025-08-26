@@ -35,7 +35,7 @@ BoundaryLayerSolver::BoundaryLayerSolver(const thermophysics::MixtureInterface& 
     grid_ = std::make_unique<grid::BoundaryLayerGrid>(std::move(grid_result.value()));
   } else {
     auto grid_result =
-        grid::BoundaryLayerGrid::create_downstream_grid(config.numerical, config.outer_edge, config.output, mixture_);
+        grid::BoundaryLayerGrid::create_downstream_grid(config.numerical, config.outer_edge, mixture_);
     if (!grid_result) {
       throw GridError(std::format("Failed to create downstream grid: {}", grid_result.error().message()));
     }

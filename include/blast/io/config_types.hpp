@@ -60,7 +60,8 @@ struct MixtureConfig {
 };
 
 struct OutputConfig {
-  std::vector<double> x_stations;
+  // x_stations are now automatically derived from edge_points.x
+  // No need to specify them separately
   std::string output_directory = "BLAST_outputs";
 };
 

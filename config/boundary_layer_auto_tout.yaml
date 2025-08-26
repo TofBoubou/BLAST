@@ -1,0 +1,758 @@
+# =============================================================================
+# CONTINUATION METHOD PARAMETERS FOR CONVERGENCE
+# =============================================================================
+
+continuation:
+  wall_temperature_stable: 3000
+  edge_temperature_stable: 5905.5
+  pressure_stable: 7000
+
+# =============================================================================
+# BASE MODE
+# =============================================================================
+
+base:
+  enabled: true
+  simulation:
+    body_type: axisymmetric
+    only_stagnation_point: false
+    finite_thickness: false
+    diffusion_type: stefan_maxwell
+    consider_thermal_diffusion: false
+    consider_dufour_effect: false
+    chemical_mode: equilibrium
+    catalytic_wall: false
+    wall_mode: imposed_temperature
+  numerical:
+    n_eta: 20
+    eta_max: 6.0
+    convergence_tolerance: 1.0e-09
+    max_iterations: 100000
+  mixture:
+    name: CO2_5
+    thermodynamic_database: RRHO
+    viscosity_algorithm: chapman_enskog_ldlt
+    thermal_conductivity_algorithm: chapman_enskog_ldlt
+    state_model: ChemNonEq1T
+  output:
+    - 0.0
+    - 0.01
+    - 0.02
+    - 0.03
+    - 0.04
+    - 0.05
+    - 0.06
+    - 0.07
+    - 0.08
+    - 0.09
+    - 0.1
+    - 0.11
+    - 0.12
+    - 0.13
+    - 0.14
+    - 0.15
+    - 0.16
+    - 0.17
+    - 0.18
+    - 0.19
+    - 0.2
+    - 0.21
+    - 0.22
+    - 0.23
+    - 0.24
+    - 0.25
+    - 0.26
+    - 0.27
+    - 0.28
+    - 0.29
+    - 0.3
+    - 0.31
+    - 0.32
+    - 0.33
+    - 0.34
+    - 0.35000000000000003
+    - 0.36
+    - 0.37
+    - 0.38
+    - 0.39
+    - 0.4
+    - 0.41000000000000003
+    - 0.42
+    - 0.43
+    - 0.44
+    - 0.45
+    - 0.46
+    - 0.47000000000000003
+    - 0.48
+    - 0.49
+    - 0.5
+    - 0.51
+    - 0.52
+    - 0.53
+    - 0.54
+    - 0.55
+    - 0.56
+    - 0.5700000000000001
+    - 0.58
+    - 0.59
+    - 0.6
+    - 0.61
+    - 0.62
+    - 0.63
+    - 0.64
+    - 0.65
+    - 0.66
+    - 0.67
+    - 0.68
+    - 0.6900000000000001
+    - 0.7000000000000001
+    - 0.71
+    - 0.72
+    - 0.73
+    - 0.74
+    - 0.75
+    - 0.76
+    - 0.77
+    - 0.78
+    - 0.79
+    - 0.8
+    - 0.81
+    - 0.8200000000000001
+    - 0.8300000000000001
+    - 0.84
+    - 0.85
+    - 0.86
+    - 0.87
+    - 0.88
+    - 0.89
+    - 0.9
+    - 0.91
+    - 0.92
+    - 0.93
+    - 0.9400000000000001
+    - 0.9500000000000001
+    - 0.96
+    - 0.97
+    - 0.98
+    - 0.99
+    - 1.0
+    output_directory: test_outputs
+  outer_edge:
+    edge_points:
+    - x: 0.0
+      radius: 1.0
+      velocity: 0.0
+      temperature: 5905.5
+      pressure: 7000.0
+    - x: 0.01
+      radius: 1.0
+      velocity: 1.0
+      temperature: 5876.445
+      pressure: 7000.0
+    - x: 0.02
+      radius: 1.0
+      velocity: 2.0
+      temperature: 5847.39
+      pressure: 7000.0
+    - x: 0.03
+      radius: 1.0
+      velocity: 3.0
+      temperature: 5818.335
+      pressure: 7000.0
+    - x: 0.04
+      radius: 1.0
+      velocity: 4.0
+      temperature: 5789.28
+      pressure: 7000.0
+    - x: 0.05
+      radius: 1.0
+      velocity: 5.0
+      temperature: 5760.225
+      pressure: 7000.0
+    - x: 0.06
+      radius: 1.0
+      velocity: 6.0
+      temperature: 5731.17
+      pressure: 7000.0
+    - x: 0.07
+      radius: 1.0
+      velocity: 7.0
+      temperature: 5702.115
+      pressure: 7000.0
+    - x: 0.08
+      radius: 1.0
+      velocity: 8.0
+      temperature: 5673.06
+      pressure: 7000.0
+    - x: 0.09
+      radius: 1.0
+      velocity: 9.0
+      temperature: 5644.005
+      pressure: 7000.0
+    - x: 0.1
+      radius: 1.0
+      velocity: 10.0
+      temperature: 5614.95
+      pressure: 7000.0
+    - x: 0.11
+      radius: 1.0
+      velocity: 11.0
+      temperature: 5585.895
+      pressure: 7000.0
+    - x: 0.12
+      radius: 1.0
+      velocity: 12.0
+      temperature: 5556.84
+      pressure: 7000.0
+    - x: 0.13
+      radius: 1.0
+      velocity: 13.0
+      temperature: 5527.785
+      pressure: 7000.0
+    - x: 0.14
+      radius: 1.0
+      velocity: 14.0
+      temperature: 5498.73
+      pressure: 7000.0
+    - x: 0.15
+      radius: 1.0
+      velocity: 15.0
+      temperature: 5469.675
+      pressure: 7000.0
+    - x: 0.16
+      radius: 1.0
+      velocity: 16.0
+      temperature: 5440.62
+      pressure: 7000.0
+    - x: 0.17
+      radius: 1.0
+      velocity: 17.0
+      temperature: 5411.565
+      pressure: 7000.0
+    - x: 0.18
+      radius: 1.0
+      velocity: 18.0
+      temperature: 5382.51
+      pressure: 7000.0
+    - x: 0.19
+      radius: 1.0
+      velocity: 19.0
+      temperature: 5353.455
+      pressure: 7000.0
+    - x: 0.2
+      radius: 1.0
+      velocity: 20.0
+      temperature: 5324.4
+      pressure: 7000.0
+    - x: 0.21
+      radius: 1.0
+      velocity: 21.0
+      temperature: 5295.345
+      pressure: 7000.0
+    - x: 0.22
+      radius: 1.0
+      velocity: 22.0
+      temperature: 5266.29
+      pressure: 7000.0
+    - x: 0.23
+      radius: 1.0
+      velocity: 23.0
+      temperature: 5237.235
+      pressure: 7000.0
+    - x: 0.24
+      radius: 1.0
+      velocity: 24.0
+      temperature: 5208.18
+      pressure: 7000.0
+    - x: 0.25
+      radius: 1.0
+      velocity: 25.0
+      temperature: 5179.125
+      pressure: 7000.0
+    - x: 0.26
+      radius: 1.0
+      velocity: 26.0
+      temperature: 5150.07
+      pressure: 7000.0
+    - x: 0.27
+      radius: 1.0
+      velocity: 27.0
+      temperature: 5121.015
+      pressure: 7000.0
+    - x: 0.28
+      radius: 1.0
+      velocity: 28.0
+      temperature: 5091.96
+      pressure: 7000.0
+    - x: 0.29
+      radius: 1.0
+      velocity: 29.0
+      temperature: 5062.905
+      pressure: 7000.0
+    - x: 0.3
+      radius: 1.0
+      velocity: 30.0
+      temperature: 5033.85
+      pressure: 7000.0
+    - x: 0.31
+      radius: 1.0
+      velocity: 31.0
+      temperature: 5004.795
+      pressure: 7000.0
+    - x: 0.32
+      radius: 1.0
+      velocity: 32.0
+      temperature: 4975.74
+      pressure: 7000.0
+    - x: 0.33
+      radius: 1.0
+      velocity: 33.0
+      temperature: 4946.685
+      pressure: 7000.0
+    - x: 0.34
+      radius: 1.0
+      velocity: 34.0
+      temperature: 4917.63
+      pressure: 7000.0
+    - x: 0.35000000000000003
+      radius: 1.0
+      velocity: 35.0
+      temperature: 4888.575
+      pressure: 7000.0
+    - x: 0.36
+      radius: 1.0
+      velocity: 36.0
+      temperature: 4859.52
+      pressure: 7000.0
+    - x: 0.37
+      radius: 1.0
+      velocity: 37.0
+      temperature: 4830.465
+      pressure: 7000.0
+    - x: 0.38
+      radius: 1.0
+      velocity: 38.0
+      temperature: 4801.41
+      pressure: 7000.0
+    - x: 0.39
+      radius: 1.0
+      velocity: 39.0
+      temperature: 4772.355
+      pressure: 7000.0
+    - x: 0.4
+      radius: 1.0
+      velocity: 40.0
+      temperature: 4743.3
+      pressure: 7000.0
+    - x: 0.41000000000000003
+      radius: 1.0
+      velocity: 41.0
+      temperature: 4714.245
+      pressure: 7000.0
+    - x: 0.42
+      radius: 1.0
+      velocity: 42.0
+      temperature: 4685.1900000000005
+      pressure: 7000.0
+    - x: 0.43
+      radius: 1.0
+      velocity: 43.0
+      temperature: 4656.135
+      pressure: 7000.0
+    - x: 0.44
+      radius: 1.0
+      velocity: 44.0
+      temperature: 4627.08
+      pressure: 7000.0
+    - x: 0.45
+      radius: 1.0
+      velocity: 45.0
+      temperature: 4598.025
+      pressure: 7000.0
+    - x: 0.46
+      radius: 1.0
+      velocity: 46.0
+      temperature: 4568.97
+      pressure: 7000.0
+    - x: 0.47000000000000003
+      radius: 1.0
+      velocity: 47.0
+      temperature: 4539.915
+      pressure: 7000.0
+    - x: 0.48
+      radius: 1.0
+      velocity: 48.0
+      temperature: 4510.860000000001
+      pressure: 7000.0
+    - x: 0.49
+      radius: 1.0
+      velocity: 49.0
+      temperature: 4481.805
+      pressure: 7000.0
+    - x: 0.5
+      radius: 1.0
+      velocity: 50.0
+      temperature: 4452.75
+      pressure: 7000.0
+    - x: 0.51
+      radius: 1.0
+      velocity: 51.0
+      temperature: 4423.695
+      pressure: 7000.0
+    - x: 0.52
+      radius: 1.0
+      velocity: 52.0
+      temperature: 4394.64
+      pressure: 7000.0
+    - x: 0.53
+      radius: 1.0
+      velocity: 53.0
+      temperature: 4365.585
+      pressure: 7000.0
+    - x: 0.54
+      radius: 1.0
+      velocity: 54.0
+      temperature: 4336.53
+      pressure: 7000.0
+    - x: 0.55
+      radius: 1.0
+      velocity: 55.0
+      temperature: 4307.475
+      pressure: 7000.0
+    - x: 0.56
+      radius: 1.0
+      velocity: 56.0
+      temperature: 4278.42
+      pressure: 7000.0
+    - x: 0.5700000000000001
+      radius: 1.0
+      velocity: 57.0
+      temperature: 4249.365
+      pressure: 7000.0
+    - x: 0.58
+      radius: 1.0
+      velocity: 58.0
+      temperature: 4220.3099999999995
+      pressure: 7000.0
+    - x: 0.59
+      radius: 1.0
+      velocity: 59.0
+      temperature: 4191.255
+      pressure: 7000.0
+    - x: 0.6
+      radius: 1.0
+      velocity: 60.0
+      temperature: 4162.2
+      pressure: 7000.0
+    - x: 0.61
+      radius: 1.0
+      velocity: 61.0
+      temperature: 4133.145
+      pressure: 7000.0
+    - x: 0.62
+      radius: 1.0
+      velocity: 62.0
+      temperature: 4104.09
+      pressure: 7000.0
+    - x: 0.63
+      radius: 1.0
+      velocity: 63.0
+      temperature: 4075.035
+      pressure: 7000.0
+    - x: 0.64
+      radius: 1.0
+      velocity: 64.0
+      temperature: 4045.98
+      pressure: 7000.0
+    - x: 0.65
+      radius: 1.0
+      velocity: 65.0
+      temperature: 4016.925
+      pressure: 7000.0
+    - x: 0.66
+      radius: 1.0
+      velocity: 66.0
+      temperature: 3987.87
+      pressure: 7000.0
+    - x: 0.67
+      radius: 1.0
+      velocity: 67.0
+      temperature: 3958.815
+      pressure: 7000.0
+    - x: 0.68
+      radius: 1.0
+      velocity: 68.0
+      temperature: 3929.76
+      pressure: 7000.0
+    - x: 0.6900000000000001
+      radius: 1.0
+      velocity: 69.0
+      temperature: 3900.705
+      pressure: 7000.0
+    - x: 0.7000000000000001
+      radius: 1.0
+      velocity: 70.0
+      temperature: 3871.65
+      pressure: 7000.0
+    - x: 0.71
+      radius: 1.0
+      velocity: 71.0
+      temperature: 3842.595
+      pressure: 7000.0
+    - x: 0.72
+      radius: 1.0
+      velocity: 72.0
+      temperature: 3813.54
+      pressure: 7000.0
+    - x: 0.73
+      radius: 1.0
+      velocity: 73.0
+      temperature: 3784.485
+      pressure: 7000.0
+    - x: 0.74
+      radius: 1.0
+      velocity: 74.0
+      temperature: 3755.43
+      pressure: 7000.0
+    - x: 0.75
+      radius: 1.0
+      velocity: 75.0
+      temperature: 3726.375
+      pressure: 7000.0
+    - x: 0.76
+      radius: 1.0
+      velocity: 76.0
+      temperature: 3697.32
+      pressure: 7000.0
+    - x: 0.77
+      radius: 1.0
+      velocity: 77.0
+      temperature: 3668.265
+      pressure: 7000.0
+    - x: 0.78
+      radius: 1.0
+      velocity: 78.0
+      temperature: 3639.21
+      pressure: 7000.0
+    - x: 0.79
+      radius: 1.0
+      velocity: 79.0
+      temperature: 3610.155
+      pressure: 7000.0
+    - x: 0.8
+      radius: 1.0
+      velocity: 80.0
+      temperature: 3581.1
+      pressure: 7000.0
+    - x: 0.81
+      radius: 1.0
+      velocity: 81.0
+      temperature: 3552.045
+      pressure: 7000.0
+    - x: 0.8200000000000001
+      radius: 1.0
+      velocity: 82.0
+      temperature: 3522.9900000000002
+      pressure: 7000.0
+    - x: 0.8300000000000001
+      radius: 1.0
+      velocity: 83.0
+      temperature: 3493.935
+      pressure: 7000.0
+    - x: 0.84
+      radius: 1.0
+      velocity: 84.0
+      temperature: 3464.88
+      pressure: 7000.0
+    - x: 0.85
+      radius: 1.0
+      velocity: 85.0
+      temperature: 3435.825
+      pressure: 7000.0
+    - x: 0.86
+      radius: 1.0
+      velocity: 86.0
+      temperature: 3406.77
+      pressure: 7000.0
+    - x: 0.87
+      radius: 1.0
+      velocity: 87.0
+      temperature: 3377.715
+      pressure: 7000.0
+    - x: 0.88
+      radius: 1.0
+      velocity: 88.0
+      temperature: 3348.66
+      pressure: 7000.0
+    - x: 0.89
+      radius: 1.0
+      velocity: 89.0
+      temperature: 3319.605
+      pressure: 7000.0
+    - x: 0.9
+      radius: 1.0
+      velocity: 90.0
+      temperature: 3290.55
+      pressure: 7000.0
+    - x: 0.91
+      radius: 1.0
+      velocity: 91.0
+      temperature: 3261.495
+      pressure: 7000.0
+    - x: 0.92
+      radius: 1.0
+      velocity: 92.0
+      temperature: 3232.44
+      pressure: 7000.0
+    - x: 0.93
+      radius: 1.0
+      velocity: 93.0
+      temperature: 3203.385
+      pressure: 7000.0
+    - x: 0.9400000000000001
+      radius: 1.0
+      velocity: 94.0
+      temperature: 3174.33
+      pressure: 7000.0
+    - x: 0.9500000000000001
+      radius: 1.0
+      velocity: 95.0
+      temperature: 3145.275
+      pressure: 7000.0
+    - x: 0.96
+      radius: 1.0
+      velocity: 96.0
+      temperature: 3116.2200000000003
+      pressure: 7000.0
+    - x: 0.97
+      radius: 1.0
+      velocity: 97.0
+      temperature: 3087.165
+      pressure: 7000.0
+    - x: 0.98
+      radius: 1.0
+      velocity: 98.0
+      temperature: 3058.11
+      pressure: 7000.0
+    - x: 0.99
+      radius: 1.0
+      velocity: 99.0
+      temperature: 3029.055
+      pressure: 7000.0
+    - x: 1.0
+      radius: 1.0
+      velocity: 100.0
+      temperature: 3000.0
+      pressure: 7000.0
+    velocity_gradient_stagnation: 4027.1213622326
+    freestream_density: 0.0019382429
+    freestream_velocity: 500000
+    finite_thickness_params:
+      v_edge: -111.31796
+      d2_ue_dxdy: -290979.9698604651
+      delta_bl: 0.010525
+  wall_parameters:
+    temperatures:
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    - 3000.0
+    emissivity: 0
+    environment_temperature: 300

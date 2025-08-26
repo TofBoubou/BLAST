@@ -19,9 +19,6 @@ public:
 };
 
 template <typename T>
-concept NumericRange = std::ranges::range<T> && std::floating_point<std::ranges::range_value_t<T>>;
-
-template <typename T>
 concept GridConfigType = requires(const T& config) {
   config.n_eta;
   config.eta_max;
@@ -37,7 +34,6 @@ constexpr double step_reduction_factor = 0.5;
 class BoundaryLayerGrid {
 private:
   std::vector<double> xi_;
-  std::vector<double> xi_output_;
   std::vector<double> eta_;
   double d_eta_;
   int n_eta_;
@@ -52,12 +48,10 @@ public:
   template <GridConfigType NumericalConfig>
   [[nodiscard]] static constexpr auto
   create_downstream_grid(NumericalConfig&& numerical_config, const io::OuterEdgeConfig& edge_config,
-                         const io::OutputConfig& output_config,
                          const thermophysics::MixtureInterface& mixture) -> std::expected<BoundaryLayerGrid, GridError>;
 
   // Modern accessors with noexcept
   [[nodiscard]] constexpr auto xi_coordinates() const noexcept -> std::span<const double> { return xi_; }
-  [[nodiscard]] constexpr auto xi_output_coordinates() const noexcept -> std::span<const double> { return xi_output_; }
   [[nodiscard]] constexpr auto eta_coordinates() const noexcept -> std::span<const double> { return eta_; }
 
   [[nodiscard]] constexpr auto n_eta() const noexcept -> int { return n_eta_; }
@@ -67,23 +61,17 @@ public:
   // Grid operations
   [[nodiscard]] auto find_xi_interval(double xi_target) const noexcept -> std::expected<std::pair<int, int>, GridError>;
 
-  template <NumericRange XGrid>
-  [[nodiscard]] auto interpolate_x_from_xi(double xi_target, XGrid&& x_grid) const -> std::expected<double, GridError>;
-
 private:
   constexpr BoundaryLayerGrid(int n_eta, double eta_max) noexcept
       : n_eta_(n_eta), eta_max_(eta_max), d_eta_(eta_max / static_cast<double>(n_eta - 1)) {
 
     xi_.reserve(constants::default_grid_reserve);
-    xi_output_.reserve(constants::default_grid_reserve);
     eta_.reserve(n_eta_);
   }
 
   inline constexpr auto generate_eta_distribution() noexcept -> void;
   auto generate_xi_distribution(const io::OuterEdgeConfig& edge_config,
                                 const thermophysics::MixtureInterface& mixture) -> std::expected<void, GridError>;
-  auto generate_xi_output_distribution(const io::OutputConfig& output_config,
-                                       std::span<const double> x_edge) -> std::expected<void, GridError>;
 };
 
 // Utility functions with constexpr where possible
@@ -97,7 +85,6 @@ constexpr auto BoundaryLayerGrid::create_stagnation_grid(
 
   grid.generate_eta_distribution();
   grid.xi_.emplace_back(0.0);
-  grid.xi_output_.emplace_back(0.0);
 
   return grid;
 }

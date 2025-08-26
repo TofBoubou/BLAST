@@ -255,8 +255,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.simulation.only_stagnation_point = true;
       config.simulation.wall_mode = SimulationConfig::WallMode::ImposedTemperature;
       config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
-      // Force x_stations = [0.0] for stagnation point
-      config.output.x_stations = {0.0};
+      // x_stations are automatically derived from edge_points (single point at x=0 for stagnation)
       
       // Force edge_points with configured radius and velocity
       if (config.outer_edge.edge_points.empty()) {
@@ -331,8 +330,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         config.simulation.catalytic_wall = true;
         config.simulation.wall_mode = SimulationConfig::WallMode::ImposedTemperature;
         config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
-        // Force x_stations = [0.0] for stagnation point
-        config.output.x_stations = {0.0};
+        // x_stations are automatically derived from edge_points (single point at x=0 for stagnation)
         
         // Edge reconstruction has its own specialized config, no outer_edge needed
       }
@@ -521,26 +519,7 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
   OutputConfig config;
 
   try {
-    // Parse x_stations - optional parameter, defaults to [0.0] for stagnation modes
-    if (node["x_stations"]) {
-      auto x_stations_result = extract_value<std::vector<double>>(node, "x_stations");
-      if (!x_stations_result)
-        return std::unexpected(x_stations_result.error());
-      config.x_stations = x_stations_result.value();
-      if (config.x_stations.empty()) {
-        return std::unexpected(core::ConfigurationError("x_stations cannot be empty"));
-      }
-      if (std::any_of(config.x_stations.begin(), config.x_stations.end(), [](double x) { return x < 0; })) {
-        return std::unexpected(core::ConfigurationError("x_stations must be non-negative"));
-      }
-      for (std::size_t i = 1; i < config.x_stations.size(); ++i) {
-        if (config.x_stations[i] <= config.x_stations[i - 1]) {
-          return std::unexpected(core::ConfigurationError("x_stations must be in strictly increasing order"));
-        }
-      }
-    } else {
-      config.x_stations = {0.0};  // Default for stagnation modes
-    }
+    // x_stations are now automatically derived from edge_points, no need to parse them
 
     auto output_dir_result = extract_value<std::string>(node, "output_directory");
     if (!output_dir_result)

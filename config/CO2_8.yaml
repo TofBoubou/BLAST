@@ -19,7 +19,6 @@ mixture:
   viscosity_algorithm: chapman_enskog_ldlt
 
 output:
-  x_stations: [0.0]
   output_directory: test_outputs
 
 outer_edge:

@@ -25,7 +25,6 @@ mixture:
   thermal_conductivity_algorithm: chapman_enskog_ldlt  # Thermal conductivity method
 
 output:
-  x_stations: [0.0]                    # Axial positions [m] for detailed output
   output_directory: test_outputs       # Directory for simulation results
 
 outer_edge:
