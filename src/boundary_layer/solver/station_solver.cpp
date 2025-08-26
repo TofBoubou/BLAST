@@ -46,15 +46,42 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
 
     if (!convergence_result) {
         // Try continuation if available and not already in continuation
-        if (auto* continuation = solver_.get_continuation(); 
+        if (auto* continuation = solver_.get_continuation();
             continuation && !in_continuation_ && should_attempt_continuation(ConvergenceError(convergence_result.error().message()))) {
-            
-            auto stable_guess = compute_stable_guess(station, xi);
-            if (stable_guess) {
-                auto cont_result = continuation->solve_with_continuation(solver_, station, xi, 
-                                                                       solver_.get_original_config(), 
-                                                                       stable_guess.value());
 
+            io::Configuration cont_config = solver_.get_original_config();
+            equations::SolutionState cont_guess;
+            bool have_guess = false;
+
+            if (station > 0) {
+                const auto& grid = solver_.get_grid();
+                double xi_prev = grid.xi_coordinates()[station - 1];
+                auto prev_bc_result = conditions::interpolate_boundary_conditions(
+                    station - 1, xi_prev, grid.xi_coordinates(), config_.outer_edge,
+                    config_.wall_parameters, config_.simulation, mixture_);
+                if (prev_bc_result) {
+                    const auto& prev_bc = prev_bc_result.value();
+                    cont_config.continuation.wall_temperature_stable = initial_guess.T[0];
+                    cont_config.continuation.edge_temperature_stable = initial_guess.T.back();
+                    cont_config.continuation.pressure_stable = prev_bc.edge.pressure;
+                    cont_config.continuation.radius_stable = prev_bc.edge.body_radius;
+                    cont_config.continuation.velocity_stable = prev_bc.edge.velocity;
+                    cont_guess = initial_guess;
+                    have_guess = true;
+                }
+            }
+
+            if (!have_guess) {
+                auto stable_guess = compute_stable_guess(station, xi);
+                if (stable_guess) {
+                    cont_guess = stable_guess.value();
+                    have_guess = true;
+                }
+            }
+
+            if (have_guess) {
+                auto cont_result = continuation->solve_with_continuation(
+                    solver_, station, xi, cont_config, cont_guess);
                 if (cont_result && cont_result.value().success) {
                     return cont_result.value().solution;
                 }
@@ -81,15 +108,42 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
         }
 
         // Try continuation for non-continuation failures
-        if (auto* continuation = solver_.get_continuation(); 
+        if (auto* continuation = solver_.get_continuation();
             continuation && !in_continuation_ && conv_info.max_residual() < 1e10) {
-            
-            auto stable_guess = compute_stable_guess(station, xi);
-            if (stable_guess) {
-                auto cont_result = continuation->solve_with_continuation(solver_, station, xi, 
-                                                                       solver_.get_original_config(), 
-                                                                       stable_guess.value());
 
+            io::Configuration cont_config = solver_.get_original_config();
+            equations::SolutionState cont_guess;
+            bool have_guess = false;
+
+            if (station > 0) {
+                const auto& grid = solver_.get_grid();
+                double xi_prev = grid.xi_coordinates()[station - 1];
+                auto prev_bc_result = conditions::interpolate_boundary_conditions(
+                    station - 1, xi_prev, grid.xi_coordinates(), config_.outer_edge,
+                    config_.wall_parameters, config_.simulation, mixture_);
+                if (prev_bc_result) {
+                    const auto& prev_bc = prev_bc_result.value();
+                    cont_config.continuation.wall_temperature_stable = initial_guess.T[0];
+                    cont_config.continuation.edge_temperature_stable = initial_guess.T.back();
+                    cont_config.continuation.pressure_stable = prev_bc.edge.pressure;
+                    cont_config.continuation.radius_stable = prev_bc.edge.body_radius;
+                    cont_config.continuation.velocity_stable = prev_bc.edge.velocity;
+                    cont_guess = initial_guess;
+                    have_guess = true;
+                }
+            }
+
+            if (!have_guess) {
+                auto stable_guess = compute_stable_guess(station, xi);
+                if (stable_guess) {
+                    cont_guess = stable_guess.value();
+                    have_guess = true;
+                }
+            }
+
+            if (have_guess) {
+                auto cont_result = continuation->solve_with_continuation(
+                    solver_, station, xi, cont_config, cont_guess);
                 if (cont_result && cont_result.value().success) {
                     return cont_result.value().solution;
                 }
@@ -97,7 +151,7 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
         }
 
         return std::unexpected(
-            ConvergenceError(std::format("Station {} failed to converge after {} iterations (residual={})", 
+            ConvergenceError(std::format("Station {} failed to converge after {} iterations (residual={})",
                                         station, conv_info.iterations, conv_info.max_residual())));
     }
 
@@ -141,6 +195,8 @@ auto StationSolver::compute_stable_guess(int station, double xi) const
     if (!stable_config.outer_edge.edge_points.empty()) {
         stable_config.outer_edge.edge_points[0].temperature = stable_config_.edge_temperature_stable;
         stable_config.outer_edge.edge_points[0].pressure = stable_config_.pressure_stable;
+        stable_config.outer_edge.edge_points[0].radius = stable_config_.radius_stable;
+        stable_config.outer_edge.edge_points[0].velocity = stable_config_.velocity_stable;
     }
 
     // Get stable boundary conditions

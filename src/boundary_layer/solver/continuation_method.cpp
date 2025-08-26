@@ -90,8 +90,12 @@ auto ContinuationMethod::interpolate_config(const io::Configuration& target, dou
 
     double Tedge_stable = target.continuation.edge_temperature_stable;
     double pressure_stable = target.continuation.pressure_stable;
+    double radius_stable = target.continuation.radius_stable;
+    double velocity_stable = target.continuation.velocity_stable;
     edge.temperature = Tedge_stable + lambda * (target_edge.temperature - Tedge_stable);
     edge.pressure = pressure_stable + lambda * (target_edge.pressure - pressure_stable);
+    edge.radius = radius_stable + lambda * (target_edge.radius - radius_stable);
+    edge.velocity = velocity_stable + lambda * (target_edge.velocity - velocity_stable);
   }
 
   return config;

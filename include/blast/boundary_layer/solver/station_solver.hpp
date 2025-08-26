@@ -34,6 +34,8 @@ public:
         double wall_temperature_stable;
         double edge_temperature_stable;
         double pressure_stable;
+        double radius_stable;
+        double velocity_stable;
     };
 
     /**

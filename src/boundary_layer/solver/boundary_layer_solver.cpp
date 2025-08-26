@@ -92,7 +92,9 @@ auto BoundaryLayerSolver::initialize_solver_components() -> void {
     StationSolver::StableGuessConfig stable_config{
       .wall_temperature_stable = original_config_.continuation.wall_temperature_stable,
       .edge_temperature_stable = original_config_.continuation.edge_temperature_stable,
-      .pressure_stable = original_config_.continuation.pressure_stable
+      .pressure_stable = original_config_.continuation.pressure_stable,
+      .radius_stable = original_config_.continuation.radius_stable,
+      .velocity_stable = original_config_.continuation.velocity_stable
     };
     station_solver_->set_stable_config(stable_config);
   }
