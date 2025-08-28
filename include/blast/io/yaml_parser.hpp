@@ -25,7 +25,7 @@ private:
       -> std::expected<EnumType, core::ConfigurationError>;
 
   [[nodiscard]] auto
-  parse_simulation_config(const YAML::Node& node) const -> std::expected<SimulationConfig, core::ConfigurationError>;
+  parse_simulation_config(const YAML::Node& node, bool abacus_mode = false, bool edge_reconstruction_mode = false) const -> std::expected<SimulationConfig, core::ConfigurationError>;
 
   [[nodiscard]] auto
   parse_numerical_config(const YAML::Node& node) const -> std::expected<NumericalConfig, core::ConfigurationError>;

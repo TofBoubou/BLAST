@@ -157,7 +157,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
 
     // Parse configuration from the determined nodes
-    auto sim_result = parse_simulation_config(sim_node);
+    auto sim_result = parse_simulation_config(sim_node, abacus_enabled, edge_reconstruction_enabled);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
@@ -351,7 +351,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
   }
 }
 
-auto YamlParser::parse_simulation_config(const YAML::Node& node) const
+auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mode, bool edge_reconstruction_mode) const
     -> std::expected<SimulationConfig, core::ConfigurationError> {
 
   SimulationConfig config;
@@ -363,11 +363,27 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.body_type = body_type_result.value();
 
-    auto only_stag_result = extract_value<bool>(node, "only_stagnation_point");
-    if (!only_stag_result) {
-      return std::unexpected(only_stag_result.error());
+    // only_stagnation_point is required for base mode, but forced to true for abacus and edge_reconstruction modes
+    if (abacus_mode || edge_reconstruction_mode) {
+      // Force to true for specialized modes
+      config.only_stagnation_point = true;
+      // Warn if user specified a different value
+      if (node["only_stagnation_point"]) {
+        bool user_value = node["only_stagnation_point"].as<bool>();
+        if (!user_value) {
+          std::cout << "INFO: Ignoring 'only_stagnation_point: false' in " 
+                    << (abacus_mode ? "abacus" : "edge_reconstruction") 
+                    << " mode. Forcing to true." << std::endl;
+        }
+      }
+    } else {
+      // Base mode - only_stagnation_point is required
+      auto only_stag_result = extract_value<bool>(node, "only_stagnation_point");
+      if (!only_stag_result) {
+        return std::unexpected(only_stag_result.error());
+      }
+      config.only_stagnation_point = only_stag_result.value();
     }
-    config.only_stagnation_point = only_stag_result.value();
 
     // Parse finite thickness - optional parameter, defaults to false
     if (node["finite_thickness"]) {
@@ -396,21 +412,52 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node) const
     }
     config.consider_dufour_effect = dufour_result.value();
 
-    auto chemical_result = extract_enum(node, "chemical_mode", enum_mappings::chemical_modes);
-    if (!chemical_result) {
-      return std::unexpected(chemical_result.error());
-    }
-    config.chemical_mode = chemical_result.value();
-
-    // Parse catalytic_wall - optional parameter, defaults to true
-    if (node["catalytic_wall"]) {
-      auto catalytic_result = extract_value<bool>(node, "catalytic_wall");
-      if (!catalytic_result) {
-        return std::unexpected(catalytic_result.error());
+    // chemical_mode is required for base mode, but forced to non_equilibrium for abacus and edge_reconstruction modes
+    if (abacus_mode || edge_reconstruction_mode) {
+      // Force to NonEquilibrium for specialized modes
+      config.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
+      // Warn if user specified a different value
+      if (node["chemical_mode"]) {
+        std::string user_value = node["chemical_mode"].as<std::string>();
+        if (user_value != "non_equilibrium" && user_value != "nonequilibrium") {
+          std::cout << "INFO: Ignoring 'chemical_mode: " << user_value << "' in " 
+                    << (abacus_mode ? "abacus" : "edge_reconstruction") 
+                    << " mode. Forcing to non_equilibrium." << std::endl;
+        }
       }
-      config.catalytic_wall = catalytic_result.value();
     } else {
-      config.catalytic_wall = true;  // Default to catalytic
+      // Base mode - chemical_mode is required
+      auto chemical_result = extract_enum(node, "chemical_mode", enum_mappings::chemical_modes);
+      if (!chemical_result) {
+        return std::unexpected(chemical_result.error());
+      }
+      config.chemical_mode = chemical_result.value();
+    }
+
+    // catalytic_wall is optional for base mode (defaults to true), but forced to true for abacus and edge_reconstruction modes
+    if (abacus_mode || edge_reconstruction_mode) {
+      // Force to true for specialized modes
+      config.catalytic_wall = true;
+      // Warn if user specified false
+      if (node["catalytic_wall"]) {
+        bool user_value = node["catalytic_wall"].as<bool>();
+        if (!user_value) {
+          std::cout << "INFO: Ignoring 'catalytic_wall: false' in " 
+                    << (abacus_mode ? "abacus" : "edge_reconstruction") 
+                    << " mode. Forcing to true." << std::endl;
+        }
+      }
+    } else {
+      // Base mode - catalytic_wall is optional, defaults to true
+      if (node["catalytic_wall"]) {
+        auto catalytic_result = extract_value<bool>(node, "catalytic_wall");
+        if (!catalytic_result) {
+          return std::unexpected(catalytic_result.error());
+        }
+        config.catalytic_wall = catalytic_result.value();
+      } else {
+        config.catalytic_wall = true;  // Default to catalytic
+      }
     }
 
     // Parse wall_mode - optional parameter, defaults to ImposedTemperature

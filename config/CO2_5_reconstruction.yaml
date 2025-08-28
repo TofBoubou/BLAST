@@ -136,7 +136,7 @@ abacus:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 30
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-8
     max_iterations: 100000
