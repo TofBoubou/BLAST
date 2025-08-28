@@ -12,7 +12,7 @@ continuation:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -22,7 +22,7 @@ base:
     consider_thermal_diffusion: false
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
-    catalytic_wall: false
+    catalytic_wall: true
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
 
   numerical:
@@ -62,7 +62,7 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [300]
+    temperatures: [3000]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"  
 
@@ -126,7 +126,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
