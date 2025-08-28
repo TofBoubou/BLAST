@@ -11,6 +11,11 @@ auto ContinuationMethod::solve_with_continuation(
     BoundaryLayerSolver& solver, int station, double xi, const io::Configuration& target_config,
     const equations::SolutionState& initial_guess) -> std::expected<ContinuationResult, SolverError> {
 
+  // Initialize switching state
+  consecutive_failures_ = 0;
+  consecutive_successes_in_equilibrium_ = 0;
+  using_equilibrium_mode_ = false;
+  original_chemical_mode_ = target_config.simulation.chemical_mode;
   
   double lambda = 0.0;
   double lambda_step = LAMBDA_STEP_INITIAL;
@@ -25,6 +30,11 @@ auto ContinuationMethod::solve_with_continuation(
     double lambda_try = lambda + lambda_step;
     auto interp_config = interpolate_config(target_config, lambda_try);
 
+    // Apply chemical mode switching if needed
+    if (using_equilibrium_mode_) {
+      interp_config = create_equilibrium_config(interp_config);
+    }
+
     solver.set_config(interp_config);
     solver.in_continuation_ = true;
     auto result = solver.solve_station(station, xi, current_solution);
@@ -35,6 +45,23 @@ auto ContinuationMethod::solve_with_continuation(
       current_solution = result.value();
       lambda = lambda_try;
 
+      // Reset failure counter and handle success in equilibrium mode
+      consecutive_failures_ = 0;
+      if (using_equilibrium_mode_) {
+        consecutive_successes_in_equilibrium_++;
+        std::cout << "[CHEMICAL SWITCHING] Success in equilibrium mode (" << consecutive_successes_in_equilibrium_ 
+                  << "/" << SUCCESS_THRESHOLD << ")" << std::endl;
+        
+        // Switch back to original mode after SUCCESS_THRESHOLD successes
+        if (consecutive_successes_in_equilibrium_ >= SUCCESS_THRESHOLD) {
+          using_equilibrium_mode_ = false;
+          consecutive_successes_in_equilibrium_ = 0;
+          std::cout << "[CHEMICAL SWITCHING] Switching back to " 
+                    << (original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium ? "non_equilibrium" : "original") 
+                    << " mode" << std::endl;
+        }
+      }
+
       if (std::abs(lambda - 1.0) < 1e-10) {
         return ContinuationResult{.solution = current_solution, .success = true, .final_lambda = lambda};
       }
@@ -43,6 +70,10 @@ auto ContinuationMethod::solve_with_continuation(
       lambda_step = std::min(lambda_step * STEP_INCREASE_FACTOR, LAMBDA_STEP_MAX);
 
     } else {
+      // Handle failure - increment failure counter and check for chemical mode switching
+      consecutive_failures_++;
+      consecutive_successes_in_equilibrium_ = 0;  // Reset success counter on any failure
+      
       // Check if the failure was due to NaN detection
       const std::string error_msg = result.error().message();
       bool is_nan_error = error_msg.find("NaN detected") != std::string::npos;
@@ -55,6 +86,17 @@ auto ContinuationMethod::solve_with_continuation(
         std::cout << "[CONTINUATION] Step failed at lambda=" << std::scientific << std::setprecision(3) << lambda_try
                   << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step << " to "
                   << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
+      }
+
+      // Check for chemical mode switching (only for NonEquilibrium -> Equilibrium)
+      if (!using_equilibrium_mode_ && 
+          original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium &&
+          consecutive_failures_ >= FAILURE_THRESHOLD) {
+        using_equilibrium_mode_ = true;
+        consecutive_failures_ = 0;
+        consecutive_successes_in_equilibrium_ = 0;
+        std::cout << "[CHEMICAL SWITCHING] Switching to equilibrium mode after " << FAILURE_THRESHOLD 
+                  << " consecutive failures" << std::endl;
       }
 
       // Decrease step after failure (including NaN errors)
@@ -95,6 +137,12 @@ auto ContinuationMethod::interpolate_config(const io::Configuration& target, dou
   }
 
   return config;
+}
+
+auto ContinuationMethod::create_equilibrium_config(const io::Configuration& config) const -> io::Configuration {
+  io::Configuration equilibrium_config = config;
+  equilibrium_config.simulation.chemical_mode = io::SimulationConfig::ChemicalMode::Equilibrium;
+  return equilibrium_config;
 }
 
 } // namespace blast::boundary_layer::solver

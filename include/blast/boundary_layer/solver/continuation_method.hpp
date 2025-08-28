@@ -32,7 +32,18 @@ private:
   static constexpr double STEP_DECREASE_FACTOR = 0.8;
   static constexpr int MAX_STEPS = 10000;
 
+  // Chemical mode switching parameters
+  static constexpr int FAILURE_THRESHOLD = 4;  // Switch after 4 consecutive failures
+  static constexpr int SUCCESS_THRESHOLD = 2;  // Switch back after 2 consecutive successes
+
+  // Mutable state for chemical mode switching
+  mutable int consecutive_failures_ = 0;
+  mutable int consecutive_successes_in_equilibrium_ = 0;
+  mutable bool using_equilibrium_mode_ = false;
+  mutable io::SimulationConfig::ChemicalMode original_chemical_mode_;
+
   [[nodiscard]] auto interpolate_config(const io::Configuration& target, double lambda) const -> io::Configuration;
+  [[nodiscard]] auto create_equilibrium_config(const io::Configuration& config) const -> io::Configuration;
 };
 
 } // namespace blast::boundary_layer::solver
