@@ -118,6 +118,10 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     const int station = static_cast<int>(station_idx);
     const double xi = xi_stations[station_idx];
 
+    // Print progress
+    std::cout << std::format("Solving boundary layer station {}/{} (xi = {:.6e})...", 
+                             station + 1, xi_stations.size(), xi) << std::endl;
+
     // CRITICAL: Update xi derivatives BEFORE solving (except for station 0)
     if (station_idx > 0) {
       xi_derivatives_->update_station(station, xi, prev_F, prev_g, prev_c);

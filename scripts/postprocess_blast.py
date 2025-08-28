@@ -460,6 +460,418 @@ class BLASTPlotter:
         plt.close()  # Free memory
         return True
     
+    def plot_individual_profile_F(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot velocity profile (F) individually for stagnation point"""
+        try:
+            valid_stations = self.reader.get_valid_stations()
+            if station_index not in valid_stations:
+                print(f"Error: Station {station_index} does not have required fields for plotting.")
+                return False
+            
+            station_data = self.reader.get_station_data(station_index)
+            
+        except Exception as e:
+            print(f"Error loading station {station_index}: {e}")
+            return False
+        
+        # Create individual plot with same formatting as subplot
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=300)
+        eta = np.array(station_data['eta'])
+        
+        ax.plot(station_data['F'], eta, 'black', linewidth=2)
+        ax.set_xlabel('F (Dimensionless Stream Function)')
+        ax.set_ylabel('η (Similarity Coordinate)')
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Station {station_index:03d} - Velocity Profile (F)', fontsize=12, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
+    def plot_individual_profile_g(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot enthalpy profile (g) individually for stagnation point"""
+        try:
+            valid_stations = self.reader.get_valid_stations()
+            if station_index not in valid_stations:
+                print(f"Error: Station {station_index} does not have required fields for plotting.")
+                return False
+            
+            station_data = self.reader.get_station_data(station_index)
+            
+        except Exception as e:
+            print(f"Error loading station {station_index}: {e}")
+            return False
+        
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=300)
+        eta = np.array(station_data['eta'])
+        
+        ax.plot(station_data['g'], eta, 'black', linewidth=2)
+        ax.set_xlabel('g (Dimensionless Enthalpy)')
+        ax.set_ylabel('η')
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Station {station_index:03d} - Enthalpy Profile (g)', fontsize=12, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
+    def plot_individual_temperature(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot temperature profile individually for stagnation point"""
+        try:
+            valid_stations = self.reader.get_valid_stations()
+            if station_index not in valid_stations:
+                print(f"Error: Station {station_index} does not have required fields for plotting.")
+                return False
+            
+            station_data = self.reader.get_station_data(station_index)
+            
+        except Exception as e:
+            print(f"Error loading station {station_index}: {e}")
+            return False
+        
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=300)
+        eta = np.array(station_data['eta'])
+        
+        ax.plot(station_data['temperature'], eta, 'black', linewidth=2)
+        ax.set_xlabel('Temperature (K)')
+        ax.set_ylabel('η')
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Station {station_index:03d} - Temperature Profile', fontsize=12, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
+    def plot_individual_species_linear(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot species concentrations (linear scale) individually for stagnation point"""
+        try:
+            valid_stations = self.reader.get_valid_stations()
+            if station_index not in valid_stations:
+                print(f"Error: Station {station_index} does not have required fields for plotting.")
+                return False
+            
+            station_data = self.reader.get_station_data(station_index)
+            species_names = self.reader.get_species_names()
+            
+        except Exception as e:
+            print(f"Error loading station {station_index}: {e}")
+            return False
+        
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4), dpi=300)
+        eta = np.array(station_data['eta'])
+        
+        line_styles = ['-', '--', '-.', ':']
+        markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
+        legend_added = False
+        
+        for i, species in enumerate(species_names):
+            col_name = f'c_{species}'
+            if col_name in station_data:
+                style_idx = i % len(line_styles)
+                marker_idx = i % len(markers)
+                
+                ax.plot(station_data[col_name], eta, 
+                       color='black',
+                       linestyle=line_styles[style_idx],
+                       marker=markers[marker_idx] if markers[marker_idx] else None,
+                       markevery=max(1, len(eta)//8),
+                       markersize=3.5,
+                       linewidth=1.5, 
+                       label=species)
+                legend_added = True
+        
+        ax.set_xlabel('Mass Fraction')
+        ax.set_ylabel('η')
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Station {station_index:03d} - Species Concentrations', fontsize=12, fontweight='bold')
+        
+        if legend_added:
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
+    def plot_individual_species_log(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot species concentrations (log scale) individually for stagnation point"""
+        try:
+            valid_stations = self.reader.get_valid_stations()
+            if station_index not in valid_stations:
+                print(f"Error: Station {station_index} does not have required fields for plotting.")
+                return False
+            
+            station_data = self.reader.get_station_data(station_index)
+            species_names = self.reader.get_species_names()
+            
+        except Exception as e:
+            print(f"Error loading station {station_index}: {e}")
+            return False
+        
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4), dpi=300)
+        eta = np.array(station_data['eta'])
+        
+        line_styles = ['-', '--', '-.', ':']
+        markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
+        legend_added_log = False
+        min_positive_value = 1.0
+        
+        for i, species in enumerate(species_names):
+            col_name = f'c_{species}'
+            if col_name in station_data:
+                data = station_data[col_name]
+                positive_mask = data > 0
+                if np.any(positive_mask):
+                    min_positive_value = min(min_positive_value, np.min(data[positive_mask]))
+                    
+                    style_idx = i % len(line_styles)
+                    marker_idx = i % len(markers)
+                    
+                    ax.semilogx(data[positive_mask], eta[positive_mask], 
+                               color='black',
+                               linestyle=line_styles[style_idx],
+                               marker=markers[marker_idx] if markers[marker_idx] else None,
+                               markevery=max(1, np.sum(positive_mask)//8),
+                               markersize=3.5,
+                               linewidth=1.5, 
+                               label=species)
+                    legend_added_log = True
+        
+        ax.set_xlabel('Mass Fraction (log scale)')
+        ax.set_ylabel('η')
+        ax.grid(True, alpha=0.3, which='both')
+        ax.set_title(f'Station {station_index:03d} - Species Concentrations (Log Scale)', fontsize=12, fontweight='bold')
+        
+        if legend_added_log and min_positive_value < 1.0:
+            ax.set_xlim(left=min_positive_value * 0.1, right=1.5)
+        
+        if legend_added_log:
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
+    def plot_individual_profile_V(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot V profile individually for stagnation point"""
+        try:
+            valid_stations = self.reader.get_valid_stations()
+            if station_index not in valid_stations:
+                print(f"Error: Station {station_index} does not have required fields for plotting.")
+                return False
+            
+            station_data = self.reader.get_station_data(station_index)
+            
+        except Exception as e:
+            print(f"Error loading station {station_index}: {e}")
+            return False
+        
+        fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=300)
+        eta = np.array(station_data['eta'])
+        
+        ax.plot(station_data['V'], eta, 'black', linewidth=2)
+        ax.set_xlabel('V (Velocity Component)')
+        ax.set_ylabel('η')
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Station {station_index:03d} - V Profile', fontsize=12, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
+    def plot_individual_stagnation_all(self, output_dir: Path) -> bool:
+        """Generate all individual plots for stagnation point (station 0) simultaneously"""
+        station_index = 0
+        
+        # Check if station 0 is valid for profiles
+        valid_stations = self.reader.get_valid_stations()
+        valid_heat_flux_stations = self.reader.get_valid_heat_flux_stations()
+        
+        if station_index not in valid_stations:
+            print(f"Error: Station {station_index} (stagnation point) not available for profile plotting.")
+            print(f"Available stations: {sorted(valid_stations)}")
+            return False
+        
+        output_dir = Path(output_dir)
+        output_dir.mkdir(exist_ok=True)
+        
+        print(f"\nGenerating individual stagnation point plots in: {output_dir}")
+        print("-" * 60)
+        
+        # Generate all plots simultaneously
+        plots = [
+            ('F_profile', self.plot_individual_profile_F),
+            ('g_profile', self.plot_individual_profile_g), 
+            ('temperature', self.plot_individual_temperature),
+            ('species_linear', self.plot_individual_species_linear),
+            ('species_log', self.plot_individual_species_log),
+            ('V_profile', self.plot_individual_profile_V)
+        ]
+        
+        # Add heat flux plots if data is available
+        if station_index in valid_heat_flux_stations:
+            plots.extend([
+                ('heat_flux_dimensional', self.plot_individual_heat_flux_dimensional),
+                ('heat_flux_species', self.plot_individual_heat_flux_species)
+            ])
+        
+        success_count = 0
+        for plot_name, plot_func in plots:
+            save_path = output_dir / f'stagnation_{plot_name}'
+            if plot_func(station_index, save_path):
+                print(f"   [OK] {plot_name}: stagnation_{plot_name}.pdf")
+                success_count += 1
+            else:
+                print(f"   [FAILED] {plot_name}")
+        
+        print("-" * 60)
+        print(f"Individual stagnation point plots completed: {success_count}/{len(plots)} successful")
+        
+        return success_count == len(plots)
+
+    def plot_individual_heat_flux_dimensional(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot dimensional heat flux profiles for a given station"""
+        try:
+            # Check if station is valid for heat flux plotting
+            valid_heat_flux_stations = self.reader.get_valid_heat_flux_stations()
+            if station_index not in valid_heat_flux_stations:
+                return False
+            
+            station_data = self.reader.get_station_heat_flux_data(station_index)
+            
+        except Exception as e:
+            print(f"Error loading heat flux data for station {station_index}: {e}")
+            return False
+        
+        # Create single plot for dimensional flux profiles
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        
+        # Get eta coordinates and heat flux data
+        eta = np.array(station_data['eta'])
+        heat_flux = station_data['heat_flux']
+        
+        # Dimensional flux profiles
+        q_cond_dim = np.array(heat_flux['dimensional']['q_conductive'])
+        q_diff_dim = np.array(heat_flux['dimensional']['q_diffusive']) 
+        q_total_dim = np.array(heat_flux['dimensional']['q_total'])
+        
+        ax.plot(q_cond_dim, eta, 'black', linestyle='-', linewidth=2, label='Conductive')
+        ax.plot(q_diff_dim, eta, 'black', linestyle='--', linewidth=2, label='Diffusive')
+        ax.plot(q_total_dim, eta, 'black', linestyle='-.', linewidth=2, label='Total')
+        ax.set_xlabel('Heat Flux (W/m²)', fontsize=12)
+        ax.set_ylabel('η', fontsize=12)
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=10)
+        ax.set_title(f'Station {station_index:03d} - Dimensional Heat Flux Profiles', fontsize=14)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        ax.tick_params(axis='x', rotation=45)
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(f"{save_path}.pdf", format='pdf', bbox_inches='tight')
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
+    def plot_individual_heat_flux_species(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
+        """Plot species diffusive heat flux contributions for a given station"""
+        try:
+            # Check if station is valid for heat flux plotting
+            valid_heat_flux_stations = self.reader.get_valid_heat_flux_stations()
+            if station_index not in valid_heat_flux_stations:
+                return False
+            
+            station_data = self.reader.get_station_heat_flux_data(station_index)
+            species_names = self.reader.get_species_names()
+            
+        except Exception as e:
+            print(f"Error loading heat flux data for station {station_index}: {e}")
+            return False
+        
+        # Create single plot for species contributions
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        
+        # Get eta coordinates and heat flux data
+        eta = np.array(station_data['eta'])
+        heat_flux = station_data['heat_flux']
+        
+        # Dimensional species diffusive contributions
+        if 'q_diffusive_species' in heat_flux['dimensional']:
+            q_diff_species_dim = heat_flux['dimensional']['q_diffusive_species']
+            line_styles = ['-', '--', '-.', ':']
+            markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
+            
+            for i, species in enumerate(species_names):
+                if i < q_diff_species_dim.shape[0]:
+                    style_idx = i % len(line_styles)
+                    marker_idx = i % len(markers)
+                    
+                    ax.plot(q_diff_species_dim[i, :], eta,
+                           color='black',
+                           linestyle=line_styles[style_idx],
+                           marker=markers[marker_idx] if markers[marker_idx] else None,
+                           markevery=max(1, len(eta)//8),
+                           markersize=4,
+                           linewidth=1.5,
+                           label=species)
+            
+            ax.legend(fontsize=10)
+        
+        ax.set_xlabel('Species Diffusive Heat Flux (W/m²)', fontsize=12)
+        ax.set_ylabel('η', fontsize=12)
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Station {station_index:03d} - Species Heat Flux Contributions', fontsize=14)
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1e}'))
+        ax.tick_params(axis='x', rotation=45)
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(f"{save_path}.pdf", format='pdf', bbox_inches='tight')
+        else:
+            plt.show()
+        
+        plt.close()
+        return True
+    
     def plot_heat_flux(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
         """Plot heat flux analysis for a given station
         
@@ -880,7 +1292,7 @@ def main():
     parser.add_argument('--input', '-i', type=str, required=True,
                        help='Input HDF5 file')
     parser.add_argument('--plots', '-p', type=str, default='all',
-                       choices=['all', 'profiles', 'heat_flux', 'summary', 'f_g_map'],
+                       choices=['all', 'profiles', 'heat_flux', 'summary', 'f_g_map', 'stagnation_individual'],
                        help='Type of plots to generate')
     parser.add_argument('--station', '-s', type=int, default=0,
                        help='Station index for profile plots')
@@ -977,6 +1389,13 @@ def main():
             if not success:
                 return 1
         
+        elif args.plots == 'stagnation_individual':
+            if not output_path:
+                output_path = Path('blast_stagnation_individual')
+            success = plotter.plot_individual_stagnation_all(output_path)
+            if not success:
+                return 1
+        
         print("\n" + "="*60)
         print("Post-processing completed successfully!")
         print("="*60)
@@ -1002,6 +1421,9 @@ python3 postprocess_blast.py --input simulation.h5 --plots heat_flux --station 2
 
 # Generate only profiles for a specific station
 python3 postprocess_blast.py --input simulation.h5 --plots profiles --station 0 --output results
+
+# Generate individual plots for stagnation point (station 0) - 6 separate PDF files
+python3 postprocess_blast.py --input simulation.h5 --plots stagnation_individual --output results
 
 # Interactive display of heat flux for station 1
 python3 postprocess_blast.py --input simulation.h5 --plots heat_flux --station 1 --show

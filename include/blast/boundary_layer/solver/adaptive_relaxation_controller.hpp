@@ -28,7 +28,7 @@ class AdaptiveRelaxationController {
 public:
   // Configuration parameters
   struct Config {
-    double initial_factor = 0.001; // Conservative initial factor
+    double initial_factor = 0.01; // Conservative initial factor
     double min_factor = 0.00001;   // Absolute minimum
     double max_factor = 0.05;      // Reasonable maximum
 
@@ -37,9 +37,9 @@ public:
     double divergence_threshold = 1; // Threshold for divergence (> 1.0)
 
     // Adaptation factors
-    double strong_increase = 1.01;   // Strong increase for ratio < 0.8
-    double moderate_increase = 1.01; // Moderate increase for [0.8, 1.0]
-    double decrease_factor = 0.7;      // Decrease for ratio > X
+    double strong_increase = 1.001;   // Strong increase for ratio < 0.8
+    double moderate_increase = 1.001; // Moderate increase for [0.8, 1.0]
+    double decrease_factor = 1;      // Decrease for ratio > X
     double oscillation_penalty = 0.9;  // Penalty factor for oscillations
 
     // Specialized configurations

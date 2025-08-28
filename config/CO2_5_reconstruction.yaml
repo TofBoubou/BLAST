@@ -12,7 +12,7 @@ continuation:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
@@ -62,7 +62,7 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [3000]
+    temperatures: [300]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"  
 
@@ -126,7 +126,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -137,9 +137,9 @@ abacus:
   
   numerical:
     n_eta: 30
-    eta_max: 8.0
-    convergence_tolerance: 1.0e-7
-    max_iterations: 75000
+    eta_max: 6.0
+    convergence_tolerance: 1.0e-8
+    max_iterations: 100000
   
   mixture:
     name: CO2_5
@@ -153,8 +153,8 @@ abacus:
   boundary_conditions:
     pressure: 7000  # Pressure for abacus mode (Pa)
     temperature_range: [4500, 5000]  # Range for abacus
-    catalyticity_values: [0.0, 0.1]
+    catalyticity_values: [0.0, 0.001, 0.01, 0.05, 0.1, 0.2]
     radius: 1.0 
     velocity: 0.0
   
-  temperature_points: 3
+  temperature_points: 20

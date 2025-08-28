@@ -11,11 +11,11 @@ from pathlib import Path
 def generate_config(
     num_points=101,
     x_range=(0.0, 1),  # Start from 0.001 to avoid x=0 issue
-    temperature_range=(5905.5, 3000),
-    pressure_range=(7000, 7000),
-    velocity_range=(0, 100),  # Non-zero velocities
+    temperature_range=(5905.5, 7000),
+    pressure_range=(7000, 10000),
+    velocity_range=(0, 300),  # Non-zero velocities
     radius_range=(1, 1),
-    wall_temperature_range=(3000, 3000),
+    wall_temperature_range=(3000, 5000),
     output_file="boundary_layer_config.yaml"
 ):
     """
@@ -99,7 +99,7 @@ def generate_config(
         'numerical': {
             'n_eta': 20,
             'eta_max': 6.0,
-            'convergence_tolerance': 1.0e-9,
+            'convergence_tolerance': 1.0e-7,
             'max_iterations': 100000
         },
         
