@@ -97,11 +97,25 @@ auto AbacusGenerator::generate() -> Result {
 }
 
 auto AbacusGenerator::solve_for_temperature(double wall_temperature) -> double {
-  // Update wall temperature in configuration
-  solver_.set_wall_temperature(wall_temperature);
+  // Store original configuration
+  auto original_config = solver_.get_config();
+  
+  // Create a copy of the configuration and update wall temperature
+  auto modified_config = original_config;
+  if (!modified_config.wall_parameters.wall_temperatures.empty()) {
+    modified_config.wall_parameters.wall_temperatures[0] = wall_temperature;
+  } else {
+    modified_config.wall_parameters.wall_temperatures.push_back(wall_temperature);
+  }
+  
+  // Set the modified configuration
+  solver_.set_config(modified_config);
 
   // Solve the boundary layer
   auto solution_result = solver_.solve();
+
+  // Restore original configuration
+  solver_.set_config(original_config);
 
   if (!solution_result) {
     std::cerr << "Solver failed for T_w = " << wall_temperature << std::endl;

@@ -264,13 +264,21 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         point.radius = config.abacus.radius;
         point.velocity = config.abacus.velocity;
         // Temperature and pressure will be set during abacus generation
-        point.temperature = 5000.0;  // Default, will be overridden
-        point.pressure = 7000.0;     // Default, will be overridden
+        point.temperature = root_["abacus"]["boundary_conditions"]["temperature"] ? 
+                           root_["abacus"]["boundary_conditions"]["temperature"].as<double>() : 5000.0;
+        point.pressure = root_["abacus"]["boundary_conditions"]["pressure"] ? 
+                        root_["abacus"]["boundary_conditions"]["pressure"].as<double>() : 7000.0;
         config.outer_edge.edge_points.push_back(point);
       } else {
         // Update existing edge_point with abacus parameters
         config.outer_edge.edge_points[0].radius = config.abacus.radius;
         config.outer_edge.edge_points[0].velocity = config.abacus.velocity;
+        if (root_["abacus"]["boundary_conditions"]["temperature"]) {
+          config.outer_edge.edge_points[0].temperature = root_["abacus"]["boundary_conditions"]["temperature"].as<double>();
+        }
+        if (root_["abacus"]["boundary_conditions"]["pressure"]) {
+          config.outer_edge.edge_points[0].pressure = root_["abacus"]["boundary_conditions"]["pressure"].as<double>();
+        }
       }
       
       // Extract catalyticity values from boundary_conditions for abacus
@@ -278,6 +286,20 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         config.abacus.catalyticity_values = root_["abacus"]["boundary_conditions"]["catalyticity_values"].as<std::vector<double>>();
         if (config.abacus.catalyticity_values.empty()) {
           return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty in abacus mode"));
+        }
+      }
+      
+      // Extract flow parameters for abacus
+      if (root_["abacus"]["flow_parameters"]) {
+        const auto flow_node = root_["abacus"]["flow_parameters"];
+        if (flow_node["velocity_gradient_stagnation"]) {
+          config.outer_edge.velocity_gradient_stagnation = flow_node["velocity_gradient_stagnation"].as<double>();
+        }
+        if (flow_node["freestream_density"]) {
+          config.outer_edge.freestream_density = flow_node["freestream_density"].as<double>();
+        }
+        if (flow_node["freestream_velocity"]) {
+          config.outer_edge.freestream_velocity = flow_node["freestream_velocity"].as<double>();
         }
       }
     }

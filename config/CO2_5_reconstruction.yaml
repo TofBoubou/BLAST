@@ -15,10 +15,10 @@ base:
   enabled: false
   
   simulation:
-    body_type: axisymmetric
+    body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
     only_stagnation_point: true
     finite_thickness: false
-    diffusion_type: stefan_maxwell  # "stefan_maxwell", "fickian", "hirschfelder_curtiss"
+    diffusion_type: stefan_maxwell
     consider_thermal_diffusion: false
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
@@ -33,9 +33,9 @@ base:
 
   mixture:
     name: CO2_5
-    thermodynamic_database: RRHO  # "RRHO", "NASA9"
-    viscosity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "sutherland"
-    thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
+    thermodynamic_database: RRHO  
+    viscosity_algorithm: chapman_enskog_ldlt  
+    thermal_conductivity_algorithm: chapman_enskog_ldlt 
     state_model: ChemNonEq1T 
 
   output:
@@ -136,7 +136,7 @@ abacus:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 200
+    n_eta: 20
     eta_max: 6.0
     convergence_tolerance: 1.0e-8
     max_iterations: 100000
@@ -152,9 +152,15 @@ abacus:
   
   boundary_conditions:
     pressure: 7000  # Pressure for abacus mode (Pa)
-    temperature_range: [4500, 5000]  # Range for abacus
-    catalyticity_values: [0.0, 0.001, 0.01, 0.05, 0.1, 0.2]
+    temperature: 5905.5  # Edge temperature
+    temperature_range: [3000, 5905.5]  # Range for abacus
+    catalyticity_values: [0.0, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1]
     radius: 1.0 
     velocity: 0.0
   
-  temperature_points: 20
+  flow_parameters:
+    velocity_gradient_stagnation: 4027.1213622326
+    freestream_density: 0.0019382429
+    freestream_velocity: 500000
+  
+  temperature_points: 100
