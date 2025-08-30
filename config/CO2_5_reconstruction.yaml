@@ -154,7 +154,7 @@ abacus:
     pressure: 7000  # Pressure for abacus mode (Pa)
     temperature: 5905.5  # Edge temperature
     temperature_range: [3000, 5905.5]  # Range for abacus
-    catalyticity_values: [0.0, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5]
+    catalyticity_values: [0.0, 0.001, 0.01, 0.1, 1]
     radius: 1.0 
     velocity: 0.0
   

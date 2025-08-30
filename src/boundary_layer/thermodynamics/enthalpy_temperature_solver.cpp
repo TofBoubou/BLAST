@@ -55,13 +55,12 @@ auto EnthalpyTemperatureSolver::solve_single_point(std::span<const double> compo
       s = b - fb * (b - a) / (fb - fa);
     }
 
-    bool condition1 = (s < (3 * a + b) / 4) || (s > b);
-    bool condition2 = mflag && (std::abs(s - b) >= std::abs(b - c_brent) / 2);
-    bool condition3 = !mflag && (std::abs(s - b) >= std::abs(c_brent - d) / 2);
+    bool condition2 = mflag && (std::abs(s - b) >= std::abs(b - c_brent) * 0.75);
+    bool condition3 = !mflag && (std::abs(s - b) >= std::abs(c_brent - d) * 0.75);
     bool condition4 = mflag && (std::abs(b - c_brent) < std::abs(step_tol));
     bool condition5 = !mflag && (std::abs(c_brent - d) < std::abs(step_tol));
 
-    if (condition1 || condition2 || condition3 || condition4 || condition5) {
+    if (condition2 || condition3 || condition4 || condition5) {
       s = (a + b) / 2;
       mflag = true;
     } else {

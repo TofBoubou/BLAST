@@ -151,8 +151,18 @@ auto ApplicationRunner::display_completion_message(
     std::cout << "\nRecommended post-processing commands:" << std::endl;
     for (const auto& file : output_files) {
       if (file.extension() == ".h5") {
+        std::cout << "  # Generate all plots (default):" << std::endl;
         std::cout << "  python3 scripts/postprocess_blast.py --input " 
                   << file.string() << " --plots all --output results" << std::endl;
+        std::cout << "  # Other plot options:" << std::endl;
+        std::cout << "  python3 scripts/postprocess_blast.py --input " 
+                  << file.string() << " --plots profiles --output results" << std::endl;
+        std::cout << "  python3 scripts/postprocess_blast.py --input " 
+                  << file.string() << " --plots heat_flux --output results" << std::endl;
+        std::cout << "  python3 scripts/postprocess_blast.py --input " 
+                  << file.string() << " --plots stagnation_individual --output results" << std::endl;
+        std::cout << "  python3 scripts/postprocess_blast.py --input " 
+                  << file.string() << " --plots summary --output results" << std::endl;
       }
     }
   }
@@ -161,7 +171,7 @@ auto ApplicationRunner::display_completion_message(
   if (!abacus_filename.empty()) {
     std::cout << "\nRecommended abacus post-processing command:" << std::endl;
     std::cout << "  python3 scripts/postprocess_abacus.py --input " 
-              << abacus_filename << " --output abacus_results" << std::endl;
+              << abacus_filename << " --output result_abacus/abacus_map" << std::endl;
   }
 }
 
