@@ -12,7 +12,7 @@ continuation:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -26,10 +26,10 @@ base:
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
 
   numerical:
-    n_eta: 100
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
-    max_iterations: 100000
+    max_iterations: 1000000
 
   mixture:
     name: CO2_5
@@ -39,15 +39,15 @@ base:
     state_model: ChemNonEq1T 
 
   output:
-    output_directory: test_outputs
+    output_directory: outputs_simulation
 
   outer_edge:
     edge_points:
       - x: 0.0
         radius: 1
         velocity: 0
-        temperature: 8905.5
-        pressure: 10000
+        temperature: 5905.5
+        pressure: 7000
         boundary_override: 
           enabled: false
           mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
@@ -62,7 +62,7 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [100]
+    temperatures: [2100]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"  
 
@@ -126,7 +126,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -136,9 +136,9 @@ abacus:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 20
+    n_eta: 200
     eta_max: 6.0
-    convergence_tolerance: 1.0e-8
+    convergence_tolerance: 1.0e-9
     max_iterations: 100000
   
   mixture:
@@ -148,13 +148,13 @@ abacus:
     thermal_conductivity_algorithm: chapman_enskog_ldlt 
   
   output:
-    output_directory: test_outputs_abacus
+    output_directory: outputs_abacus
   
   boundary_conditions:
     pressure: 7000  # Pressure for abacus mode (Pa)
     temperature: 5905.5  # Edge temperature
     temperature_range: [3000, 5905.5]  # Range for abacus
-    catalyticity_values: [0.0, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1]
+    catalyticity_values: [0.0, 0.001, 0.01, 0.05, 0.1, 0.2, 0.5]
     radius: 1.0 
     velocity: 0.0
   
@@ -163,4 +163,4 @@ abacus:
     freestream_density: 0.0019382429
     freestream_velocity: 500000
   
-  temperature_points: 100
+  temperature_points: 20

@@ -450,7 +450,7 @@ auto build_catalytic_boundary_conditions(const core::Matrix<double>& c_wall, con
     const double J_fake_wall = Le / Pr * coeffs.transport.l0[0] * dc_deta_wall;
 
     // h_bc = J_cat - J_reel + J_fake_wall to ensure the flux balance
-    boundary_conds.h_bc[i] = (+cat_flux[i] - J_reel) * 1 + J_fake_wall;
+    boundary_conds.h_bc[i] = (+cat_flux[i] - J_reel) * 1 - J_fake_wall;
   }
 
   // Electrons: dummy values (not used in system, determined by charge neutrality)

@@ -177,7 +177,7 @@ class AbacusPlotter:
 def main() -> int:
     parser = argparse.ArgumentParser(description='BLAST Abacus Post-Processing (map + curves)')
     parser.add_argument('--input', '-i', type=str, required=True, help='Input abacus HDF5 file')
-    parser.add_argument('--output', '-o', type=str, default='abacus_plots/abacus_map', help='Output path (without extension) if not --show')
+    parser.add_argument('--output', '-o', type=str, default='abacus_result/abacus_map', help='Output path (without extension) if not --show')
     parser.add_argument('--dpi', type=int, default=300, help='Figure DPI')
     parser.add_argument('--show', action='store_true', help='Show interactively instead of saving')
     args = parser.parse_args()

@@ -34,7 +34,7 @@ private:
 
   // Chemical mode switching parameters
   static constexpr int FAILURE_THRESHOLD = 4;  // Switch after 4 consecutive failures
-  static constexpr int SUCCESS_THRESHOLD = 2;  // Switch back after 2 consecutive successes
+  static constexpr int SUCCESS_THRESHOLD = 3;  // Switch back after 2 consecutive successes
 
   // Mutable state for chemical mode switching
   mutable int consecutive_failures_ = 0;
