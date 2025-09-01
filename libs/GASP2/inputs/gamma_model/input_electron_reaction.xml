@@ -1,0 +1,7 @@
+<gasp2 surface_model="catalysis">
+    <reactions model="gamma_model">
+        <reaction type="GammaGiven" formula="NO+ + e- -> NO">
+            <gammas>NO+:0.1, e-:0.1</gammas>
+        </reaction>
+    </reactions>
+</gasp2>

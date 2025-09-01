@@ -1,0 +1,9 @@
+<gasp2 surface_model="catalysis">
+    <reactions model="finite_rate">
+        <site_density>1.0</site_density>
+        <reaction type="LH" formula="2O(s) <-> O2(s) + (s)">
+                <parameters>C_lh:0.2,beta:0.1,Elh:0.0</parameters>
+        </reaction>
+    </reactions>
+</gasp2>
+

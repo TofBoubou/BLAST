@@ -1,0 +1,56 @@
+cmake_minimum_required(VERSION 3.20)
+project(gasp2 LANGUAGES CXX)
+
+# === Build options ===
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(GASP2_ENABLE_WARNINGS "Enable extra warnings" ON)
+
+# === Dependencies ===
+find_package(Eigen3 3.3 REQUIRED)
+
+# === Library sources ===
+set(GASP2_SOURCES
+  src/catalysis/gamma/gamma_dispatcher.cpp
+  src/catalysis/gamma/gamma_build.cpp
+  src/catalysis/gamma/gamma_core.cpp
+  src/catalysis/gamma/bose_flux.cpp
+  src/catalysis/gamma/rini_flux.cpp
+  src/catalysis/gamma/gamma_model.cpp
+  src/catalysis/finite_rate/finite_rate.cpp
+  src/catalysis/finite_rate/finite_rate_input_parser.cpp
+  src/catalysis/finite_rate/finite_rate_reaction_validation.cpp
+  src/catalysis/finite_rate/finite_rate_reaction_properties.cpp
+  src/catalysis/finite_rate/finite_rate_flux_computation.cpp
+  src/catalysis/finite_rate/steady_surface_coverage.cpp
+  src/catalysis/finite_rate/stoichiometry.cpp
+  src/catalysis/gamma/gamma_input_parser.cpp
+  src/catalysis/gamma/gamma_reaction_validation.cpp
+  src/utils/input_models.cpp
+  src/gasp2.cpp
+)
+
+add_library(gasp2 ${GASP2_SOURCES})
+
+# Public headers are in include/, private helpers in src/
+target_include_directories(gasp2
+  PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(gasp2 PUBLIC Eigen3::Eigen)
+
+if(GASP2_ENABLE_WARNINGS)
+  if(MSVC)
+    target_compile_options(gasp2 PRIVATE /W4 /permissive- /Zc:preprocessor /utf-8)
+  else()
+    target_compile_options(gasp2 PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+endif()
+
+# Provide path to bundled input files at compile time
+file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/inputs" INPUTS_DIR_CMAKE)
+target_compile_definitions(gasp2 PRIVATE INPUTS_DIR="${INPUTS_DIR_CMAKE}")

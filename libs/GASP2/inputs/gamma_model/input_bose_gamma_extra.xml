@@ -1,0 +1,9 @@
+<gasp2 surface_model="catalysis">
+    <first_order>true</first_order>
+    <reactions model="gamma_model">
+        <reaction type="GammaBose" gamma="0.1" p2="0.5"/>
+        <reaction type="GammaGiven" formula="O -> O">
+            <gammas>O:0.2</gammas>
+        </reaction>
+    </reactions>
+</gasp2>

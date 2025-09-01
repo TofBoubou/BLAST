@@ -1,0 +1,11 @@
+<gasp2 surface_model="catalysis">
+    <reactions model="gamma_model">
+        <gamma_w>0.2</gamma_w>
+        <reaction type="Rini_model" formula="O + O -> O2">
+        </reaction>
+        <reaction type="Rini_model" formula="CO + O -> CO2">
+        </reaction>
+        <reaction type="Rini_model" formula="C + 2 O -> CO2">
+        </reaction>
+    </reactions>
+</gasp2>

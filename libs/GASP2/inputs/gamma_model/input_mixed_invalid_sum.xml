@@ -1,0 +1,13 @@
+<gasp2 surface_model="catalysis">
+    <reactions model="gamma_model">
+        <reaction type="GammaGiven" formula="O + O -> O2">
+                <gammas>O:0.7</gammas>
+        </reaction>
+        <reaction type="GammaT" formula="N + N -> N2">
+                <gammaT>N:0.3:0:0:-1</gammaT>
+        </reaction>
+        <reaction type="GammaT" formula="N + O -> NO">
+                <gammaT>N:0.2:0:0:-1, O:0.5:0:0:-1</gammaT>
+        </reaction>
+    </reactions>
+</gasp2>

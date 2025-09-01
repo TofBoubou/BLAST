@@ -1,0 +1,8 @@
+<gasp2 surface_model="catalysis">
+    <first_order>true</first_order>
+    <reactions model="gamma_model">
+        <reaction type="GammaConsistent" formula="N + O -> NO">
+                <gammas>N:0.5</gammas>
+        </reaction>
+    </reactions>
+</gasp2>

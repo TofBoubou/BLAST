@@ -1,0 +1,9 @@
+<gasp2 surface_model="catalysis">
+    <reactions model="finite_rate">
+        <site_density>1.0</site_density>
+        <reaction type="ER" formula="O + (s) <-> O(s)">
+                <parameters>gamma_er:0.2,beta:0.1,Eer:0.0</parameters>
+        </reaction>
+    </reactions>
+</gasp2>
+

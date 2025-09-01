@@ -1,0 +1,9 @@
+<gasp2 surface_model="catalysis">
+    <reactions model="gamma_model">
+        <first_order>false</first_order>
+        <reaction type="SuperCatalytic" formula="O + O -> O2">
+        </reaction>
+        <reaction type="SuperCatalytic" formula="N + N -> N2">
+        </reaction>
+    </reactions>
+</gasp2>

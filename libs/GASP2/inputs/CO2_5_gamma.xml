@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gasp2 surface_model="catalysis">
+    <!-- CO2_5 species: CO2, CO, O2, O, C -->
+    
+    <reactions model="gamma_model">
+        <first_order>true</first_order>
+        <limiting_fluxes>true</limiting_fluxes>
+        
+        <!-- O atom recombination: O + O -> O2 -->
+        <reaction type="GammaGiven" formula="O + O -> O2">
+            <gammas>O:0.01</gammas>
+        </reaction>
+        
+        <!-- CO oxidation: CO + O -> CO2 -->
+        <reaction type="GammaGiven" formula="CO + O -> CO2">
+            <gammas>CO:0.01, O:0.01</gammas>
+        </reaction>
+        
+    </reactions>
+</gasp2>

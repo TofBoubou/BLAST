@@ -1,0 +1,8 @@
+<gasp2 surface_model="catalysis">
+    <reactions model="finite_rate">
+        <site_density>1.43e-5</site_density>
+        <reaction type="Adsorption" formula="O + (s) -> O(s)">
+                <parameters>beta:0.5,Ead:0.0</parameters>
+        </reaction>
+    </reactions>
+</gasp2>
