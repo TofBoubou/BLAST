@@ -130,6 +130,7 @@ struct ContinuationConfig {
   double wall_temperature_stable = constants::defaults::stable_wall_temperature;
   double edge_temperature_stable = constants::defaults::stable_edge_temperature;
   double pressure_stable = constants::defaults::stable_pressure;
+  bool use_linear_predictor = true;  // Enable linear predictor for better convergence
 };
 
 struct EdgeReconstructionConfig {

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <Eigen/Dense>
 
 namespace blast::boundary_layer::solver {
 
@@ -17,10 +18,18 @@ auto ContinuationMethod::solve_with_continuation(
   using_equilibrium_mode_ = false;
   original_chemical_mode_ = target_config.simulation.chemical_mode;
   
+  // Initialize predictor state
+  history_.clear();
+  step_reductions_for_current_step_ = 0;
+  predictor_enabled_ = target_config.continuation.use_linear_predictor;
+  
   double lambda = 0.0;
   double lambda_step = LAMBDA_STEP_INITIAL;
   equations::SolutionState current_solution = initial_guess;
   const auto original_config = solver.config();
+  
+  // Initialize history with initial solution at lambda=0
+  add_to_history(current_solution, lambda);
 
   for (int step = 0; step < MAX_STEPS; ++step) {
     if (lambda + lambda_step > 1.0) {
@@ -28,6 +37,34 @@ auto ContinuationMethod::solve_with_continuation(
     }
 
     double lambda_try = lambda + lambda_step;
+    
+    // Use linear predictor if enabled and we have enough history
+    equations::SolutionState predicted_solution = current_solution;
+    if (predictor_enabled_ && history_.size() >= 2) {
+      try {
+        predicted_solution = predict_solution(lambda_try);
+        
+        // Debug: show evolution for first grid point of g component (energy)
+        const auto& p1 = history_[history_.size() - 2]; 
+        const auto& p2 = history_[history_.size() - 1];
+        if (!p1.solution.g.empty()) {
+          std::cout << "[PREDICTOR] Linear g[0]: λ=" << std::scientific << std::setprecision(3) 
+                    << p1.lambda << " -> " << std::fixed << std::setprecision(6) << p1.solution.g[0]
+                    << ", λ=" << std::scientific << std::setprecision(3)
+                    << p2.lambda << " -> " << std::fixed << std::setprecision(6) << p2.solution.g[0]
+                    << " => λ=" << std::scientific << std::setprecision(3)
+                    << lambda_try << " -> " << std::fixed << std::setprecision(6) << predicted_solution.g[0] << std::endl;
+        }
+        
+        std::cout << "[PREDICTOR] Using linear prediction for lambda=" 
+                  << std::scientific << std::setprecision(3) << lambda_try << std::endl;
+      } catch (const std::exception& e) {
+        std::cout << "[PREDICTOR] Prediction failed: " << e.what() 
+                  << ", falling back to previous solution" << std::endl;
+        predicted_solution = current_solution;
+      }
+    }
+    
     auto interp_config = interpolate_config(target_config, lambda_try);
 
     // Apply chemical mode switching if needed
@@ -37,13 +74,19 @@ auto ContinuationMethod::solve_with_continuation(
 
     solver.set_config(interp_config);
     solver.in_continuation_ = true;
-    auto result = solver.solve_station(station, xi, current_solution);
+    auto result = solver.solve_station(station, xi, predicted_solution);
     solver.in_continuation_ = false;
     solver.set_config(original_config);
 
     if (result) {
       current_solution = result.value();
       lambda = lambda_try;
+      
+      // Add successful point to history
+      add_to_history(current_solution, lambda);
+      
+      // Reset step reduction counter on success
+      step_reductions_for_current_step_ = 0;
 
       // Reset failure counter and handle success in equilibrium mode
       consecutive_failures_ = 0;
@@ -66,8 +109,12 @@ auto ContinuationMethod::solve_with_continuation(
         return ContinuationResult{.solution = current_solution, .success = true, .final_lambda = lambda};
       }
 
-      // Increase step after success
+      // Increase step after success and re-enable predictor if it was disabled
       lambda_step = std::min(lambda_step * STEP_INCREASE_FACTOR, LAMBDA_STEP_MAX);
+      if (!predictor_enabled_ && target_config.continuation.use_linear_predictor) {
+        predictor_enabled_ = true;
+        std::cout << "[PREDICTOR] Re-enabled after successful step" << std::endl;
+      }
 
     } else {
       // Handle failure - increment failure counter and check for chemical mode switching
@@ -101,6 +148,14 @@ auto ContinuationMethod::solve_with_continuation(
 
       // Decrease step after failure (including NaN errors)
       lambda_step *= STEP_DECREASE_FACTOR;
+      step_reductions_for_current_step_++;
+      
+      // Disable predictor if too many step reductions
+      if (step_reductions_for_current_step_ >= MAX_STEP_REDUCTIONS && predictor_enabled_) {
+        predictor_enabled_ = false;
+        std::cout << "[PREDICTOR] Disabled after " << MAX_STEP_REDUCTIONS 
+                  << " step reductions" << std::endl;
+      }
 
       if (lambda_step < LAMBDA_STEP_MIN) {
         std::cout << "[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
@@ -143,6 +198,79 @@ auto ContinuationMethod::create_equilibrium_config(const io::Configuration& conf
   io::Configuration equilibrium_config = config;
   equilibrium_config.simulation.chemical_mode = io::SimulationConfig::ChemicalMode::Equilibrium;
   return equilibrium_config;
+}
+
+auto ContinuationMethod::predict_solution(double target_lambda) const -> equations::SolutionState {
+  if (history_.size() < 2) {
+    throw std::runtime_error("Not enough history points for prediction");
+  }
+  
+  // Get the last 2 points from history for linear extrapolation
+  const auto& p1 = history_[history_.size() - 2]; // previous
+  const auto& p2 = history_[history_.size() - 1]; // current
+  
+  // Create predicted solution by linear extrapolation
+  equations::SolutionState predicted = p2.solution; // Start with last solution as template
+  
+  // Check for degenerate case
+  if (std::abs(p2.lambda - p1.lambda) < 1e-12) {
+    return predicted; // Return current solution if lambdas are too close
+  }
+  
+  // Predict V (continuity) using linear extrapolation
+  const int n_V_points = p2.solution.V.size();
+  for (int i = 0; i < n_V_points; ++i) {
+    double slope = (p2.solution.V[i] - p1.solution.V[i]) / (p2.lambda - p1.lambda);
+    predicted.V[i] = p2.solution.V[i] + slope * (target_lambda - p2.lambda);
+  }
+  
+  // Predict F (momentum) using linear extrapolation
+  const int n_F_points = p2.solution.F.size();
+  for (int i = 0; i < n_F_points; ++i) {
+    double slope = (p2.solution.F[i] - p1.solution.F[i]) / (p2.lambda - p1.lambda);
+    predicted.F[i] = p2.solution.F[i] + slope * (target_lambda - p2.lambda);
+  }
+  
+  // Predict g (energy) using linear extrapolation
+  const int n_g_points = p2.solution.g.size();
+  for (int i = 0; i < n_g_points; ++i) {
+    double slope = (p2.solution.g[i] - p1.solution.g[i]) / (p2.lambda - p1.lambda);
+    predicted.g[i] = p2.solution.g[i] + slope * (target_lambda - p2.lambda);
+  }
+  
+  // Predict T (temperature) using linear extrapolation
+  const int n_T_points = p2.solution.T.size();
+  for (int i = 0; i < n_T_points; ++i) {
+    double slope = (p2.solution.T[i] - p1.solution.T[i]) / (p2.lambda - p1.lambda);
+    predicted.T[i] = p2.solution.T[i] + slope * (target_lambda - p2.lambda);
+  }
+  
+  // Predict c (species mass fractions) using linear extrapolation
+  const int n_species = p2.solution.c.rows();
+  const int n_species_points = p2.solution.c.cols();
+  for (int i = 0; i < n_species; ++i) {
+    for (int j = 0; j < n_species_points; ++j) {
+      double slope = (p2.solution.c(i, j) - p1.solution.c(i, j)) / (p2.lambda - p1.lambda);
+      predicted.c(i, j) = p2.solution.c(i, j) + slope * (target_lambda - p2.lambda);
+    }
+  }
+  
+  return predicted;
+}
+
+void ContinuationMethod::add_to_history(const equations::SolutionState& solution, double lambda) const {
+  history_.push_back({solution, lambda});
+  
+  // Keep only the last 2 points for linear extrapolation
+  while (history_.size() > 2) {
+    history_.pop_front();
+  }
+}
+
+void ContinuationMethod::reset_predictor_state() const {
+  history_.clear();
+  step_reductions_for_current_step_ = 0;
+  predictor_enabled_ = true;
 }
 
 } // namespace blast::boundary_layer::solver

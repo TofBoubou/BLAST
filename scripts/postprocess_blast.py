@@ -433,10 +433,11 @@ class BLASTPlotter:
         axes[1, 1].set_ylabel('η')
         axes[1, 1].grid(True, alpha=0.3, which='both')
         
-        # Set adaptive x-axis limits
+        # Set adaptive x-axis limits with minimum bound at 1e-12
         if legend_added_log and min_positive_value < 1.0:
-            # Set lower limit to one decade below the minimum value
-            axes[1, 1].set_xlim(left=min_positive_value * 0.1, right=1.5)
+            # Set lower limit to one decade below the minimum value, but not below 1e-12
+            lower_limit = max(min_positive_value * 0.1, 1e-12)
+            axes[1, 1].set_xlim(left=lower_limit, right=1.5)
         
         if legend_added_log:
             axes[1, 1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -666,7 +667,9 @@ class BLASTPlotter:
         ax.set_title(f'Station {station_index:03d} - Species Concentrations (Log Scale)', fontsize=12, fontweight='bold')
         
         if legend_added_log and min_positive_value < 1.0:
-            ax.set_xlim(left=min_positive_value * 0.1, right=1.5)
+            # Set lower limit to one decade below the minimum value, but not below 1e-12
+            lower_limit = max(min_positive_value * 0.1, 1e-12)
+            ax.set_xlim(left=lower_limit, right=1.5)
         
         if legend_added_log:
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')

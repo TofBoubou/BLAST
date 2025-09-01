@@ -882,6 +882,9 @@ auto YamlParser::parse_continuation_config(const YAML::Node& node) const
     if (node["pressure_stable"]) {
       config.pressure_stable = node["pressure_stable"].as<double>();
     }
+    if (node["use_linear_predictor"]) {
+      config.use_linear_predictor = node["use_linear_predictor"].as<bool>();
+    }
     return config;
   } catch (const YAML::Exception& e) {
     return std::unexpected(

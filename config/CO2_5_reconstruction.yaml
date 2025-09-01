@@ -6,13 +6,14 @@ continuation:
   wall_temperature_stable: 3000
   edge_temperature_stable: 5905.5
   pressure_stable: 7000
+  use_linear_predictor: false
 
 # =============================================================================
 # BASE MODE
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -22,14 +23,14 @@ base:
     consider_thermal_diffusion: false
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
-    catalytic_wall: true
+    catalytic_wall: false
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
 
   numerical:
     n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
-    max_iterations: 1000000
+    max_iterations: 50000
 
   mixture:
     name: CO2_5
@@ -62,7 +63,7 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [2100]
+    temperatures: [3000]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"  
 
@@ -126,7 +127,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
