@@ -361,7 +361,23 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.edge_reconstruction = EdgeReconstructionConfig{};
     }
     
-    // Abacus mode has its own specialized config, no outer_edge needed
+    // Parse catalysis configuration
+    YAML::Node catalysis_node;
+    if (base_enabled && root_["base"]["catalysis"]) {
+      catalysis_node = root_["base"]["catalysis"];
+    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["catalysis"]) {
+      catalysis_node = root_["edge_reconstruction"]["catalysis"];
+    } else if (abacus_enabled && root_["abacus"]["catalysis"]) {
+      catalysis_node = root_["abacus"]["catalysis"];
+    } else {
+      catalysis_node = root_["catalysis"];
+    }
+    
+    auto catalysis_result = parse_catalysis_config(catalysis_node);
+    if (!catalysis_result) {
+      return std::unexpected(catalysis_result.error());
+    }
+    config.catalysis = std::move(catalysis_result.value());
 
     return config;
 
@@ -491,6 +507,15 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mod
       config.wall_mode = wall_mode_result.value();
     }
     
+    // Parse catalysis_provider - optional parameter, defaults to MutationPP
+    if (node["catalysis_provider"]) {
+      auto provider_result = extract_enum(node, "catalysis_provider", enum_mappings::catalysis_providers);
+      if (!provider_result) {
+        return std::unexpected(provider_result.error());
+      }
+      config.catalysis_provider = provider_result.value();
+    }
+
     // Legacy support: if old "adiabatic" parameter is present, convert to wall_mode
     if (node["adiabatic"]) {
       auto adiabatic_result = extract_value<bool>(node, "adiabatic");
@@ -1016,6 +1041,31 @@ auto YamlParser::parse_edge_reconstruction_config(const YAML::Node& node) const
   } catch (const YAML::Exception& e) {
     return std::unexpected(
         core::ConfigurationError(std::format("In 'edge_reconstruction' section: failed to parse - {}", e.what())));
+  }
+}
+
+auto YamlParser::parse_catalysis_config(const YAML::Node& node) const
+    -> std::expected<CatalysisConfig, core::ConfigurationError> {
+  try {
+    CatalysisConfig config;
+    
+    if (!node || node.IsNull()) {
+      // No catalysis section - return defaults
+      return config;
+    }
+
+    // Parse gasp2_xml_file (optional)
+    if (node["gasp2_xml_file"]) {
+      config.gasp2_xml_file = node["gasp2_xml_file"].as<std::string>();
+    }
+
+    // Catalysis is enabled if the section exists
+    config.enabled = true;
+
+    return config;
+  } catch (const YAML::Exception& e) {
+    return std::unexpected(
+        core::ConfigurationError(std::format("In 'catalysis' section: failed to parse - {}", e.what())));
   }
 }
 

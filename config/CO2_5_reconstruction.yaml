@@ -25,6 +25,7 @@ base:
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
     catalytic_wall: true
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
+    catalysis_provider: "gasp2"  # "mutation++" or "gasp2"
 
   numerical:
     n_eta: 200
@@ -65,7 +66,11 @@ base:
   wall_parameters:
     temperatures: [3000]
     emissivity: 0  # Only used when wall_mode is "radiative"
-    environment_temperature: 300  # Only used when wall_mode is "radiative"  
+    environment_temperature: 300  # Only used when wall_mode is "radiative"
+
+  catalysis:
+    gasp2_xml_file: "config/catalysis.xml"
+    enabled: true
 
 # =============================================================================
 # EDGE RECONSTRUCTION MODE

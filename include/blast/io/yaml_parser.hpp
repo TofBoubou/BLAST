@@ -54,6 +54,9 @@ private:
   [[nodiscard]] auto parse_edge_reconstruction_config(const YAML::Node& node) const
       -> std::expected<EdgeReconstructionConfig, core::ConfigurationError>;
 
+  [[nodiscard]] auto parse_catalysis_config(const YAML::Node& node) const
+      -> std::expected<CatalysisConfig, core::ConfigurationError>;
+
 public:
   explicit YamlParser(std::string file_path) : file_path_(std::move(file_path)) {} // constructor so no ->
 
@@ -142,6 +145,11 @@ inline const std::unordered_map<std::string, MixtureConfig::ThermalConductivityA
     {"chapman_enskog_cg", MixtureConfig::ThermalConductivityAlgorithm::chapmanEnskog_CG},
     {"chapman_enskog_ldlt", MixtureConfig::ThermalConductivityAlgorithm::chapmanEnskog_LDLT},
     {"wilke", MixtureConfig::ThermalConductivityAlgorithm::Wilke}};
+
+inline const std::unordered_map<std::string, SimulationConfig::CatalysisProvider> catalysis_providers = {
+    {"mutation++", SimulationConfig::CatalysisProvider::MutationPP},
+    {"mutationpp", SimulationConfig::CatalysisProvider::MutationPP},
+    {"gasp2", SimulationConfig::CatalysisProvider::GASP2}};
 
 inline const std::unordered_map<std::string, MixtureConfig::Database> databases = {
     {"rrho", MixtureConfig::Database::RRHO},

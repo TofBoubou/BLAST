@@ -14,6 +14,7 @@ MAKEFLAGS += -j$(shell nproc)
 EIGEN_PATH = libs/eigen
 MUTATIONPP_PATH = libs/mutationpp
 YAML_CPP_PATH = libs/yaml-cpp
+GASP2_PATH = libs/GASP2
 
 # External library flags
 HDF5_FLAGS = $(shell pkg-config --cflags --libs hdf5)
@@ -23,11 +24,13 @@ ZLIB_FLAGS = -lz
 INCLUDES = $(INCLUDE_FLAGS) \
            -I$(EIGEN_PATH) \
            -I$(MUTATIONPP_PATH)/install/include \
-           -I$(YAML_CPP_PATH)/include
+           -I$(YAML_CPP_PATH)/include \
+           -I$(GASP2_PATH)/include
 
 # Library linking
 LIBS = -L$(MUTATIONPP_PATH)/install/lib -lmutation++ \
        -L$(YAML_CPP_PATH)/build -lyaml-cpp \
+       -L$(GASP2_PATH)/build -lgasp2 \
        $(HDF5_FLAGS) \
        $(ZLIB_FLAGS) \
        \
@@ -106,6 +109,7 @@ check_dependencies:
 	@test -d $(MUTATIONPP_PATH) || { printf "✗\nError: Mutation++ not found at $(MUTATIONPP_PATH)\n"; exit 1; }
 	@test -d $(YAML_CPP_PATH) || { printf "✗\nError: yaml-cpp not found at $(YAML_CPP_PATH)\n"; exit 1; }
 	@test -d $(EIGEN_PATH) || { printf "✗\nError: Eigen not found at $(EIGEN_PATH)\n"; exit 1; }
+	@test -d $(GASP2_PATH) || { printf "✗\nError: GASP2 not found at $(GASP2_PATH)\n"; exit 1; }
 	@printf "✓\n"
 
 # Library building
@@ -127,6 +131,14 @@ build_libs:
 		make -j$(shell nproc); \
 	else \
 		echo "✓ yaml-cpp already built"; \
+	fi
+	@if [ ! -f $(GASP2_PATH)/build/libgasp2.a ]; then \
+		echo "Building GASP2..."; \
+		cd $(GASP2_PATH) && mkdir -p build && cd build && \
+		cmake .. -DCMAKE_BUILD_TYPE=Release && \
+		make -j$(shell nproc); \
+	else \
+		echo "✓ GASP2 already built"; \
 	fi
 	@echo "✓ External libraries ready"
 
@@ -260,6 +272,7 @@ config:
 	@echo "  Eigen: $(EIGEN_PATH)"
 	@echo "  Mutation++: $(MUTATIONPP_PATH)"
 	@echo "  yaml-cpp: $(YAML_CPP_PATH)"
+	@echo "  GASP2: $(GASP2_PATH)"
 	@echo ""
 	@echo "Source files: $(words $(ALL_SOURCES)) files"
 	@echo "Object files: $(words $(ALL_OBJECTS)) objects"

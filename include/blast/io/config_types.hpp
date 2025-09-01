@@ -29,6 +29,10 @@ struct SimulationConfig {
   ChemicalMode chemical_mode = ChemicalMode::NonEquilibrium;
   bool catalytic_wall = false;
   WallMode wall_mode = WallMode::ImposedTemperature;  // Default to imposed temperature
+  
+  // Catalysis provider configuration
+  enum class CatalysisProvider { MutationPP, GASP2 };
+  CatalysisProvider catalysis_provider = CatalysisProvider::MutationPP;
 };
 
 struct NumericalConfig {
@@ -171,6 +175,11 @@ struct EdgeReconstructionConfig {
   } solver;
 };
 
+struct CatalysisConfig {
+  std::string gasp2_xml_file = "config/catalysis.xml";
+  bool enabled = false;
+};
+
 struct Configuration {
   SimulationConfig simulation;
   NumericalConfig numerical;
@@ -182,6 +191,7 @@ struct Configuration {
   AbacusConfig abacus;
   ContinuationConfig continuation;
   EdgeReconstructionConfig edge_reconstruction;
+  CatalysisConfig catalysis;
 };
 
 template <typename T>
