@@ -361,23 +361,23 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.edge_reconstruction = EdgeReconstructionConfig{};
     }
     
-    // Parse catalysis configuration
-    YAML::Node catalysis_node;
-    if (base_enabled && root_["base"]["catalysis"]) {
-      catalysis_node = root_["base"]["catalysis"];
-    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["catalysis"]) {
-      catalysis_node = root_["edge_reconstruction"]["catalysis"];
-    } else if (abacus_enabled && root_["abacus"]["catalysis"]) {
-      catalysis_node = root_["abacus"]["catalysis"];
+    // Parse surface chemistry configuration
+    YAML::Node surface_chemistry_node;
+    if (base_enabled && root_["base"]["surface_chemistry"]) {
+      surface_chemistry_node = root_["base"]["surface_chemistry"];
+    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["surface_chemistry"]) {
+      surface_chemistry_node = root_["edge_reconstruction"]["surface_chemistry"];
+    } else if (abacus_enabled && root_["abacus"]["surface_chemistry"]) {
+      surface_chemistry_node = root_["abacus"]["surface_chemistry"];
     } else {
-      catalysis_node = root_["catalysis"];
+      surface_chemistry_node = root_["surface_chemistry"];
     }
     
-    auto catalysis_result = parse_catalysis_config(catalysis_node);
-    if (!catalysis_result) {
-      return std::unexpected(catalysis_result.error());
+    auto surface_chemistry_result = parse_surface_chemistry_config(surface_chemistry_node);
+    if (!surface_chemistry_result) {
+      return std::unexpected(surface_chemistry_result.error());
     }
-    config.catalysis = std::move(catalysis_result.value());
+    config.surface_chemistry = std::move(surface_chemistry_result.value());
 
     return config;
 
@@ -1044,28 +1044,69 @@ auto YamlParser::parse_edge_reconstruction_config(const YAML::Node& node) const
   }
 }
 
-auto YamlParser::parse_catalysis_config(const YAML::Node& node) const
-    -> std::expected<CatalysisConfig, core::ConfigurationError> {
+auto YamlParser::parse_surface_chemistry_config(const YAML::Node& node) const
+    -> std::expected<SurfaceChemistryConfig, core::ConfigurationError> {
   try {
-    CatalysisConfig config;
+    SurfaceChemistryConfig config;
     
     if (!node || node.IsNull()) {
-      // No catalysis section - return defaults
+      // No surface chemistry section - return defaults
       return config;
     }
 
-    // Parse gasp2_xml_file (optional)
-    if (node["gasp2_xml_file"]) {
-      config.gasp2_xml_file = node["gasp2_xml_file"].as<std::string>();
-    }
-
-    // Catalysis is enabled if the section exists
+    // Surface chemistry is enabled if the section exists
     config.enabled = true;
+
+    // Parse GASP2 options
+    if (node["gasp2"]) {
+      const auto& gasp2_node = node["gasp2"];
+      
+      if (gasp2_node["xml_file"]) {
+        config.gasp2.xml_file = gasp2_node["xml_file"].as<std::string>();
+      }
+      
+      if (gasp2_node["reaction_type"]) {
+        config.gasp2.reaction_type = gasp2_node["reaction_type"].as<std::string>();
+      }
+      
+      if (gasp2_node["temperature_exponent"]) {
+        config.gasp2.temperature_exponent = gasp2_node["temperature_exponent"].as<double>();
+      }
+      
+      if (gasp2_node["activation_energy"]) {
+        config.gasp2.activation_energy = gasp2_node["activation_energy"].as<double>();
+      }
+      
+      if (gasp2_node["pre_exponential"]) {
+        config.gasp2.pre_exponential = gasp2_node["pre_exponential"].as<double>();
+      }
+      
+      if (gasp2_node["use_xml_parameters"]) {
+        config.gasp2.use_xml_parameters = gasp2_node["use_xml_parameters"].as<bool>();
+      }
+      
+      if (gasp2_node["verbose_output"]) {
+        config.gasp2.verbose_output = gasp2_node["verbose_output"].as<bool>();
+      }
+    }
+    
+    // Parse Mutation++ options  
+    if (node["mutation"]) {
+      const auto& mutation_node = node["mutation"];
+      
+      if (mutation_node["gsi_file"]) {
+        config.mutation.gsi_file = mutation_node["gsi_file"].as<std::string>();
+      }
+      
+      if (mutation_node["reload_gsi_each_step"]) {
+        config.mutation.reload_gsi_each_step = mutation_node["reload_gsi_each_step"].as<bool>();
+      }
+    }
 
     return config;
   } catch (const YAML::Exception& e) {
     return std::unexpected(
-        core::ConfigurationError(std::format("In 'catalysis' section: failed to parse - {}", e.what())));
+        core::ConfigurationError(std::format("In 'surface_chemistry' section: failed to parse - {}", e.what())));
   }
 }
 

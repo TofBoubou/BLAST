@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gasp2_catalysis>
+  <!-- CO2_5 species: CO2, CO, O2, O, C -->
+  
+  <surface_reactions>
+    
+    <!-- Gamma model catalysis reactions for CO2/air mixture -->
+    
+    <!-- O atom recombination -->
+    <reaction id="1">
+      <equation>O + O -> O2</equation>
+      <type>gamma</type>
+      <gamma_value>0.3</gamma_value>
+    </reaction>
+    
+    <!-- CO oxidation -->
+    <reaction id="2">
+      <equation>CO + O -> CO2</equation>
+      <type>gamma</type>
+      <gamma_value>0.3</gamma_value>
+    </reaction>
+    
+    <!-- C atom oxidation -->
+    <reaction id="3">
+      <equation>C + O2 -> CO2</equation>
+      <type>gamma</type>
+      <gamma_value>0.1</gamma_value>
+    </reaction>
+    
+  </surface_reactions>
+  
+  <!-- Species mapping -->
+  <species_mapping>
+    <species name="CO2" index="0"/>
+    <species name="CO" index="1"/>
+    <species name="O2" index="2"/>
+    <species name="O" index="3"/>
+    <species name="C" index="4"/>
+  </species_mapping>
+  
+</gasp2_catalysis>

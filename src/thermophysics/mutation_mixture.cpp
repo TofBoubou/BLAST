@@ -533,7 +533,7 @@ auto create_mixture(const io::MixtureConfig& config)
 
 auto create_mixture_with_catalysis(const io::MixtureConfig& mixture_config, 
                                    const io::SimulationConfig& sim_config,
-                                   const io::CatalysisConfig& catalysis_config)
+                                   const io::SurfaceChemistryConfig& surface_chem_config)
     -> std::expected<std::unique_ptr<MixtureInterface>, ThermophysicsError> {
 
   // Always create the base mixture first
@@ -544,7 +544,7 @@ auto create_mixture_with_catalysis(const io::MixtureConfig& mixture_config,
   auto base_mixture = std::move(base_mixture_result.value());
 
   // If catalysis is disabled or using Mutation++, return base mixture directly
-  if (!sim_config.catalytic_wall || !catalysis_config.enabled || 
+  if (!sim_config.catalytic_wall || !surface_chem_config.enabled || 
       sim_config.catalysis_provider == io::SimulationConfig::CatalysisProvider::MutationPP) {
     return base_mixture;
   }
@@ -561,8 +561,14 @@ auto create_mixture_with_catalysis(const io::MixtureConfig& mixture_config,
         molar_masses.push_back(base_mixture->species_molecular_weight(i));
       }
 
+      if (surface_chem_config.gasp2.verbose_output) {
+        std::cout << "🔥 Creating GASP2 " << surface_chem_config.gasp2.reaction_type 
+                  << " catalysis for " << species_names.size() 
+                  << " species using: " << surface_chem_config.gasp2.xml_file << std::endl;
+      }
+
       auto gasp2_catalysis = std::make_unique<catalysis::Gasp2Catalysis>(
-          catalysis_config.gasp2_xml_file, species_names, molar_masses);
+          surface_chem_config.gasp2.xml_file, species_names, molar_masses);
 
       return std::make_unique<HybridMixture>(std::move(base_mixture), 
                                            std::move(gasp2_catalysis));

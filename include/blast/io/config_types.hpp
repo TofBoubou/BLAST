@@ -175,9 +175,25 @@ struct EdgeReconstructionConfig {
   } solver;
 };
 
-struct CatalysisConfig {
-  std::string gasp2_xml_file = "config/catalysis.xml";
+struct SurfaceChemistryConfig {
   bool enabled = false;
+  
+  // GASP2 specific options
+  struct GASP2Options {
+    std::string xml_file = "config/surface_chemistry/CO2_5_finite_rate.xml";
+    std::string reaction_type = "finite_rate";  // "finite_rate" or "gamma"
+    double temperature_exponent = 0.0;
+    double activation_energy = 0.0;  // J/mol
+    double pre_exponential = 1.0e13; // m²/mol/s for finite rate, dimensionless for gamma
+    bool use_xml_parameters = true;  // If false, use the above defaults
+    bool verbose_output = false;
+  } gasp2;
+  
+  // Mutation++ specific options  
+  struct MutationOptions {
+    std::string gsi_file = "";  // If empty, uses default from mixture
+    bool reload_gsi_each_step = false;
+  } mutation;
 };
 
 struct Configuration {
@@ -191,7 +207,7 @@ struct Configuration {
   AbacusConfig abacus;
   ContinuationConfig continuation;
   EdgeReconstructionConfig edge_reconstruction;
-  CatalysisConfig catalysis;
+  SurfaceChemistryConfig surface_chemistry;
 };
 
 template <typename T>

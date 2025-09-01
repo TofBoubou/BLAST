@@ -104,4 +104,13 @@ public:
   [[nodiscard]] auto get_number_energy_modes() const noexcept -> std::size_t override;
 };
 
+// Factory functions
+[[nodiscard]] auto create_mixture(const io::MixtureConfig& config)
+    -> std::expected<std::unique_ptr<MixtureInterface>, ThermophysicsError>;
+
+[[nodiscard]] auto create_mixture_with_catalysis(const io::MixtureConfig& mixture_config, 
+                                                 const io::SimulationConfig& sim_config,
+                                                 const io::SurfaceChemistryConfig& surface_chem_config)
+    -> std::expected<std::unique_ptr<MixtureInterface>, ThermophysicsError>;
+
 } // namespace blast::thermophysics

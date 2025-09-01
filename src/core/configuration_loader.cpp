@@ -2,6 +2,7 @@
 #include "blast/core/constants.hpp"
 #include "blast/io/config_manager.hpp"
 #include "blast/thermophysics/mixture_interface.hpp"
+#include "blast/thermophysics/mutation_mixture.hpp"
 #include <format>
 #include <iomanip>
 #include <iostream>
@@ -20,9 +21,12 @@ auto ConfigurationLoader::load_configuration(const std::string& config_file)
   
   std::cout << "✓ Configuration loaded successfully" << std::endl;
   
-  auto mixture_result = create_mixture(config.mixture);
+  auto mixture_result = thermophysics::create_mixture_with_catalysis(config.mixture, config.simulation, config.surface_chemistry);
   if (!mixture_result) {
-    return std::unexpected(mixture_result.error());
+    return std::unexpected(ApplicationError{
+      "Failed to create mixture: " + mixture_result.error().message(),
+      constants::indexing::second
+    });
   }
   auto mixture = std::move(mixture_result.value());
   
