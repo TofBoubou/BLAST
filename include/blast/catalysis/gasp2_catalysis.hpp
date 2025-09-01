@@ -30,6 +30,7 @@ public:
   [[nodiscard]] auto n_species() const noexcept -> std::size_t override;
 
 private:
+  std::string xml_file_;
   std::vector<std::string> species_order_;
   std::vector<double> molar_masses_;
   bool initialized_;

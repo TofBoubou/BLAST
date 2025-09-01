@@ -1,15 +1,15 @@
 #include "blast/catalysis/gasp2_catalysis.hpp"
 #include <gasp2/gasp2.hpp>
 #include <format>
+#include <iostream>
 
 namespace blast::catalysis {
 
 Gasp2Catalysis::Gasp2Catalysis(const std::string& xml_file, const std::vector<std::string>& species_order, 
                                const std::vector<double>& molar_masses)
-    : species_order_(species_order), molar_masses_(molar_masses), initialized_(false) {
-  
-  // Initialize GASP2
-  auto init_result = gasp2::initialize_catalysis(species_order_, molar_masses_, xml_file);
+      : xml_file_(xml_file), species_order_(species_order), molar_masses_(molar_masses), initialized_(false) {
+  // Initialize GASP2 using the provided XML definition.
+  auto init_result = gasp2::initialize_catalysis(species_order_, molar_masses_, xml_file_);
   if (!init_result) {
     throw CatalysisError(std::format("Failed to initialize GASP2: {}", init_result.error().message));
   }
@@ -28,6 +28,17 @@ auto Gasp2Catalysis::compute_surface_fluxes(std::span<const double> partial_dens
     return std::unexpected(CatalysisError(std::format("Size mismatch: expected {} species, got {}", 
                                                      species_order_.size(), partial_densities.size())));
   }
+
+  // Reinitialize GASP2 every call to ensure gamma values remain intact
+  {
+    std::cout << "[GASP2] Reinitializing catalysis with XML='" << xml_file_ << "'" << std::endl;
+    auto init_result = gasp2::initialize_catalysis(species_order_, molar_masses_, xml_file_);
+    if (!init_result) {
+      return std::unexpected(CatalysisError(
+          std::format("Failed to reinitialize GASP2: {}", init_result.error().message)));
+    }
+  }
+
 
   // Convert partial densities to vector for GASP2
   std::vector<double> rho_wall(partial_densities.begin(), partial_densities.end());
