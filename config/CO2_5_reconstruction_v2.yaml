@@ -76,7 +76,7 @@ base:
     gasp2:
       xml_file: "CO2_5_gamma.xml"      # Nom du fichier XML (dans libs/GASP2/inputs/)
       reaction_type: "gamma"            # "finite_rate" ou "gamma"
-      verbose_output: true              # Affiche des messages détaillés
+      verbose_output: false              # Affiche des messages détaillés
     
     # Options spécifiques à Mutation++ (pour comparaison)
     mutation:
