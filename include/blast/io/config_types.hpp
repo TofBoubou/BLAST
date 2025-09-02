@@ -120,7 +120,9 @@ struct WallParametersConfig {
 };
 
 struct AbacusConfig {
+  enum class Mode { TemperatureSweep, GammaSweepAtTw };
   bool enabled = false;
+  Mode mode = Mode::TemperatureSweep;
   std::vector<double> catalyticity_values;
   double temperature_min = constants::defaults::abacus::temperature_min;
   double temperature_max = constants::defaults::abacus::temperature_max;

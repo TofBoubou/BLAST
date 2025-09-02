@@ -121,44 +121,55 @@ class AbacusPlotter:
         fig, (ax_map, ax_curves) = plt.subplots(1, 2, figsize=(16, 7), dpi=self.dpi)
         fig.suptitle('Abacus: q_wall(γ, T_w)', fontsize=16, fontweight='bold')
 
-        # LEFT: 2D map (imshow) with explicit extent; axis 0 = gamma
-        im = ax_map.imshow(
-            Q,
-            extent=[T.min(), T.max(), G.min(), G.max()],
-            aspect='auto',
-            origin='lower',
-            cmap='Greys_r',
-            interpolation='bicubic'
-        )
-        ax_map.set_xlabel('Wall Temperature T_w (K)')
-        ax_map.set_ylabel('Catalyticity γ')
-        ax_map.grid(True, alpha=0.15)
-        cbar = plt.colorbar(im, ax=ax_map)
-        cbar.set_label('Heat Flux q_wall (W/m²)')
-
-        # RIGHT: q_wall(T_w) curves for each gamma (no extra interpolation)
-        # Black-only, varied linestyles/markers to differentiate series
-        line_styles = ['-', '--', '-.', ':']
-        markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
-
-        for i in range(Q.shape[0]):
-            style = line_styles[i % len(line_styles)]
-            marker = markers[i % len(markers)]
-            ax_curves.plot(
-                T, Q[i, :],
-                color='black',
-                linestyle=style,
-                marker=(marker if marker else None),
-                markevery=max(1, len(T)//10),
-                linewidth=1.5,
-                markersize=3.5,
-                label=f'γ = {G[i]:g}'
+        if T.size >= 2:
+            # LEFT: 2D map (imshow) with explicit extent; axis 0 = gamma
+            im = ax_map.imshow(
+                Q,
+                extent=[T.min(), T.max(), G.min(), G.max()],
+                aspect='auto',
+                origin='lower',
+                cmap='Greys_r',
+                interpolation='bicubic'
             )
+            ax_map.set_xlabel('Wall Temperature T_w (K)')
+            ax_map.set_ylabel('Catalyticity γ')
+            ax_map.grid(True, alpha=0.15)
+            cbar = plt.colorbar(im, ax=ax_map)
+            cbar.set_label('Heat Flux q_wall (W/m²)')
 
-        ax_curves.set_xlabel('Wall Temperature T_w (K)')
-        ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
-        ax_curves.grid(True, alpha=0.3)
-        ax_curves.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
+            # RIGHT: q_wall(T_w) curves for each gamma (no extra interpolation)
+            # Black-only, varied linestyles/markers to differentiate series
+            line_styles = ['-', '--', '-.', ':']
+            markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
+
+            for i in range(Q.shape[0]):
+                style = line_styles[i % len(line_styles)]
+                marker = markers[i % len(markers)]
+                ax_curves.plot(
+                    T, Q[i, :],
+                    color='black',
+                    linestyle=style,
+                    marker=(marker if marker else None),
+                    markevery=max(1, len(T)//10),
+                    linewidth=1.5,
+                    markersize=3.5,
+                    label=f'γ = {G[i]:g}'
+                )
+
+            ax_curves.set_xlabel('Wall Temperature T_w (K)')
+            ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
+            ax_curves.grid(True, alpha=0.3)
+            ax_curves.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
+        else:
+            # Single-temperature mode: show γ → q_wall curve on the right, annotate left
+            ax_map.axis('off')
+            ax_map.text(0.5, 0.5, f'Single T_w = {float(T[0]):.1f} K',
+                        ha='center', va='center', fontsize=14)
+
+            ax_curves.plot(G, Q[:, 0], color='black', marker='o')
+            ax_curves.set_xlabel('Catalyticity γ')
+            ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
+            ax_curves.grid(True, alpha=0.3)
 
         plt.tight_layout()
 

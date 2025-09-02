@@ -44,9 +44,14 @@ auto AbacusGenerator::generate() -> Result {
 
   // Setup temperature vector
   result.temperatures.resize(n_temps);
-  const double dT = (abacus_config.temperature_max - abacus_config.temperature_min) / (n_temps - 1);
-  for (int i = 0; i < n_temps; ++i) {
-    result.temperatures[i] = abacus_config.temperature_min + i * dT;
+  if (n_temps <= 1) {
+    // Single-temperature mode: fixed wall temperature
+    result.temperatures[0] = abacus_config.temperature_min; // min == max by construction in YAML parser
+  } else {
+    const double dT = (abacus_config.temperature_max - abacus_config.temperature_min) / (n_temps - 1);
+    for (int i = 0; i < n_temps; ++i) {
+      result.temperatures[i] = abacus_config.temperature_min + i * dT;
+    }
   }
 
   // Copy catalyticity values

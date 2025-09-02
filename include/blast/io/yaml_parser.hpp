@@ -175,6 +175,12 @@ inline const std::unordered_map<std::string, SimulationConfig::WallMode> wall_mo
     {"radiative", SimulationConfig::WallMode::Radiative},
     {"radiative_wall", SimulationConfig::WallMode::Radiative}};
 
+inline const std::unordered_map<std::string, AbacusConfig::Mode> abacus_modes = {
+    {"temperature_sweep", AbacusConfig::Mode::TemperatureSweep},
+    {"gamma_sweep_at_tw", AbacusConfig::Mode::GammaSweepAtTw},
+    {"gamma_sweep", AbacusConfig::Mode::GammaSweepAtTw},
+    {"tw_fixed", AbacusConfig::Mode::GammaSweepAtTw}};
+
 } // namespace enum_mappings
 
 } // namespace blast::io

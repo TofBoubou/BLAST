@@ -21,7 +21,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -136,7 +136,17 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: false
+  enabled: true
+  # Choose one:
+  #   - temperature_sweep: q_wall(Tw) for each γ over a Tw range (current default)
+  #   - gamma_sweep_at_Tw: q_wall(γ) at a fixed wall temperature Tw
+  mode: temperature_sweep
+  temperature_sweep:
+    range: [3500, 4000]
+    points: 5
+  gamma_sweep:
+    wall_temperature: 3000
+  catalyticity_values: [0.0, 0.001, 0.01, 0.1, 1]
   
   simulation:
     body_type: axisymmetric
@@ -146,7 +156,7 @@ abacus:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 200
+    n_eta: 20
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 100000
@@ -163,8 +173,6 @@ abacus:
   boundary_conditions:
     pressure: 7000  # Pressure for abacus mode (Pa)
     temperature: 5905.5  # Edge temperature
-    temperature_range: [3000, 5905.5]  # Range for abacus
-    catalyticity_values: [0.0, 0.001, 0.01, 0.1, 1]
     radius: 1.0 
     velocity: 0.0
   
@@ -173,4 +181,3 @@ abacus:
     freestream_density: 0.0019382429
     freestream_velocity: 500000
   
-  temperature_points: 20

@@ -194,9 +194,19 @@ auto SimulationRunner::display_standard_results(const boundary_layer::solver::So
 }
 
 auto SimulationRunner::display_abacus_info(const io::Configuration& config) const -> void {
-  std::cout << "Temperature range: " << config.abacus.temperature_min << " - " 
-            << config.abacus.temperature_max << " K" << std::endl;
-  std::cout << "Temperature points: " << config.abacus.temperature_points << std::endl;
+  std::cout << "Abacus mode: "
+            << (config.abacus.mode == io::AbacusConfig::Mode::TemperatureSweep
+                    ? "temperature_sweep"
+                    : "gamma_sweep_at_Tw")
+            << std::endl;
+  if (config.abacus.temperature_points <= 1) {
+    std::cout << "Fixed wall temperature: " << config.abacus.temperature_min << " K" << std::endl;
+    std::cout << "Temperature points: 1" << std::endl;
+  } else {
+    std::cout << "Temperature range: " << config.abacus.temperature_min << " - "
+              << config.abacus.temperature_max << " K" << std::endl;
+    std::cout << "Temperature points: " << config.abacus.temperature_points << std::endl;
+  }
   std::cout << "Catalyticity values: ";
   
   for (size_t i = constants::indexing::first; i < config.abacus.catalyticity_values.size(); ++i) {
