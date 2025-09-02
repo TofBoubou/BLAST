@@ -146,7 +146,7 @@ abacus:
     points: 5
   gamma_sweep:
     wall_temperature: [3500, 3700, 4000]
-  catalyticity_values: [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.01, 0.02, 0.03, 0.05, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 1]
+  catalyticity_values: [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 1]
   
   simulation:
     body_type: axisymmetric

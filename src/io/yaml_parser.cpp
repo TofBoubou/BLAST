@@ -36,6 +36,8 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     bool edge_reconstruction_enabled = false;
     bool abacus_enabled = false;
     
+    // Debug markers to trace parsing (disabled)
+
     if (root_["base"] && root_["base"]["enabled"]) {
       base_enabled = root_["base"]["enabled"].as<bool>();
     }
@@ -157,24 +159,28 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
 
     // Parse configuration from the determined nodes
+    
     auto sim_result = parse_simulation_config(sim_node, abacus_enabled, edge_reconstruction_enabled);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
     config.simulation = std::move(sim_result.value());
 
+    
     auto num_result = parse_numerical_config(num_node);
     if (!num_result) {
       return std::unexpected(num_result.error());
     }
     config.numerical = std::move(num_result.value());
 
+    
     auto mix_result = parse_mixture_config(mix_node);
     if (!mix_result) {
       return std::unexpected(mix_result.error());
     }
     config.mixture = std::move(mix_result.value());
 
+    
     auto out_result = parse_output_config(out_node);
     if (!out_result) {
       return std::unexpected(out_result.error());
@@ -183,6 +189,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Parse outer_edge only for base mode (edge_reconstruction and abacus use specialized configs)
     if (base_enabled) {
+      
       auto edge_result = parse_outer_edge_config(edge_node, false, false);
       if (!edge_result) {
         return std::unexpected(edge_result.error());
@@ -195,6 +202,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Parse wall_parameters for modes that need it (only base mode)
     if (base_enabled) {
+      
       auto wall_result = parse_wall_parameters_config(wall_node);
       if (!wall_result) {
         return std::unexpected(wall_result.error());
@@ -239,6 +247,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Parse abacus config only if in abacus mode
     if (abacus_enabled) {
+      
       auto abacus_result = parse_abacus_config(root_["abacus"]);
       if (!abacus_result) {
         return std::unexpected(abacus_result.error());
@@ -281,8 +290,13 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         }
       }
       
-      // Extract catalyticity values from boundary_conditions for abacus
-      if (root_["abacus"]["boundary_conditions"]["catalyticity_values"]) {
+      // Extract catalyticity values for abacus (new schema preferred, fallback to legacy)
+      if (root_["abacus"]["catalyticity_values"]) {
+        config.abacus.catalyticity_values = root_["abacus"]["catalyticity_values"].as<std::vector<double>>();
+        if (config.abacus.catalyticity_values.empty()) {
+          return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty in abacus mode"));
+        }
+      } else if (root_["abacus"]["boundary_conditions"]["catalyticity_values"]) {
         config.abacus.catalyticity_values = root_["abacus"]["boundary_conditions"]["catalyticity_values"].as<std::vector<double>>();
         if (config.abacus.catalyticity_values.empty()) {
           return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty in abacus mode"));
@@ -331,6 +345,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       cont_node = root_["continuation"];
     }
     
+    
     auto cont_result = parse_continuation_config(cont_node);
     if (!cont_result) {
       return std::unexpected(cont_result.error());
@@ -339,6 +354,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Parse edge reconstruction config only if in edge_reconstruction mode
     if (edge_reconstruction_enabled) {
+      
       auto edge_recon_result = parse_edge_reconstruction_config(root_["edge_reconstruction"]);
       if (!edge_recon_result) {
         return std::unexpected(edge_recon_result.error());
@@ -373,6 +389,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       gasp2_node = root_["gasp2"];
     }
     
+    
     auto gasp2_result = parse_gasp2_config(gasp2_node);
     if (!gasp2_result) {
       return std::unexpected(gasp2_result.error());
@@ -380,23 +397,28 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     config.gasp2 = std::move(gasp2_result.value());
 
     // Parse Mutation++ configuration
-    YAML::Node mutation_node;
-    if (base_enabled && root_["base"]["mutation"]) {
-      mutation_node = root_["base"]["mutation"];
-    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["mutation"]) {
-      mutation_node = root_["edge_reconstruction"]["mutation"];
-    } else if (abacus_enabled && root_["abacus"]["mutation"]) {
-      mutation_node = root_["abacus"]["mutation"];
+    if (abacus_enabled) {
+      // In abacus mode, mutation config is not required; default it
+      config.mutation = MutationConfig{};
     } else {
-      mutation_node = root_["mutation"];
-    }
-    
-    auto mutation_result = parse_mutation_config(mutation_node);
-    if (!mutation_result) {
-      return std::unexpected(mutation_result.error());
-    }
-    config.mutation = std::move(mutation_result.value());
+      YAML::Node mutation_node;
+      if (base_enabled && root_["base"]["mutation"]) {
+        mutation_node = root_["base"]["mutation"];
+      } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["mutation"]) {
+        mutation_node = root_["edge_reconstruction"]["mutation"];
+      } else {
+        mutation_node = root_["mutation"];
+      }
 
+      
+      auto mutation_result = parse_mutation_config(mutation_node);
+      if (!mutation_result) {
+        return std::unexpected(mutation_result.error());
+      }
+      config.mutation = std::move(mutation_result.value());
+    }
+
+    
     return config;
 
   } catch (const YAML::Exception& e) {
@@ -862,35 +884,83 @@ auto YamlParser::parse_abacus_config(const YAML::Node& node) const
 
     // Only parse other fields if enabled
     if (config.enabled) {
-      // For abacus mode, catalyticity_values are now in wall_parameters
-      // This is handled separately in the main parse function
-      // Just set a default here, will be overridden
-      config.catalyticity_values = {0.0, 0.1}; // Default fallback
+      // Default catalyticity values (overridden below if provided)
+      config.catalyticity_values = {0.0, 0.1};
 
-      // temperature_range now parsed in boundary_conditions section
+      // Parse mode if present (supports both new and legacy naming)
+      if (node["mode"]) {
+        auto mode_result = extract_enum(node, "mode", enum_mappings::abacus_modes);
+        if (!mode_result) {
+          return std::unexpected(core::ConfigurationError(std::format("In 'abacus' section: {}", mode_result.error().message())));
+        }
+        config.mode = mode_result.value();
+      }
 
-      // Parse temperature points
-      if (node["temperature_points"]) {
-        config.temperature_points = node["temperature_points"].as<int>();
-        if (config.temperature_points < constants::indexing::min_range_size) {
-          return std::unexpected(core::ConfigurationError(std::format("temperature_points must be at least {}", constants::indexing::min_range_size)));
+      // Respect selected mode and ignore unrelated blocks
+      if (config.mode == AbacusConfig::Mode::TemperatureSweep) {
+        // New schema: temperature_sweep { range: [min, max], points: N }
+        if (node["temperature_sweep"]) {
+          auto ts_node = node["temperature_sweep"];
+          if (ts_node["range"]) {
+            auto range = ts_node["range"].as<std::vector<double>>();
+            if (range.size() != constants::indexing::min_range_size) {
+              return std::unexpected(core::ConfigurationError(std::format("temperature_sweep.range must have exactly {} values", constants::indexing::min_range_size)));
+            }
+            config.temperature_min = range[constants::indexing::first];
+            config.temperature_max = range[constants::indexing::second];
+            if (config.temperature_min >= config.temperature_max) {
+              return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
+            }
+          }
+          if (ts_node["points"]) {
+            config.temperature_points = ts_node["points"].as<int>();
+            if (config.temperature_points < constants::indexing::min_range_size) {
+              return std::unexpected(core::ConfigurationError(std::format("temperature_sweep.points must be at least {}", constants::indexing::min_range_size)));
+            }
+          }
+        }
+
+        // Legacy fallbacks only for temperature_sweep mode
+        if (node["temperature_points"]) {
+          config.temperature_points = node["temperature_points"].as<int>();
+          if (config.temperature_points < constants::indexing::min_range_size) {
+            return std::unexpected(core::ConfigurationError(std::format("temperature_points must be at least {}", constants::indexing::min_range_size)));
+          }
+        }
+        if (node["boundary_conditions"]) {
+          auto bc_node = node["boundary_conditions"];
+          if (bc_node["temperature_range"]) {
+            auto range = bc_node["temperature_range"].as<std::vector<double>>();
+            if (range.size() != constants::indexing::min_range_size) {
+              return std::unexpected(core::ConfigurationError(std::format("temperature_range must have exactly {} values", constants::indexing::min_range_size)));
+            }
+            config.temperature_min = range[constants::indexing::first];
+            config.temperature_max = range[constants::indexing::second];
+            if (config.temperature_min >= config.temperature_max) {
+              return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
+            }
+          }
+        }
+      } else if (config.mode == AbacusConfig::Mode::GammaSweepAtTw) {
+        // New schema: gamma_sweep { wall_temperature: Tw }
+        if (node["gamma_sweep"]) {
+          auto gs_node = node["gamma_sweep"];
+          if (gs_node["wall_temperature"]) {
+            const double Tw = gs_node["wall_temperature"].as<double>();
+            config.temperature_min = Tw;
+            config.temperature_max = Tw;
+            config.temperature_points = 1; // single temperature
+          } else {
+            return std::unexpected(core::ConfigurationError("gamma_sweep.wall_temperature is required for gamma_sweep_at_Tw mode"));
+          }
+        } else {
+          return std::unexpected(core::ConfigurationError("gamma_sweep section is required for gamma_sweep_at_Tw mode"));
         }
       }
-      
-      // Parse boundary conditions for abacus mode
+
+      // Geometry/flow optional parameters shared across modes
       if (node["boundary_conditions"]) {
         auto bc_node = node["boundary_conditions"];
-        if (bc_node["temperature_range"]) {
-          auto range = bc_node["temperature_range"].as<std::vector<double>>();
-          if (range.size() != constants::indexing::min_range_size) {
-            return std::unexpected(core::ConfigurationError(std::format("temperature_range must have exactly {} values", constants::indexing::min_range_size)));
-          }
-          config.temperature_min = range[constants::indexing::first];
-          config.temperature_max = range[constants::indexing::second];
-          if (config.temperature_min >= config.temperature_max) {
-            return std::unexpected(core::ConfigurationError("temperature_min must be less than temperature_max"));
-          }
-        }
         // Optional radius (defaults to 1.0)
         if (bc_node["radius"]) {
           config.radius = bc_node["radius"].as<double>();
@@ -898,6 +968,19 @@ auto YamlParser::parse_abacus_config(const YAML::Node& node) const
         // Optional velocity (defaults to 0.0)
         if (bc_node["velocity"]) {
           config.velocity = bc_node["velocity"].as<double>();
+        }
+      }
+
+      // Catalyticity values (new schema preferred, fallback to legacy)
+      if (node["catalyticity_values"]) {
+        config.catalyticity_values = node["catalyticity_values"].as<std::vector<double>>();
+        if (config.catalyticity_values.empty()) {
+          return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty in abacus mode"));
+        }
+      } else if (node["boundary_conditions"] && node["boundary_conditions"]["catalyticity_values"]) {
+        config.catalyticity_values = node["boundary_conditions"]["catalyticity_values"].as<std::vector<double>>();
+        if (config.catalyticity_values.empty()) {
+          return std::unexpected(core::ConfigurationError("catalyticity_values cannot be empty in abacus mode"));
         }
       }
     }
