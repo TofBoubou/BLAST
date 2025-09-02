@@ -644,6 +644,24 @@ auto YamlParser::parse_numerical_config(const YAML::Node& node) const
       return std::unexpected(max_iter_result.error());
     config.max_iterations = max_iter_result.value();
 
+    // Optional numerical guards and policies
+    if (node["divergence_threshold"]) {
+      config.divergence_threshold = node["divergence_threshold"].as<double>();
+    }
+    if (node["residual_guard"]) {
+      config.residual_guard = node["residual_guard"].as<double>();
+    }
+    if (node["nan_policy"]) {
+      auto np = extract_enum(node, "nan_policy", nan_policies);
+      if (!np) return std::unexpected(np.error());
+      config.nan_policy = np.value();
+    }
+    if (node["continuation_attempt_policy"]) {
+      auto cap = extract_enum(node, "continuation_attempt_policy", continuation_policies);
+      if (!cap) return std::unexpected(cap.error());
+      config.continuation_attempt_policy = cap.value();
+    }
+
     return config;
 
   } catch (const core::ConfigurationError& e) {
@@ -1064,6 +1082,25 @@ auto YamlParser::parse_continuation_config(const YAML::Node& node) const
     }
     if (node["use_linear_predictor"]) {
       config.use_linear_predictor = node["use_linear_predictor"].as<bool>();
+      config.predictor_enabled = config.use_linear_predictor;
+    }
+
+    // Optional continuation step parameters
+    if (node["step_initial"]) config.step_initial = node["step_initial"].as<double>();
+    if (node["step_min"])     config.step_min     = node["step_min"].as<double>();
+    if (node["step_max"])     config.step_max     = node["step_max"].as<double>();
+    if (node["step_increase_factor"]) config.step_increase_factor = node["step_increase_factor"].as<double>();
+    if (node["step_decrease_factor"]) config.step_decrease_factor = node["step_decrease_factor"].as<double>();
+    if (node["max_steps"])    config.max_steps    = node["max_steps"].as<int>();
+
+    if (node["failure_threshold"]) config.failure_threshold = node["failure_threshold"].as<int>();
+    if (node["success_threshold"]) config.success_threshold = node["success_threshold"].as<int>();
+
+    // Optional nested predictor block
+    if (node["predictor"]) {
+      auto p = node["predictor"];
+      if (p["enabled"]) config.predictor_enabled = p["enabled"].as<bool>();
+      if (p["max_step_reductions"]) config.predictor_max_step_reductions = p["max_step_reductions"].as<int>();
     }
     return config;
   } catch (const YAML::Exception& e) {

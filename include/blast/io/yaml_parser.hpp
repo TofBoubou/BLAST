@@ -183,4 +183,15 @@ inline const std::unordered_map<std::string, AbacusConfig::Mode> abacus_modes = 
 
 } // namespace enum_mappings
 
+// Additional enum mappings for numerical policies
+inline const std::unordered_map<std::string, NumericalConfig::NanPolicy> nan_policies = {
+    {"reduce_step", NumericalConfig::NanPolicy::ReduceStep},
+    {"fail", NumericalConfig::NanPolicy::Fail}};
+
+inline const std::unordered_map<std::string, NumericalConfig::ContinuationAttemptPolicy> continuation_policies = {
+    {"always", NumericalConfig::ContinuationAttemptPolicy::Always},
+    {"only_if_residual_below_threshold", NumericalConfig::ContinuationAttemptPolicy::OnlyIfResidualBelowGuard},
+    {"only_if_residual_below_guard", NumericalConfig::ContinuationAttemptPolicy::OnlyIfResidualBelowGuard},
+    {"never", NumericalConfig::ContinuationAttemptPolicy::Never}};
+
 } // namespace blast::io

@@ -156,6 +156,8 @@ public:
   [[nodiscard]] auto get_mixture() -> thermophysics::MixtureInterface& {
     return const_cast<thermophysics::MixtureInterface&>(mixture_);
   }
+  [[nodiscard]] auto get_mixture() const -> const thermophysics::MixtureInterface& { return mixture_; }
+
 
   [[nodiscard]] auto config() const noexcept -> const io::Configuration& { return config_; }
 

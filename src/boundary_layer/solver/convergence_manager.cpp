@@ -222,7 +222,7 @@ auto ConvergenceManager::update_wall_temperature_radiative(int station, double x
 auto ConvergenceManager::check_divergence(const ConvergenceInfo& conv_info, int station, int iteration) const
     -> std::expected<void, SolverError> {
     
-    if (conv_info.max_residual() > 1e6) {
+    if (conv_info.max_residual() > config_.numerical.divergence_threshold 1e6) {
         return std::unexpected(NumericError(std::format("Solution diverged at station {} iteration {} (residual={})",
                                                         station, iteration, conv_info.max_residual())));
     }

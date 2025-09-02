@@ -41,6 +41,16 @@ struct NumericalConfig {
   double convergence_tolerance = constants::tolerance::standard;
   int max_iterations = constants::iteration_limits::boundary_layer_max;
 
+  // Global numerical guards and policies
+  double divergence_threshold = 1.0e6;   // Max residual before declaring divergence
+  double residual_guard = 1.0e10;        // Residual cap to allow continuation attempt
+
+  enum class NanPolicy { ReduceStep, Fail };
+  NanPolicy nan_policy = NanPolicy::ReduceStep;
+
+  enum class ContinuationAttemptPolicy { Always, OnlyIfResidualBelowGuard, Never };
+  ContinuationAttemptPolicy continuation_attempt_policy = ContinuationAttemptPolicy::OnlyIfResidualBelowGuard;
+
   struct Solvers {
     double h2t_tolerance = constants::tolerance::high_precision;
     int h2t_max_iterations = constants::iteration_limits::enthalpy_temperature_max;
@@ -137,7 +147,23 @@ struct ContinuationConfig {
   double wall_temperature_stable = constants::defaults::stable_wall_temperature;
   double edge_temperature_stable = constants::defaults::stable_edge_temperature;
   double pressure_stable = constants::defaults::stable_pressure;
-  bool use_linear_predictor = true;  // Enable linear predictor for better convergence
+  bool use_linear_predictor = true;  // Back-compat alias for predictor_enabled
+
+  // Step and adaptation parameters
+  double step_initial = 0.01;
+  double step_min = 1.0e-4;
+  double step_max = 0.5;
+  double step_increase_factor = 1.3;
+  double step_decrease_factor = 0.5;
+  int max_steps = 10000;
+
+  // Mode switching thresholds
+  int failure_threshold = 4;   // consecutive failures before switching to equilibrium
+  int success_threshold = 3;   // consecutive successes before switching back
+
+  // Predictor parameters
+  bool predictor_enabled = true;
+  int predictor_max_step_reductions = 3;
 };
 
 struct EdgeReconstructionConfig {

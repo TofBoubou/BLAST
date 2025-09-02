@@ -82,7 +82,7 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
 
         // Try continuation for non-continuation failures
         if (auto* continuation = solver_.get_continuation(); 
-            continuation && !in_continuation_ && conv_info.max_residual() < 1e10) {
+            continuation && !in_continuation_ && conv_info.max_residual() < config_.numerical.residual_guard) {
             
             auto stable_guess = compute_stable_guess(station, xi);
             if (stable_guess) {
@@ -162,10 +162,18 @@ auto StationSolver::compute_stable_guess(int station, double xi) const
 }
 
 auto StationSolver::should_attempt_continuation(const ConvergenceError& convergence_error) const noexcept -> bool {
-    // Avoid relying on error message parsing; default to attempting continuation.
-    // If future numeric criteria are available, they should be checked upstream.
-    (void)convergence_error; // unused parameter
-    return true;
+    (void)convergence_error; // Unused; decision based on configured policy
+    using CAP = io::NumericalConfig::ContinuationAttemptPolicy;
+    switch (config_.numerical.continuation_attempt_policy) {
+      case CAP::Always:
+        return true;
+      case CAP::OnlyIfResidualBelowGuard:
+        // When residual is unknown here, be conservative: do not attempt at this stage
+        return false;
+      case CAP::Never:
+      default:
+        return false;
+    }
 }
 
 // Note: create_initial_guess method moved to InitialGuessFactory
