@@ -19,7 +19,6 @@ namespace blast::io {
 AbacusGenerator::AbacusGenerator(boundary_layer::solver::BoundaryLayerSolver& solver,
                                  thermophysics::MixtureInterface& mixture, const Configuration& config)
     : solver_(solver), mixture_(mixture), config_(config), gsi_manager_(config) {
-
   // Backup GSI file on construction
   auto backup_result = gsi_manager_.backup_gsi_file();
   if (!backup_result) {
@@ -41,6 +40,8 @@ auto AbacusGenerator::generate() -> Result {
   const auto& abacus_config = config_.abacus;
   const int n_temps = abacus_config.temperature_points;
   const int n_gammas = abacus_config.catalyticity_values.size();
+
+  
 
   // Setup temperature vector
   result.temperatures.resize(n_temps);

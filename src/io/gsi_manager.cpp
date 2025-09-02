@@ -117,16 +117,18 @@ auto GsiManager::construct_gsi_path() const -> std::filesystem::path {
   const char* mpp_data = std::getenv("MPP_DATA_DIRECTORY");
 
   if (!mpp_data) {
-    // Try to find it relative to executable
-    std::filesystem::path exe_path = std::filesystem::read_symlink("/proc/self/exe");
-    std::filesystem::path base_path = exe_path.parent_path();
-    std::filesystem::path mpp_path = base_path / "libs" / "mutationpp" / "data";
-
-    if (std::filesystem::exists(mpp_path)) {
-      return mpp_path / "gsi" / (config_.mixture.name + "_cata.xml");
+    // Try to find it relative to the executable if available (Linux), non-throwing
+    std::error_code ec;
+    std::filesystem::path exe_path = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (!ec && !exe_path.empty()) {
+      std::filesystem::path base_path = exe_path.parent_path();
+      std::filesystem::path mpp_path = base_path / "libs" / "mutationpp" / "data";
+      if (std::filesystem::exists(mpp_path)) {
+        return mpp_path / "gsi" / (config_.mixture.name + "_cata.xml");
+      }
     }
 
-    // Fallback to current directory
+    // Fallback to current working directory (cross-platform)
     return std::filesystem::current_path() / "libs" / "mutationpp" / "data" / "gsi" /
            (config_.mixture.name + "_cata.xml");
   }
