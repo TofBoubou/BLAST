@@ -32,11 +32,9 @@ static double parse_double_c_locale(const std::string& s) {
 [[nodiscard]] ParsedInput
 read_gamma_input_file(const std::filesystem::path &input_filename,
                       const std::vector<std::string> &species_order) {
-  // Normalize cout formatting for the entire parsing routine (debug readability)
+  // Debug formatting removed to keep parser silent in production
   auto cout_flags_guard = std::cout.flags();
   auto cout_prec_guard = std::cout.precision();
-  std::cout.setf(static_cast<std::ios::fmtflags>(0), std::ios::floatfield);
-  std::cout.precision(6);
   if (!std::filesystem::exists(input_filename)) {
     throw std::runtime_error("Input file does not exist: " +
                              input_filename.string());
@@ -307,11 +305,9 @@ read_gamma_input_file(const std::filesystem::path &input_filename,
     if (std::regex_search(block, gm, gamma_re)) {
       std::string gammas_str =
           gm[1].str(); // Get content between <gammas>...</gammas>
-      std::cout << "DEBUG XML Parsing - Found gammas string: '" << gammas_str << "'" << std::endl;
       // Normalize separators: replace commas with semicolons for consistent
       // parsing
       std::replace(gammas_str.begin(), gammas_str.end(), ',', ';');
-      std::cout << "DEBUG XML Parsing - After comma replacement: '" << gammas_str << "'" << std::endl;
       std::stringstream ss(gammas_str);
       std::string token;
       // Split on semicolons to get individual species:value pairs
@@ -325,29 +321,21 @@ read_gamma_input_file(const std::filesystem::path &input_filename,
           continue; // Skip empty tokens
 
         // Look for colon separator between species name and value
-        std::cout << "DEBUG XML Parsing - Processing token: '" << token << "'" << std::endl;
+        // processing token
         auto pos = token.find(':');
         if (pos != std::string::npos) {
           std::string species = token.substr(0, pos);      // Before ':'
           std::string value_str = token.substr(pos + 1);   // After ':'
           double value = parse_double_c_locale(value_str);
-          // Force sane numeric formatting for debug (avoid global stream state side effects)
-          auto old_flags = std::cout.flags();
-          auto old_prec = std::cout.precision();
-          std::cout.setf(static_cast<std::ios::fmtflags>(0), std::ios::floatfield);
-          std::cout.precision(6);
-          std::cout << "DEBUG XML Parsing - Parsed species: '" << species << "', value: " << value << std::endl;
-          std::cout.flags(old_flags);
-          std::cout.precision(old_prec);
+          // parsed species/value
           // Create gammas map if it doesn't exist yet (lazy initialization)
           if (!r.gammas)
             r.gammas.emplace();
           // Store species -> gamma_value mapping
           (*r.gammas)[species] = value;
-          std::cout << "DEBUG XML Parsing - Stored in map: " << species << " -> " << value << std::endl;
-          std::cout << "DEBUG XML Parsing - Map size after storing: " << r.gammas->size() << std::endl;
+          // stored in map
         } else {
-          std::cout << "DEBUG XML Parsing - No colon found in token: '" << token << "'" << std::endl;
+          // ignore malformed token without colon
         }
         // Note: Silently ignore tokens without ':' (malformed entries)
       }
@@ -541,19 +529,7 @@ read_gamma_input_file(const std::filesystem::path &input_filename,
   }
 
   // Debug: summarize parsed gamma values before returning
-  std::cout << "DEBUG XML Parsing - FINAL SUMMARY of gammas:" << std::endl;
-  for (size_t i = 0; i < parsed.reactions.size(); ++i) {
-    const auto &rx = parsed.reactions[i];
-    std::cout << "  Reaction " << i << ": " << rx.formula << std::endl;
-    if (rx.gammas) {
-      std::cout << "    gammas size: " << rx.gammas->size() << std::endl;
-      for (const auto &kv : *rx.gammas) {
-        std::cout << "    " << kv.first << " -> " << kv.second << std::endl;
-      }
-    } else {
-      std::cout << "    gammas: <none>" << std::endl;
-    }
-  }
+  // Debug summary suppressed
 
   // Final validation: Enforce mutual exclusivity rules for catalysis models
   // These models have incompatible mathematical formulations and cannot coexist

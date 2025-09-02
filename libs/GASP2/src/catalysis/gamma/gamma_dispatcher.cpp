@@ -116,19 +116,21 @@ gamma_dispatcher(const SpeciesData &species, std::size_t ns, std::size_t nr,
     // Normalize numeric formatting for debug output
     auto old_flags = std::cout.flags();
     auto old_prec = std::cout.precision();
-    std::cout.setf(static_cast<std::ios::fmtflags>(0), std::ios::floatfield);
-    std::cout.precision(6);
-    std::cout << "DEBUG GAMMA_DISP: gamma_dispatcher called with ns=" << ns << ", nr=" << nr << std::endl;
-    
-    // Debug: Check what reactions we received
-    std::cout << "DEBUG GAMMA_DISP: Received " << reactions.size() << " reactions" << std::endl;
-    for (size_t i = 0; i < reactions.size(); ++i) {
-      const auto &reaction = reactions[i];
-      std::cout << "  Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
-      if (reaction.gammas) {
-        std::cout << "    gammas size: " << reaction.gammas->size() << std::endl;
-        for (const auto& [sp, val] : *reaction.gammas) {
-          std::cout << "    " << sp << " -> " << val << std::endl;
+    if (debug) {
+      std::cout.setf(static_cast<std::ios::fmtflags>(0), std::ios::floatfield);
+      std::cout.precision(6);
+      std::cout << "DEBUG GAMMA_DISP: gamma_dispatcher called with ns=" << ns << ", nr=" << nr << std::endl;
+
+      // Debug: Check what reactions we received
+      std::cout << "DEBUG GAMMA_DISP: Received " << reactions.size() << " reactions" << std::endl;
+      for (size_t i = 0; i < reactions.size(); ++i) {
+        const auto &reaction = reactions[i];
+        std::cout << "  Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
+        if (reaction.gammas) {
+          std::cout << "    gammas size: " << reaction.gammas->size() << std::endl;
+          for (const auto& [sp, val] : *reaction.gammas) {
+            std::cout << "    " << sp << " -> " << val << std::endl;
+          }
         }
       }
     }
@@ -155,9 +157,13 @@ gamma_dispatcher(const SpeciesData &species, std::size_t ns, std::size_t nr,
     const auto &nu_diff = stoic_matrices.nu_diff;
 
     // Compute gammas or handle special models
-    std::cout << "DEBUG GAMMA_DISP: all_super=" << all_super << ", all_rini=" << all_rini << std::endl;
+    if (debug) {
+      std::cout << "DEBUG GAMMA_DISP: all_super=" << all_super << ", all_rini=" << all_rini << std::endl;
+    }
     if (all_super || all_rini) {
-      std::cout << "DEBUG GAMMA_DISP: Taking all_super/all_rini early return path!" << std::endl;
+      if (debug) {
+        std::cout << "DEBUG GAMMA_DISP: Taking all_super/all_rini early return path!" << std::endl;
+      }
       auto reactions_copy = reactions;
       if (all_super) {
         for (auto &r : reactions_copy)

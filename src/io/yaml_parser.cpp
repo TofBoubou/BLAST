@@ -421,6 +421,9 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         std::cout << "[YAML] root.mutation defined? " << std::boolalpha << static_cast<bool>(mutation_node) << std::endl;
       }
 
+      // If no explicit mutation section is provided, proceed with defaults.
+      // Default behavior: use mixture name to locate GSI in MPP_DATA_DIRECTORY or libs/mutationpp/data/gsi.
+
       std::cout << "[YAML] Parsing mutation section..." << std::endl;
       try {
         auto mutation_result = parse_mutation_config(mutation_node);

@@ -163,48 +163,65 @@ Result<void> initialize(const std::vector<std::string> &species_order,
                                              ctx.index);
     
     // Debug: Print gammas from parsed reactions before pre-population
-    std::cout << "DEBUG BEFORE PRE-POPULATION: Checking gammas in ctx.reactions:" << std::endl;
-    for (size_t i = 0; i < ctx.reactions.size(); ++i) {
-      const auto &reaction = ctx.reactions[i];
-      std::cout << "  Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
-      if (reaction.gammas) {
-        std::cout << "    gammas size: " << reaction.gammas->size() << std::endl;
-        for (const auto& [sp, val] : *reaction.gammas) {
-          std::cout << "    " << sp << " -> " << val << std::endl;
+    if (ctx.debug) {
+      std::cout << "DEBUG BEFORE PRE-POPULATION: Checking gammas in ctx.reactions:" << std::endl;
+      for (size_t i = 0; i < ctx.reactions.size(); ++i) {
+        const auto &reaction = ctx.reactions[i];
+        std::cout << "  Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
+        if (reaction.gammas) {
+          std::cout << "    gammas size: " << reaction.gammas->size() << std::endl;
+          for (const auto& [sp, val] : *reaction.gammas) {
+            std::cout << "    " << sp << " -> " << val << std::endl;
+          }
         }
       }
+      std::cout << "DEBUG INIT MARKER: About to start pre-population" << std::endl;
+      std::cout << "DEBUG INIT: Starting pre-population with " << ctx.reactions.size() << " reactions" << std::endl;
     }
-    
-    std::cout << "DEBUG INIT MARKER: About to start pre-population" << std::endl;
     // Pre-populate computed_gamma values during initialization
     // This avoids the need to call verify_gamma_reactions during each flux computation
-    std::cout << "DEBUG INIT: Starting pre-population with " << ctx.reactions.size() << " reactions" << std::endl;
     for (size_t i = 0; i < ctx.reactions.size(); ++i) {
       auto &reaction = ctx.reactions[i];  // This is a reference to modify the actual element
-      std::cout << "DEBUG INIT: Reaction " << i << " type: " << static_cast<int>(reaction.type) << std::endl;
-      std::cout << "DEBUG INIT: Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
+      if (ctx.debug) {
+        std::cout << "DEBUG INIT: Reaction " << i << " type: " << static_cast<int>(reaction.type) << std::endl;
+        std::cout << "DEBUG INIT: Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
+      }
       
       if (reaction.type == CatalysisModel::GammaGiven) {
-        std::cout << "DEBUG INIT: Processing GammaGiven reaction " << i << std::endl;
+        if (ctx.debug) {
+          std::cout << "DEBUG INIT: Processing GammaGiven reaction " << i << std::endl;
+        }
         for (const auto &[sp_ref, _] : reaction.reactants) {
           std::string sp = sp_ref;  // Create a copy to avoid reference issues
-          std::cout << "DEBUG INIT: Checking species " << sp << std::endl;
+          if (ctx.debug) {
+            std::cout << "DEBUG INIT: Checking species " << sp << std::endl;
+          }
           if (reaction.gammas && reaction.gammas->find(sp) != reaction.gammas->end()) {
             double gamma_value = reaction.gammas->at(sp);
-            std::cout << "DEBUG INIT: About to assign gamma_value " << gamma_value << " to computed_gamma[" << sp << "]" << std::endl;
+            if (ctx.debug) {
+              std::cout << "DEBUG INIT: About to assign gamma_value " << gamma_value << " to computed_gamma[" << sp << "]" << std::endl;
+            }
             reaction.computed_gamma[sp] = gamma_value;
-            std::cout << "DEBUG INIT: gamma_value from gammas map = " << gamma_value << std::endl;
-            std::cout << "DEBUG INIT: Pre-populated computed_gamma[" << sp << "] = " << reaction.computed_gamma[sp] << std::endl;
+            if (ctx.debug) {
+              std::cout << "DEBUG INIT: gamma_value from gammas map = " << gamma_value << std::endl;
+              std::cout << "DEBUG INIT: Pre-populated computed_gamma[" << sp << "] = " << reaction.computed_gamma[sp] << std::endl;
+            }
             // Double check
-            std::cout << "DEBUG INIT: Verification - computed_gamma[" << sp << "] = " << reaction.computed_gamma.at(sp) << std::endl;
+            if (ctx.debug) {
+              std::cout << "DEBUG INIT: Verification - computed_gamma[" << sp << "] = " << reaction.computed_gamma.at(sp) << std::endl;
+            }
             // Triple check with direct access to ctx
-            std::cout << "DEBUG INIT: Direct check - ctx.reactions[" << i << "].computed_gamma[" << sp << "] = " << ctx.reactions[i].computed_gamma[sp] << std::endl;
+            if (ctx.debug) {
+              std::cout << "DEBUG INIT: Direct check - ctx.reactions[" << i << "].computed_gamma[" << sp << "] = " << ctx.reactions[i].computed_gamma[sp] << std::endl;
+            }
           } else {
-            std::cout << "DEBUG INIT: ERROR - No gamma found for species " << sp << std::endl;
-            if (!reaction.gammas) {
-              std::cout << "DEBUG INIT: reaction.gammas is null!" << std::endl;
-            } else {
-              std::cout << "DEBUG INIT: reaction.gammas size: " << reaction.gammas->size() << std::endl;
+            if (ctx.debug) {
+              std::cout << "DEBUG INIT: ERROR - No gamma found for species " << sp << std::endl;
+              if (!reaction.gammas) {
+                std::cout << "DEBUG INIT: reaction.gammas is null!" << std::endl;
+              } else {
+                std::cout << "DEBUG INIT: reaction.gammas size: " << reaction.gammas->size() << std::endl;
+              }
             }
           }
         }
@@ -212,12 +229,14 @@ Result<void> initialize(const std::vector<std::string> &species_order,
     }
     
     // Debug: Verify pre-population was successful
-    std::cout << "DEBUG AFTER PRE-POPULATION: Verifying computed_gamma values:" << std::endl;
-    for (size_t i = 0; i < ctx.reactions.size(); ++i) {
-      const auto &reaction = ctx.reactions[i];
-      std::cout << "  Reaction " << i << " computed_gamma size: " << reaction.computed_gamma.size() << std::endl;
-      for (const auto& [sp, val] : reaction.computed_gamma) {
-        std::cout << "    " << sp << " -> " << val << std::endl;
+    if (ctx.debug) {
+      std::cout << "DEBUG AFTER PRE-POPULATION: Verifying computed_gamma values:" << std::endl;
+      for (size_t i = 0; i < ctx.reactions.size(); ++i) {
+        const auto &reaction = ctx.reactions[i];
+        std::cout << "  Reaction " << i << " computed_gamma size: " << reaction.computed_gamma.size() << std::endl;
+        for (const auto& [sp, val] : reaction.computed_gamma) {
+          std::cout << "    " << sp << " -> " << val << std::endl;
+        }
       }
     }
 
@@ -227,12 +246,14 @@ Result<void> initialize(const std::vector<std::string> &species_order,
       print_matrix(ctx.nu.nu_diff, ctx.species_order, "nu_diff");
     }
     
-    std::cout << "DEBUG INIT PRE-CHECK: Right after debug matrices print" << std::endl;
-    std::cout << "DEBUG INIT END: ctx.reactions pointer = " << &ctx.reactions << std::endl;
-    std::cout << "DEBUG INIT END: ctx.reactions.size() = " << ctx.reactions.size() << std::endl;
-    std::cout << "DEBUG INIT END: Final verification of computed_gamma in ctx.reactions[0]: " << ctx.reactions[0].computed_gamma.size() << std::endl;
-    for (const auto& [sp, val] : ctx.reactions[0].computed_gamma) {
-      std::cout << "DEBUG INIT END: " << sp << " -> " << val << std::endl;
+    if (ctx.debug) {
+      std::cout << "DEBUG INIT PRE-CHECK: Right after debug matrices print" << std::endl;
+      std::cout << "DEBUG INIT END: ctx.reactions pointer = " << &ctx.reactions << std::endl;
+      std::cout << "DEBUG INIT END: ctx.reactions.size() = " << ctx.reactions.size() << std::endl;
+      std::cout << "DEBUG INIT END: Final verification of computed_gamma in ctx.reactions[0]: " << ctx.reactions[0].computed_gamma.size() << std::endl;
+      for (const auto& [sp, val] : ctx.reactions[0].computed_gamma) {
+        std::cout << "DEBUG INIT END: " << sp << " -> " << val << std::endl;
+      }
     }
 
     ctx.initialized = true;
@@ -260,9 +281,11 @@ Result<void> initialize(const std::vector<std::string> &species_order,
 ///          initialized.
 Result<CatalysisFluxes> compute_fluxes(double T_wall,
                                        std::span<const double> rho_wall) {
-  std::cout << "DEBUG COMPUTE_FLUXES: Function called with T_wall=" << T_wall << std::endl;
-  std::cout << "DEBUG COMPUTE_FLUXES: ctx.reactions pointer = " << &ctx.reactions << std::endl;
-  std::cout << "DEBUG COMPUTE_FLUXES: ctx.reactions.size() = " << ctx.reactions.size() << std::endl;
+  if (ctx.debug) {
+    std::cout << "DEBUG COMPUTE_FLUXES: Function called with T_wall=" << T_wall << std::endl;
+    std::cout << "DEBUG COMPUTE_FLUXES: ctx.reactions pointer = " << &ctx.reactions << std::endl;
+    std::cout << "DEBUG COMPUTE_FLUXES: ctx.reactions.size() = " << ctx.reactions.size() << std::endl;
+  }
   if (!ctx.initialized) {
     return std::unexpected(
         Error{ErrorCode::RuntimeError, "initialize_catalysis not called"});
@@ -275,31 +298,32 @@ Result<CatalysisFluxes> compute_fluxes(double T_wall,
     // Ensure debug numbers print with decimals (reset any external stream formatting)
     auto old_flags = std::cout.flags();
     auto old_prec = std::cout.precision();
-    std::cout.setf(static_cast<std::ios::fmtflags>(0), std::ios::floatfield);
-    std::cout.precision(6);
-    std::cout << "DEBUG COMPUTE_FLUXES: About to call gamma_dispatcher" << std::endl;
-    // Debug: Check computed_gamma values before dispatcher call
-    std::cout << "DEBUG COMPUTE_FLUXES: Checking ctx.reactions computed_gamma values:" << std::endl;
-    for (size_t i = 0; i < ctx.reactions.size(); ++i) {
-      std::cout << "  Reaction " << i << " computed_gamma size: " << ctx.reactions[i].computed_gamma.size() << std::endl;
-      for (const auto& [sp, val] : ctx.reactions[i].computed_gamma) {
-        std::cout << "    " << sp << " -> " << val << std::endl;
-      }
-    }
-    
-    // Debug: Force re-check just before dispatcher call
-    std::cout << "DEBUG COMPUTE_FLUXES: Final check just before dispatcher:" << std::endl;
-    for (size_t i = 0; i < ctx.reactions.size(); ++i) {
-      const auto &reaction = ctx.reactions[i];
-      std::cout << "  Reaction " << i << " computed_gamma size: " << reaction.computed_gamma.size() << std::endl;
-      for (const auto& [sp, val] : reaction.computed_gamma) {
-        std::cout << "    computed_gamma[" << sp << "] = " << val << std::endl;
-      }
-      std::cout << "  Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
-      if (reaction.gammas) {
-        std::cout << "    gammas size: " << reaction.gammas->size() << std::endl;
-        for (const auto& [sp, val] : *reaction.gammas) {
+    if (ctx.debug) {
+      std::cout.setf(static_cast<std::ios::fmtflags>(0), std::ios::floatfield);
+      std::cout.precision(6);
+      std::cout << "DEBUG COMPUTE_FLUXES: About to call gamma_dispatcher" << std::endl;
+      // Debug: Check computed_gamma values before dispatcher call
+      std::cout << "DEBUG COMPUTE_FLUXES: Checking ctx.reactions computed_gamma values:" << std::endl;
+      for (size_t i = 0; i < ctx.reactions.size(); ++i) {
+        std::cout << "  Reaction " << i << " computed_gamma size: " << ctx.reactions[i].computed_gamma.size() << std::endl;
+        for (const auto& [sp, val] : ctx.reactions[i].computed_gamma) {
           std::cout << "    " << sp << " -> " << val << std::endl;
+        }
+      }
+      // Debug: Force re-check just before dispatcher call
+      std::cout << "DEBUG COMPUTE_FLUXES: Final check just before dispatcher:" << std::endl;
+      for (size_t i = 0; i < ctx.reactions.size(); ++i) {
+        const auto &reaction = ctx.reactions[i];
+        std::cout << "  Reaction " << i << " computed_gamma size: " << reaction.computed_gamma.size() << std::endl;
+        for (const auto& [sp, val] : reaction.computed_gamma) {
+          std::cout << "    computed_gamma[" << sp << "] = " << val << std::endl;
+        }
+        std::cout << "  Reaction " << i << " gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
+        if (reaction.gammas) {
+          std::cout << "    gammas size: " << reaction.gammas->size() << std::endl;
+          for (const auto& [sp, val] : *reaction.gammas) {
+            std::cout << "    " << sp << " -> " << val << std::endl;
+          }
         }
       }
     }

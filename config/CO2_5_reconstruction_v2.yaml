@@ -21,7 +21,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -33,7 +33,7 @@ base:
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
     catalytic_wall: true
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
-    catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
+    catalysis_provider: "gasp2"  # "mutation++" or "gasp2"
 
   numerical:
     n_eta: 200
@@ -81,7 +81,7 @@ base:
 # =============================================================================
 
 edge_reconstruction:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -91,26 +91,26 @@ edge_reconstruction:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 25
-    eta_max: 7.0
-    convergence_tolerance: 1.0e-6  # Plus permissif
-    max_iterations: 10000  # Moins d'itérations max
+    n_eta: 200
+    eta_max: 6.0
+    convergence_tolerance: 1.0e-6  
+    max_iterations: 100000  
   
   mixture:
     name: CO2_5
     thermodynamic_database: RRHO  # "RRHO", "NASA9"
-    viscosity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "sutherland"
-    thermal_conductivity_algorithm: chapman_enskog_ldlt  # "chapman_enskog_ldlt", "eucken"
+    viscosity_algorithm: chapman_enskog_ldlt
+    thermal_conductivity_algorithm: chapman_enskog_ldlt 
   
   output:
     output_directory: test_outputs_edge_reconstruction
   
   # Edge reconstruction specific parameters
-  target_heat_flux: 400000
+  target_heat_flux: 900000
   
   boundary_conditions:
     pressure: 7000
-    wall_temperature: 2000
+    wall_temperature: 3000
     catalyticity: 0.1
     radius: 1
   
@@ -126,7 +126,7 @@ edge_reconstruction:
   
   solver:
     initial_temperature_guess: 5600
-    temperature_min: 3312
+    temperature_min: 5000
     temperature_max: 6000
     tolerance: 1e-3
     max_iterations: 50
