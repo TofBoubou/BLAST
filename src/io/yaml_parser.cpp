@@ -946,10 +946,23 @@ auto YamlParser::parse_abacus_config(const YAML::Node& node) const
         if (node["gamma_sweep"]) {
           auto gs_node = node["gamma_sweep"];
           if (gs_node["wall_temperature"]) {
-            const double Tw = gs_node["wall_temperature"].as<double>();
-            config.temperature_min = Tw;
-            config.temperature_max = Tw;
-            config.temperature_points = 1; // single temperature
+            // Accept scalar or sequence of temperatures
+            if (gs_node["wall_temperature"].IsSequence()) {
+              auto temps = gs_node["wall_temperature"].as<std::vector<double>>();
+              if (temps.empty()) {
+                return std::unexpected(core::ConfigurationError("gamma_sweep.wall_temperature list cannot be empty"));
+              }
+              config.temperatures_override = temps;
+              config.temperature_points = static_cast<int>(temps.size());
+              config.temperature_min = temps.front();
+              config.temperature_max = temps.back();
+            } else {
+              const double Tw = gs_node["wall_temperature"].as<double>();
+              config.temperatures_override = {Tw};
+              config.temperature_min = Tw;
+              config.temperature_max = Tw;
+              config.temperature_points = 1; // single temperature
+            }
           } else {
             return std::unexpected(core::ConfigurationError("gamma_sweep.wall_temperature is required for gamma_sweep_at_Tw mode"));
           }

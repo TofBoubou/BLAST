@@ -129,6 +129,8 @@ struct AbacusConfig {
   int temperature_points = constants::grid::default_temperature_points;
   double radius = 1.0;     // [m] Radius for abacus
   double velocity = 0.0;   // [m/s] Velocity for abacus
+  // Optional explicit temperatures override (used for gamma_sweep with multiple Tw)
+  std::vector<double> temperatures_override;
 };
 
 struct ContinuationConfig {

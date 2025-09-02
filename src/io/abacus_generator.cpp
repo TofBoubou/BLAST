@@ -38,20 +38,26 @@ auto AbacusGenerator::generate() -> Result {
   }
 
   const auto& abacus_config = config_.abacus;
-  const int n_temps = abacus_config.temperature_points;
+  const int n_temps = abacus_config.temperatures_override.empty()
+                          ? abacus_config.temperature_points
+                          : static_cast<int>(abacus_config.temperatures_override.size());
   const int n_gammas = abacus_config.catalyticity_values.size();
 
   
 
   // Setup temperature vector
-  result.temperatures.resize(n_temps);
-  if (n_temps <= 1) {
-    // Single-temperature mode: fixed wall temperature
-    result.temperatures[0] = abacus_config.temperature_min; // min == max by construction in YAML parser
+  if (!abacus_config.temperatures_override.empty()) {
+    result.temperatures = abacus_config.temperatures_override;
   } else {
-    const double dT = (abacus_config.temperature_max - abacus_config.temperature_min) / (n_temps - 1);
-    for (int i = 0; i < n_temps; ++i) {
-      result.temperatures[i] = abacus_config.temperature_min + i * dT;
+    result.temperatures.resize(n_temps);
+    if (n_temps <= 1) {
+      // Single-temperature mode: fixed wall temperature
+      result.temperatures[0] = abacus_config.temperature_min; // min == max by construction in YAML parser
+    } else {
+      const double dT = (abacus_config.temperature_max - abacus_config.temperature_min) / (n_temps - 1);
+      for (int i = 0; i < n_temps; ++i) {
+        result.temperatures[i] = abacus_config.temperature_min + i * dT;
+      }
     }
   }
 
