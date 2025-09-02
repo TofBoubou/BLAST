@@ -46,7 +46,8 @@ private:
   [[nodiscard]] auto create_equilibrium_config(const io::Configuration& config) const -> io::Configuration;
   
   // Polynomial predictor methods
-  [[nodiscard]] auto predict_solution(double target_lambda) const -> equations::SolutionState;
+  [[nodiscard]] auto predict_solution(double target_lambda) const
+      -> std::expected<equations::SolutionState, SolverError>;
   void add_to_history(const equations::SolutionState& solution, double lambda) const;
   void reset_predictor_state() const;
 };

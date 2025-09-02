@@ -166,6 +166,7 @@ public:
   // Continuation mode control (RAII-friendly)
   auto enter_continuation() noexcept -> void { in_continuation_ = true; }
   auto exit_continuation() noexcept -> void { in_continuation_ = false; }
+  [[nodiscard]] auto is_in_continuation() const noexcept -> bool { return in_continuation_; }
 
 private:
   // =============================================================================

@@ -71,13 +71,7 @@ public:
                                                     const equations::SolutionState& new_solution,
                                                     double base_factor) const -> equations::SolutionState;
 
-    /**
-     * @brief Set continuation mode
-     * @param in_continuation True if in continuation mode
-     */
-    auto set_continuation_mode(bool in_continuation) noexcept -> void {
-        in_continuation_ = in_continuation;
-    }
+    // Continuation mode is queried directly from BoundaryLayerSolver
 
     /**
      * @brief Initialize relaxation controller for station type
@@ -149,7 +143,7 @@ private:
     const io::Configuration& config_;
     std::unique_ptr<AdaptiveRelaxationController> relaxation_controller_;
     RadiativeEquilibriumSolver* radiative_solver_{nullptr};
-    bool in_continuation_{false};
+    // No local continuation state; rely on solver_.is_in_continuation()
 };
 
 } // namespace blast::boundary_layer::solver

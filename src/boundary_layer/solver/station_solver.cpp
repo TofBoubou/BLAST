@@ -39,7 +39,6 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
     
     // Initialize relaxation controller for this station type
     convergence_manager.initialize_relaxation_for_station(station);
-    convergence_manager.set_continuation_mode(in_continuation_);
 
     // Attempt direct solution
     auto convergence_result = convergence_manager.iterate_station_adaptive(station, xi, bc, solution);
@@ -47,7 +46,7 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
     if (!convergence_result) {
         // Try continuation if available and policy allows (no residual known here)
         if (auto* continuation = solver_.get_continuation(); 
-            continuation && !in_continuation_ && should_attempt_continuation(std::nullopt)) {
+            continuation && !solver_.is_in_continuation() && should_attempt_continuation(std::nullopt)) {
             
             auto stable_guess = compute_stable_guess(station, xi);
             if (stable_guess) {
@@ -68,7 +67,7 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
 
     if (!conv_info.converged) {
         // Handle non-convergence based on context
-        if (in_continuation_) {
+        if (solver_.is_in_continuation()) {
             // Return specific error for continuation to handle
             if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
                 return std::unexpected(ConvergenceError(
@@ -82,7 +81,7 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
 
         // Try continuation for non-continuation failures if policy allows for this residual
         if (auto* continuation = solver_.get_continuation(); 
-            continuation && !in_continuation_ && should_attempt_continuation(conv_info.max_residual())) {
+            continuation && !solver_.is_in_continuation() && should_attempt_continuation(conv_info.max_residual())) {
             
             auto stable_guess = compute_stable_guess(station, xi);
             if (stable_guess) {

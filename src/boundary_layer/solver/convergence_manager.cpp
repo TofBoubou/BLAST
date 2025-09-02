@@ -44,7 +44,7 @@ auto ConvergenceManager::iterate_station_adaptive(int station, double xi,
         // Handle NaN detection with global policy
         const bool has_nan = std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c);
         if (has_nan) {
-            if (in_continuation_) {
+            if (solver_.is_in_continuation()) {
                 // Let continuation logic handle step reduction
                 conv_info.converged = false;
                 conv_info.iterations = iter + 1;

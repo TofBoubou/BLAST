@@ -4,6 +4,8 @@
 
 namespace blast::boundary_layer::solver {
 
+// RAII guard: single source of truth for continuation state
+// Enter continuation on construction and guarantee exit on destruction.
 class ContinuationScope {
 public:
   explicit ContinuationScope(BoundaryLayerSolver& solver) noexcept : solver_(solver), active_(true) {
@@ -18,7 +20,7 @@ public:
   }
   ContinuationScope& operator=(ContinuationScope&& other) = delete;
 
-  ~ContinuationScope() {
+  ~ContinuationScope() noexcept {
     if (active_) solver_.exit_continuation();
   }
 
@@ -28,4 +30,3 @@ private:
 };
 
 } // namespace blast::boundary_layer::solver
-

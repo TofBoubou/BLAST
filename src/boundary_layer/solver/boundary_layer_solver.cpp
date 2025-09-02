@@ -247,9 +247,6 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
 auto BoundaryLayerSolver::solve_station(int station, double xi, const equations::SolutionState& initial_guess)
     -> std::expected<equations::SolutionState, SolverError> {
   
-  // Set continuation mode for station solver
-  station_solver_->set_continuation_mode(in_continuation_);
-  
   // Delegate to specialized StationSolver
   return station_solver_->solve_station(station, xi, initial_guess);
 }

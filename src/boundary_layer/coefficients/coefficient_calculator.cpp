@@ -113,7 +113,9 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
   
-  // Local work buffers
+  // Local work buffers (pre-allocated, reused inside loops)
+  std::vector<double> c_local(n_species);
+  std::vector<double> dc_deta_local(n_species);
 
   ThermodynamicCoefficients thermo;
   thermo.rho.reserve(n_eta);
@@ -126,8 +128,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
       return std::unexpected(CoefficientError(std::format("Invalid temperature at eta={}: T={}", i, inputs.T[i])));
     }
 
-    // Extract species concentrations using local workspace
-    std::vector<double> c_local(n_species);
+    // Extract species concentrations into pre-allocated workspace
     double sum_c = 0.0;
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
@@ -157,8 +158,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
   // Compute molecular weight derivative
   thermo.d_MW_deta.resize(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
-    // Local workspace for derivative calculation
-    std::vector<double> dc_deta_local(n_species);
+    // Fill derivative workspace
     for (std::size_t j = 0; j < n_species; ++j) {
       dc_deta_local[j] = inputs.dc_deta(j, i);
       if (!std::isfinite(dc_deta_local[j])) {
@@ -210,6 +210,8 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
   TransportCoefficients transport;
   transport.l0.reserve(n_eta);
   transport.l3.reserve(n_eta);
+  // Reusable local composition buffer
+  std::vector<double> c_local(n_species);
 
   // Precompute edge composition and properties once (used for normalization)
   std::vector<double> c_local_e(n_species);
@@ -229,8 +231,7 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
   }
 
   for (std::size_t i = 0; i < n_eta; ++i) {
-    // Extract local composition using local workspace
-    std::vector<double> c_local(n_species);
+    // Extract local composition into pre-allocated workspace
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
     }
@@ -567,10 +568,11 @@ auto CoefficientCalculator::calculate_thermal_diffusion(const CoefficientInputs&
 
   // Use edge pressure consistently
   const double P_edge = bc.P_e();
+  // Reusable local composition buffer
+  std::vector<double> c_local(n_species);
 
   // Calculate thermal diffusion ratios
   for (std::size_t i = 0; i < n_eta; ++i) {
-    std::vector<double> c_local(n_species);
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
     }
@@ -643,8 +645,8 @@ auto CoefficientCalculator::calculate_species_enthalpies(const CoefficientInputs
   // Compute derivatives
   core::Matrix<double> dh_species_deta(n_species, n_eta);
 
+  std::vector<double> h_row(n_eta);
   for (std::size_t j = 0; j < n_species; ++j) {
-    std::vector<double> h_row(n_eta);
     for (std::size_t i = 0; i < n_eta; ++i) {
       h_row[i] = h_species(j, i);
     }
@@ -669,8 +671,9 @@ auto CoefficientCalculator::calculate_wall_properties(const CoefficientInputs& i
     -> std::expected<WallProperties, CoefficientError> {
 
   const auto n_species = inputs.c.rows();
-  // Extract wall composition using local workspace
-  std::vector<double> c_wall(n_species);
+  // Extract wall composition using thread-local reusable buffer
+  static thread_local std::vector<double> c_wall;
+  c_wall.resize(n_species);
   for (std::size_t j = 0; j < n_species; ++j) {
     c_wall[j] = inputs.c(j, 0);
   }
@@ -886,7 +889,8 @@ auto CoefficientCalculator::calculate_finite_thickness_coefficients(const Coeffi
 
   // Get edge viscosity using local workspace
   const auto n_species = inputs.c.rows();
-  std::vector<double> c_edge(n_species);
+  static thread_local std::vector<double> c_edge;
+  c_edge.resize(n_species);
   for (std::size_t j = 0; j < n_species; ++j) {
     c_edge[j] = inputs.c(j, n_eta - 1);
   }
@@ -900,7 +904,8 @@ auto CoefficientCalculator::calculate_finite_thickness_coefficients(const Coeffi
   // Compute finite thickness coefficient
   const double coeff_finite_thickness = v_e * d2_ue_dxdy / (d_ue_dx * d_ue_dx);
 
-  std::vector<double> integrand(n_eta);
+  static thread_local std::vector<double> integrand;
+  integrand.resize(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
     integrand[i] = 1.0 / thermo.rho[i];
   }

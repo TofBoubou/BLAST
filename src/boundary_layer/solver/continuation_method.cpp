@@ -51,13 +51,12 @@ auto ContinuationMethod::solve_with_continuation(
     // Use linear predictor if enabled and we have enough history
     equations::SolutionState predicted_solution = current_solution;
     if (predictor_enabled_ && history_.size() >= 2) {
-      try {
-        predicted_solution = predict_solution(lambda_try);
-        
-        // Using linear prediction
-      } catch (const std::exception& e) {
+      auto pred_res = predict_solution(lambda_try);
+      if (pred_res) {
+        predicted_solution = std::move(pred_res.value());
+      } else {
         if (verbose) {
-          std::cout << "\n[PREDICTOR] Prediction failed: " << e.what() 
+          std::cout << "\n[PREDICTOR] Prediction failed: " << pred_res.error().message()
                     << ", falling back to previous solution" << std::endl;
         }
         predicted_solution = current_solution;
@@ -199,9 +198,10 @@ auto ContinuationMethod::create_equilibrium_config(const io::Configuration& conf
   return equilibrium_config;
 }
 
-auto ContinuationMethod::predict_solution(double target_lambda) const -> equations::SolutionState {
+auto ContinuationMethod::predict_solution(double target_lambda) const
+    -> std::expected<equations::SolutionState, SolverError> {
   if (history_.size() < 2) {
-    throw std::runtime_error("Not enough history points for prediction");
+    return std::unexpected(NumericError("Not enough history points for prediction"));
   }
   
   // Get the last 2 points from history for linear extrapolation

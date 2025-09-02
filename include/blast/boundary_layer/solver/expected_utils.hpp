@@ -17,22 +17,31 @@ namespace blast::boundary_layer::solver {
 namespace expected_utils {
 
 /**
- * @brief BLAST_TRY macro for simplified error propagation
- * 
- * Usage: auto value = BLAST_TRY(some_expected_result);
- * Replaces:
- *   auto result = some_expected_result;
- *   if (!result) return std::unexpected(result.error());
- *   auto value = result.value();
+ * @brief Assign-or-return helper (portable)
+ *
+ * Usage:
+ *   BLAST_TRY_ASSIGN(value, some_expected_result);
+ * Expands to:
+ *   auto __tmp = some_expected_result;
+ *   if (!__tmp) return std::unexpected(__tmp.error());
+ *   value = std::move(__tmp.value());
  */
-#define BLAST_TRY(expr) \
-    ({ \
-        auto __tmp = (expr); \
-        if (!__tmp) return std::unexpected(__tmp.error()); \
-        if constexpr (!std::is_void_v<decltype(__tmp.value())>) { \
-            std::move(__tmp.value()); \
-        } \
-    })
+#define BLAST_TRY_ASSIGN(lhs, expr)                                                           \
+    do {                                                                                      \
+        auto blast_try_tmp = (expr);                                                          \
+        if (!blast_try_tmp)                                                                   \
+            return std::unexpected(blast_try_tmp.error());                                    \
+        lhs = std::move(blast_try_tmp.value());                                               \
+    } while (0)
+
+/**
+ * @brief Deprecated alias for non-portable BLAST_TRY.
+ *
+ * The old GNU statement-expression version allowed: auto v = BLAST_TRY(expr);
+ * That construct is not portable (fails on MSVC). Use BLAST_TRY_ASSIGN instead:
+ *   Type v; BLAST_TRY_ASSIGN(v, expr);
+ */
+#define BLAST_TRY(...) static_assert(false, "Use BLAST_TRY_ASSIGN(var, expr) instead of BLAST_TRY(expr)")
 
 /**
  * @brief BLAST_TRY_VOID macro for void expected results
@@ -42,26 +51,48 @@ namespace expected_utils {
  *   auto result = some_void_expected_result;
  *   if (!result) return std::unexpected(result.error());
  */
-#define BLAST_TRY_VOID(expr) \
-    do { \
-        auto __tmp = (expr); \
-        if (!__tmp) return std::unexpected(__tmp.error()); \
-    } while(0)
+#define BLAST_TRY_VOID(expr)                                                                  \
+    do {                                                                                      \
+        auto blast_try_tmp_void = (expr);                                                     \
+        if (!blast_try_tmp_void)                                                              \
+            return std::unexpected(blast_try_tmp_void.error());                               \
+    } while (0)
 
 /**
  * @brief BLAST_TRY_WITH_CONTEXT macro for error propagation with additional context
  * 
  * Usage: auto value = BLAST_TRY_WITH_CONTEXT(some_expected_result, "Failed to compute X");
  */
-#define BLAST_TRY_WITH_CONTEXT(expr, context) \
-    ({ \
-        auto __tmp = (expr); \
-        if (!__tmp) { \
-            return std::unexpected(NumericError( \
-                std::format("{}: {}", (context), __tmp.error().message()))); \
-        } \
-        std::move(__tmp.value()); \
-    })
+/**
+ * @brief Assign-or-return helper with added error context (portable)
+ *
+ * Usage:
+ *   BLAST_TRY_ASSIGN_CTX(value, expr, "message");
+ */
+#define BLAST_TRY_ASSIGN_CTX(lhs, expr, context)                                              \
+    do {                                                                                      \
+        auto blast_try_tmp_ctx = (expr);                                                      \
+        if (!blast_try_tmp_ctx) {                                                             \
+            return std::unexpected(NumericError(                                              \
+                std::format("{}: {}", (context), blast_try_tmp_ctx.error().message())));     \
+        }                                                                                     \
+        lhs = std::move(blast_try_tmp_ctx.value());                                           \
+    } while (0)
+
+/**
+ * @brief Void-or-return helper with added error context (portable)
+ */
+#define BLAST_TRY_VOID_CTX(expr, context)                                                     \
+    do {                                                                                      \
+        auto blast_try_tmp_vctx = (expr);                                                     \
+        if (!blast_try_tmp_vctx) {                                                            \
+            return std::unexpected(NumericError(                                              \
+                std::format("{}: {}", (context), blast_try_tmp_vctx.error().message())));    \
+        }                                                                                     \
+    } while (0)
+
+// Deprecated alias (non-portable before). Force a clear error if used.
+#define BLAST_TRY_WITH_CONTEXT(...) static_assert(false, "Use BLAST_TRY_ASSIGN_CTX(lhs, expr, ctx) or BLAST_TRY_VOID_CTX(expr, ctx)")
 
 /**
  * @brief Chain multiple expected operations with automatic error propagation

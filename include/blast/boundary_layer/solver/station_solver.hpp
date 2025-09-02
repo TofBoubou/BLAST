@@ -67,13 +67,7 @@ public:
         stable_config_ = stable_config;
     }
 
-    /**
-     * @brief Set continuation flag
-     * @param in_continuation True if currently in continuation mode
-     */
-    auto set_continuation_mode(bool in_continuation) noexcept -> void {
-        in_continuation_ = in_continuation;
-    }
+    // Continuation mode now read directly from BoundaryLayerSolver (single source of truth)
 
 private:
     /**
@@ -115,7 +109,7 @@ private:
     const thermophysics::MixtureInterface& mixture_;
     const io::Configuration& config_;
     StableGuessConfig stable_config_{};
-    bool in_continuation_{false};
+    // No local continuation state; rely on solver_.is_in_continuation()
 };
 
 } // namespace blast::boundary_layer::solver

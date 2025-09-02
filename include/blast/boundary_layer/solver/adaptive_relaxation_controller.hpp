@@ -92,7 +92,7 @@ public:
   [[nodiscard]] auto config() const noexcept -> const Config& { return config_; }
 
   // Reset for a new station
-  auto reset_for_new_station() -> void {
+  auto reset_for_new_station() noexcept -> void {
     current_factor_ = config_.initial_factor;
     previous_residual_ = 1e10;
     consecutive_improvements_ = 0;
