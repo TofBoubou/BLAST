@@ -12,20 +12,8 @@ namespace blast::boundary_layer::coefficients {
 
 using namespace blast::boundary_layer;
 
-void CoefficientCalculator::ensure_workspace_size(std::size_t n_species, std::size_t n_eta) const {
-  if (workspace_species_.size() < n_species) {
-    workspace_species_.resize(n_species);
-  }
-  if (workspace_species2_.size() < n_species) {
-    workspace_species2_.resize(n_species);
-  }
-  if (workspace_derivatives_.size() < n_eta) {
-    workspace_derivatives_.resize(n_eta);
-  }
-  if (workspace_integrand_.size() < n_eta) {
-    workspace_integrand_.resize(n_eta);
-  }
-}
+// Removed shared mutable workspaces to ensure thread-safety. Each routine now
+// uses local work buffers allocated per call.
 
 auto CoefficientCalculator::calculate(const CoefficientInputs& inputs, const conditions::BoundaryConditions& bc,
                                       const XiDerivatives& xi_der) const
@@ -125,8 +113,7 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
   
-  // Ensure workspace is sized correctly
-  ensure_workspace_size(n_species, n_eta);
+  // Local work buffers
 
   ThermodynamicCoefficients thermo;
   thermo.rho.reserve(n_eta);
@@ -139,8 +126,8 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
       return std::unexpected(CoefficientError(std::format("Invalid temperature at eta={}: T={}", i, inputs.T[i])));
     }
 
-    // Extract species concentrations using pre-allocated workspace
-    auto& c_local = workspace_species_;  // Reuse workspace
+    // Extract species concentrations using local workspace
+    std::vector<double> c_local(n_species);
     double sum_c = 0.0;
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
@@ -170,8 +157,8 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
   // Compute molecular weight derivative
   thermo.d_MW_deta.resize(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
-    // Reuse workspace for derivative calculation
-    auto& dc_deta_local = workspace_species2_;
+    // Local workspace for derivative calculation
+    std::vector<double> dc_deta_local(n_species);
     for (std::size_t j = 0; j < n_species; ++j) {
       dc_deta_local[j] = inputs.dc_deta(j, i);
       if (!std::isfinite(dc_deta_local[j])) {
@@ -198,8 +185,8 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
   }
   thermo.d_rho_deta = d_rho_deta_result.value();
 
-  // Compute wall enthalpy using workspace
-  auto& c_wall = workspace_species_;
+  // Compute wall enthalpy using local workspace
+  std::vector<double> c_wall(n_species);
   for (std::size_t j = 0; j < n_species; ++j) {
     c_wall[j] = inputs.c(j, 0);
   }
@@ -220,15 +207,12 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
-  // Ensure workspaces sized for species and eta usage in this routine
-  ensure_workspace_size(n_species, n_eta);
-
   TransportCoefficients transport;
   transport.l0.reserve(n_eta);
   transport.l3.reserve(n_eta);
 
   // Precompute edge composition and properties once (used for normalization)
-  auto& c_local_e = workspace_species2_;
+  std::vector<double> c_local_e(n_species);
   for (std::size_t j = 0; j < n_species; ++j) {
     c_local_e[j] = inputs.c(j, n_eta - 1);
   }
@@ -245,8 +229,8 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
   }
 
   for (std::size_t i = 0; i < n_eta; ++i) {
-    // Extract local composition using workspaces
-    auto& c_local = workspace_species_;
+    // Extract local composition using local workspace
+    std::vector<double> c_local(n_species);
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
     }
@@ -437,17 +421,9 @@ auto CoefficientCalculator::extract_local_composition(std::size_t station_index,
     -> std::expected<std::pair<std::vector<double>, std::vector<double>>, CoefficientError> {
 
   const auto n_species = c.rows();
-  // Use static thread_local storage to avoid repeated allocations
-  thread_local std::vector<double> c_local_tl;
-  thread_local std::vector<double> rho_species_tl;
-  
-  if (c_local_tl.size() < n_species) {
-    c_local_tl.resize(n_species);
-    rho_species_tl.resize(n_species);
-  }
-  
-  auto& c_local = c_local_tl;
-  auto& rho_species = rho_species_tl;
+  // Local storage for composition and partial densities (thread-safe)
+  std::vector<double> c_local(n_species);
+  std::vector<double> rho_species(n_species);
 
   double sum_c = 0.0;
   for (std::size_t j = 0; j < n_species; ++j) {
@@ -465,11 +441,7 @@ auto CoefficientCalculator::extract_local_composition(std::size_t station_index,
     return std::unexpected(CoefficientError("Zero total composition encountered in extract_local_composition"));
   }
 
-  // Return copies to avoid issues with thread_local storage
-  return std::make_pair(
-    std::vector<double>(c_local.begin(), c_local.begin() + n_species),
-    std::vector<double>(rho_species.begin(), rho_species.begin() + n_species)
-  );
+  return std::make_pair(std::move(c_local), std::move(rho_species));
 }
 
 auto CoefficientCalculator::transform_jacobian(
@@ -569,12 +541,8 @@ auto CoefficientCalculator::compute_temperature_derivatives(const std::vector<do
 
   const auto& wi_pert = wi_pert_result.value();
   
-  // Use thread_local storage to avoid allocation
-  thread_local std::vector<double> dwi_dT_tl;
-  if (dwi_dT_tl.size() < wi_base.size()) {
-    dwi_dT_tl.resize(wi_base.size());
-  }
-  auto& dwi_dT = dwi_dT_tl;
+  // Local buffer for derivatives
+  std::vector<double> dwi_dT(wi_base.size());
 
   for (std::size_t j = 0; j < wi_base.size(); ++j) {
     dwi_dT[j] = (wi_pert[j] - wi_base[j]) / dT;
@@ -583,8 +551,7 @@ auto CoefficientCalculator::compute_temperature_derivatives(const std::vector<do
     }
   }
 
-  // Return copy to avoid reference to thread_local storage
-  return std::vector<double>(dwi_dT.begin(), dwi_dT.begin() + wi_base.size());
+  return dwi_dT;
 }
 
 auto CoefficientCalculator::calculate_thermal_diffusion(const CoefficientInputs& inputs,
@@ -594,8 +561,6 @@ auto CoefficientCalculator::calculate_thermal_diffusion(const CoefficientInputs&
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
-  // Ensure workspaces sized for use in this routine
-  ensure_workspace_size(n_species, n_eta);
 
   ThermalDiffusionCoefficients tdr;
   tdr.tdr = core::Matrix<double>(n_species, n_eta);
@@ -605,7 +570,7 @@ auto CoefficientCalculator::calculate_thermal_diffusion(const CoefficientInputs&
 
   // Calculate thermal diffusion ratios
   for (std::size_t i = 0; i < n_eta; ++i) {
-    auto& c_local = workspace_species_;
+    std::vector<double> c_local(n_species);
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
     }
@@ -655,8 +620,6 @@ auto CoefficientCalculator::calculate_species_enthalpies(const CoefficientInputs
 
   const auto n_eta = inputs.T.size();
   const auto n_species = mixture_.n_species();
-  // Ensure workspaces sized for derivative row buffer
-  ensure_workspace_size(n_species, n_eta);
 
   core::Matrix<double> h_species(n_species, n_eta);
 
@@ -681,7 +644,7 @@ auto CoefficientCalculator::calculate_species_enthalpies(const CoefficientInputs
   core::Matrix<double> dh_species_deta(n_species, n_eta);
 
   for (std::size_t j = 0; j < n_species; ++j) {
-    auto& h_row = workspace_derivatives_;
+    std::vector<double> h_row(n_eta);
     for (std::size_t i = 0; i < n_eta; ++i) {
       h_row[i] = h_species(j, i);
     }
@@ -706,11 +669,8 @@ auto CoefficientCalculator::calculate_wall_properties(const CoefficientInputs& i
     -> std::expected<WallProperties, CoefficientError> {
 
   const auto n_species = inputs.c.rows();
-  // Ensure workspaces sized for wall composition extraction
-  ensure_workspace_size(n_species, inputs.T.size());
-
-  // Extract wall composition using workspace
-  auto& c_wall = workspace_species_;
+  // Extract wall composition using local workspace
+  std::vector<double> c_wall(n_species);
   for (std::size_t j = 0; j < n_species; ++j) {
     c_wall[j] = inputs.c(j, 0);
   }
@@ -757,12 +717,8 @@ template <std::ranges::sized_range Range>
 auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::vector<double>, CoefficientError> {
   const auto n = std::ranges::size(values);
   
-  // Use thread_local storage to avoid repeated allocations
-  thread_local std::vector<double> derivatives_tl;
-  if (derivatives_tl.size() < n) {
-    derivatives_tl.resize(n);
-  }
-  auto& derivatives = derivatives_tl;
+  // Local storage for derivatives (thread-safe)
+  std::vector<double> derivatives(n);
 
   if (d_eta <= 0.0) {
     return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
@@ -779,7 +735,7 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::
       derivatives[i] = (values[i + 1] - values[i - 1]) / (2.0 * d_eta);
     }
     derivatives[n - 1] = (values[n - 1] - values[n - 2]) / d_eta;
-    return std::vector<double>(derivatives.begin(), derivatives.begin() + n);
+    return derivatives;
   }
 
   const double dx12 = 12.0 * d_eta;
@@ -805,8 +761,7 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::
                         25.0 * values[n - 1]) /
                        dx12;
 
-  // Copy result to avoid returning reference to thread_local
-  return std::vector<double>(derivatives.begin(), derivatives.begin() + n);
+  return derivatives;
 }
 
 template <std::ranges::sized_range Range>
@@ -814,12 +769,8 @@ auto compute_eta_second_derivative(Range&& values, double d_eta)
     -> std::expected<std::vector<double>, CoefficientError> {
   const auto n = std::ranges::size(values);
   
-  // Use thread_local storage to avoid repeated allocations
-  thread_local std::vector<double> second_derivatives_tl;
-  if (second_derivatives_tl.size() < n) {
-    second_derivatives_tl.resize(n);
-  }
-  auto& second_derivatives = second_derivatives_tl;
+  // Local storage for second derivatives (thread-safe)
+  std::vector<double> second_derivatives(n);
 
   if (d_eta <= 0.0) {
     return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
@@ -840,7 +791,7 @@ auto compute_eta_second_derivative(Range&& values, double d_eta)
     }
     second_derivatives[n - 1] = (values[n - 3] - 2.0 * values[n - 2] + values[n - 1]) / d_eta_sq;
 
-    return std::vector<double>(second_derivatives.begin(), second_derivatives.begin() + n);
+    return second_derivatives;
   }
 
   const double dx2_12 = 12.0 * d_eta * d_eta;
@@ -881,14 +832,9 @@ auto compute_matrix_eta_second_derivative(const Matrix& values, double d_eta)
     return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
   }
 
-  // Use thread_local storage for row values
-  thread_local std::vector<double> row_values_tl;
-  if (row_values_tl.size() < n_cols) {
-    row_values_tl.resize(n_cols);
-  }
-  
+  // Local row buffer for values
+  std::vector<double> row_values(n_cols);
   for (std::size_t i = 0; i < n_rows; ++i) {
-    auto& row_values = row_values_tl;
     for (std::size_t j = 0; j < n_cols; ++j) {
       row_values[j] = values(i, j);
     }
@@ -938,10 +884,9 @@ auto CoefficientCalculator::calculate_finite_thickness_coefficients(const Coeffi
   const double rho_e = thermo.rho[n_eta - 1];
   const double d_ue_dx = bc.d_ue_dx();
 
-  // Get edge viscosity using workspace
+  // Get edge viscosity using local workspace
   const auto n_species = inputs.c.rows();
-  ensure_workspace_size(n_species, n_eta);
-  auto& c_edge = workspace_species_;
+  std::vector<double> c_edge(n_species);
   for (std::size_t j = 0; j < n_species; ++j) {
     c_edge[j] = inputs.c(j, n_eta - 1);
   }
@@ -955,7 +900,7 @@ auto CoefficientCalculator::calculate_finite_thickness_coefficients(const Coeffi
   // Compute finite thickness coefficient
   const double coeff_finite_thickness = v_e * d2_ue_dxdy / (d_ue_dx * d_ue_dx);
 
-  auto& integrand = workspace_integrand_;
+  std::vector<double> integrand(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
     integrand[i] = 1.0 / thermo.rho[i];
   }

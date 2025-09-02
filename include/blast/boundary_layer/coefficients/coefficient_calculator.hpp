@@ -34,14 +34,6 @@ private:
   const io::OuterEdgeConfig& outer_edge_config_;
   double d_eta_;
 
-  // Pre-allocated workspaces for performance optimization
-  mutable std::vector<double> workspace_species_;     // n_species workspace
-  mutable std::vector<double> workspace_species2_;    // n_species workspace 2
-  mutable std::vector<double> workspace_derivatives_; // n_eta workspace
-  mutable std::vector<double> workspace_integrand_;   // n_eta workspace
-  
-  void ensure_workspace_size(std::size_t n_species, std::size_t n_eta) const;
-
   [[nodiscard]] auto calculate_transport_coefficients(
       const CoefficientInputs& inputs, const ThermodynamicCoefficients& thermo,
       const conditions::BoundaryConditions& bc) const -> std::expected<TransportCoefficients, CoefficientError>;
@@ -101,15 +93,7 @@ public:
   CoefficientCalculator(const thermophysics::MixtureInterface& mixture, const io::SimulationConfig& sim_config,
                         const io::NumericalConfig& num_config, const io::OuterEdgeConfig& outer_edge_config)
       : mixture_(mixture), sim_config_(sim_config), num_config_(num_config), outer_edge_config_(outer_edge_config),
-        d_eta_(num_config.eta_max / static_cast<double>(num_config.n_eta - 1)) {
-    // Pre-allocate workspaces based on expected problem size
-    const std::size_t max_species = 50;  // Conservative estimate
-    const std::size_t max_eta = 1000;    // Conservative estimate
-    workspace_species_.reserve(max_species);
-    workspace_species2_.reserve(max_species);
-    workspace_derivatives_.reserve(max_eta);
-    workspace_integrand_.reserve(max_eta);
-  }
+        d_eta_(num_config.eta_max / static_cast<double>(num_config.n_eta - 1)) {}
 
   // Main calculation interface
   [[nodiscard]] auto calculate(const CoefficientInputs& inputs, const conditions::BoundaryConditions& bc,
