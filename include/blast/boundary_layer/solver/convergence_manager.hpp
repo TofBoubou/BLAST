@@ -133,16 +133,6 @@ private:
         -> std::expected<void, SolverError>;
 
     /**
-     * @brief Handle NaN detection in residuals
-     * @param conv_info Convergence information
-     * @param station Station number
-     * @param iteration Iteration number
-     * @return Error if NaN detected and should fail
-     */
-    [[nodiscard]] auto handle_nan_detection(const ConvergenceInfo& conv_info, int station, int iteration) const
-        -> std::expected<void, SolverError>;
-
-    /**
      * @brief Print final heat flux summary for radiative equilibrium
      * @param station Station number
      * @param xi Streamwise coordinate

@@ -41,15 +41,35 @@ auto ConvergenceManager::iterate_station_adaptive(int station, double xi,
         conv_info = check_convergence(solution_old, solution_new);
         conv_info.iterations = iter + 1;
 
-        // Handle NaN detection
-        if (auto nan_result = handle_nan_detection(conv_info, station, iter); !nan_result) {
+        // Handle NaN detection with global policy
+        const bool has_nan = std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c);
+        if (has_nan) {
             if (in_continuation_) {
+                // Let continuation logic handle step reduction
                 conv_info.converged = false;
                 conv_info.iterations = iter + 1;
                 return conv_info;
-            } else {
-                return std::unexpected(nan_result.error());
             }
+
+            if (config_.numerical.nan_policy == io::NumericalConfig::NanPolicy::Fail) {
+                return std::unexpected(NumericError(std::format(
+                    "NaN detected in residuals at station {} iteration {}", station, iter)));
+            }
+
+            // ReduceStep policy outside continuation: apply strong relaxation and continue iterating
+            const double adaptive_factor = relaxation_controller_->config().min_factor;
+            solution = apply_relaxation_differential(solution_old, solution_new, adaptive_factor);
+
+            // Optionally update wall temperature for radiative equilibrium
+            if (radiative_solver_ && radiative_solver_->is_radiative_equilibrium_enabled()) {
+                auto radiative_result = update_wall_temperature_radiative(station, xi, bc_dynamic, solution, iter);
+                if (!radiative_result) {
+                    return std::unexpected(radiative_result.error());
+                }
+            }
+
+            // Skip the rest of this iteration and try again with reduced step
+            continue;
         }
 
         // Adaptive relaxation
@@ -225,16 +245,6 @@ auto ConvergenceManager::check_divergence(const ConvergenceInfo& conv_info, int 
     if (conv_info.max_residual() > config_.numerical.divergence_threshold) {
         return std::unexpected(NumericError(std::format("Solution diverged at station {} iteration {} (residual={})",
                                                         station, iteration, conv_info.max_residual())));
-    }
-    return {};
-}
-
-auto ConvergenceManager::handle_nan_detection(const ConvergenceInfo& conv_info, int station, int iteration) const
-    -> std::expected<void, SolverError> {
-    
-    if (std::isnan(conv_info.residual_F) || std::isnan(conv_info.residual_g) || std::isnan(conv_info.residual_c)) {
-        return std::unexpected(NumericError(std::format("NaN detected in residuals at station {} iteration {}", 
-                                                        station, iteration)));
     }
     return {};
 }
