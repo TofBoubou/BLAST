@@ -9,6 +9,7 @@
 #include "solver_errors.hpp"
 #include <expected>
 #include <functional>
+#include <optional>
 
 namespace blast::boundary_layer::solver {
 
@@ -104,10 +105,10 @@ private:
 
     /**
      * @brief Check if continuation should be attempted
-     * @param convergence_error The convergence error from direct solution
+     * @param residual Optional current residual value to compare to guard
      * @return True if continuation should be tried
      */
-    [[nodiscard]] auto should_attempt_continuation(const ConvergenceError& convergence_error) const noexcept -> bool;
+    [[nodiscard]] auto should_attempt_continuation(std::optional<double> residual) const noexcept -> bool;
 
 private:
     BoundaryLayerSolver& solver_;

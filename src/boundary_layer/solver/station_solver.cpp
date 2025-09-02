@@ -45,9 +45,9 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
     auto convergence_result = convergence_manager.iterate_station_adaptive(station, xi, bc, solution);
 
     if (!convergence_result) {
-        // Try continuation if available and not already in continuation
+        // Try continuation if available and policy allows (no residual known here)
         if (auto* continuation = solver_.get_continuation(); 
-            continuation && !in_continuation_ && should_attempt_continuation(ConvergenceError(convergence_result.error().message()))) {
+            continuation && !in_continuation_ && should_attempt_continuation(std::nullopt)) {
             
             auto stable_guess = compute_stable_guess(station, xi);
             if (stable_guess) {
@@ -80,9 +80,9 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
             }
         }
 
-        // Try continuation for non-continuation failures
+        // Try continuation for non-continuation failures if policy allows for this residual
         if (auto* continuation = solver_.get_continuation(); 
-            continuation && !in_continuation_ && conv_info.max_residual() < config_.numerical.residual_guard) {
+            continuation && !in_continuation_ && should_attempt_continuation(conv_info.max_residual())) {
             
             auto stable_guess = compute_stable_guess(station, xi);
             if (stable_guess) {
@@ -161,15 +161,14 @@ auto StationSolver::compute_stable_guess(int station, double xi) const
     return guess_factory.create_initial_guess(station, xi, bc_stable.value(), T_edge_stable);
 }
 
-auto StationSolver::should_attempt_continuation(const ConvergenceError& convergence_error) const noexcept -> bool {
-    (void)convergence_error; // Unused; decision based on configured policy
+auto StationSolver::should_attempt_continuation(std::optional<double> residual) const noexcept -> bool {
     using CAP = io::NumericalConfig::ContinuationAttemptPolicy;
-    switch (config_.numerical.continuation_attempt_policy) {
+    const auto policy = config_.numerical.continuation_attempt_policy;
+    switch (policy) {
       case CAP::Always:
         return true;
       case CAP::OnlyIfResidualBelowGuard:
-        // When residual is unknown here, be conservative: do not attempt at this stage
-        return false;
+        return residual.has_value() && (residual.value() < config_.numerical.residual_guard);
       case CAP::Never:
       default:
         return false;
