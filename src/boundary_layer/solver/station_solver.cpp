@@ -52,7 +52,7 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
             auto stable_guess = compute_stable_guess(station, xi);
             if (stable_guess) {
                 auto cont_result = continuation->solve_with_continuation(solver_, station, xi, 
-                                                                       solver_.get_config(), 
+                                                                       solver_.get_original_config(), 
                                                                        stable_guess.value());
 
                 if (cont_result && cont_result.value().success) {
@@ -87,7 +87,7 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
             auto stable_guess = compute_stable_guess(station, xi);
             if (stable_guess) {
                 auto cont_result = continuation->solve_with_continuation(solver_, station, xi, 
-                                                                       solver_.get_config(), 
+                                                                       solver_.get_original_config(), 
                                                                        stable_guess.value());
 
                 if (cont_result && cont_result.value().success) {
@@ -136,8 +136,6 @@ auto StationSolver::compute_stable_guess(int station, double xi) const
     
     if (!stable_config.wall_parameters.wall_temperatures.empty()) {
         stable_config.wall_parameters.wall_temperatures[0] = stable_config_.wall_temperature_stable;
-    } else {
-        stable_config.wall_parameters.wall_temperatures.push_back(stable_config_.wall_temperature_stable);
     }
     
     if (!stable_config.outer_edge.edge_points.empty()) {

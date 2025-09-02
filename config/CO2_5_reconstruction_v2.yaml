@@ -4,7 +4,7 @@
 
 continuation:
   wall_temperature_stable: 3000
-  edge_temperature_stable: 5905.5
+  edge_temperature_stable: 3000
   pressure_stable: 7000
   use_linear_predictor: true
 
