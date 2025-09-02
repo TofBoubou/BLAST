@@ -24,9 +24,9 @@ from typing import Dict, List, Optional, Union, Tuple, Set
 import warnings
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
-warnings.filterwarnings('ignore')
 
-# Set publication-quality plot style
+warnings.filterwarnings('ignore', message='Unable to import Axes3D', category=UserWarning)
+
 plt.style.use('classic')
 
 plt.rcParams.update({
@@ -45,8 +45,16 @@ plt.rcParams.update({
     'savefig.dpi': 600,
 })
 
-class BLASTFileError(Exception):
-    """Custom exception for BLAST file-related errors"""
+class BLASTError(Exception):
+    """Base exception for BLAST post-processing"""
+    pass
+
+class BLASTFileError(BLASTError):
+    """HDF5 file I/O and structure errors"""
+    pass
+
+class BLASTDataError(BLASTError):
+    """Data content/validation errors in datasets"""
     pass
 
 class BLASTReader:
@@ -59,10 +67,6 @@ class BLASTReader:
     REQUIRED_HEAT_FLUX_FIELDS = {'eta', 'heat_flux'}
     
     def __init__(self, input_path: Union[str, Path]):
-        print("\n" + "="*60)
-        print("BLAST POST-PROCESSING TOOL")
-        print("="*60)
-        print(f"\nInitializing HDF5 reader for: {input_path}")
         self.input_path = Path(input_path)
         self.format = self._detect_format()
         self.data = None
@@ -73,11 +77,11 @@ class BLASTReader:
     def _detect_format(self) -> str:
         """Auto-detect input format"""
         if not self.input_path.exists():
-            raise FileNotFoundError(f"Input file not found: {self.input_path}")
+            raise BLASTFileError(f"Input file not found: {self.input_path}")
             
         if self.input_path.suffix.lower() in ['.h5', '.hdf5']:
             return 'hdf5'
-        raise ValueError(f"Only HDF5 format is supported. Got: {self.input_path}")
+        raise BLASTFileError(f"Only HDF5 format is supported. Got: {self.input_path}")
     
     def _verify_file_integrity(self) -> None:
         """Test file integrity and required structure"""
@@ -157,7 +161,7 @@ class BLASTReader:
         except Exception as e:
             if isinstance(e, BLASTFileError):
                 raise
-            raise RuntimeError(f"Failed to load HDF5 file: {e}")
+            raise BLASTFileError(f"Failed to load HDF5 file: {e}")
     
     def _validate_station_data(self, station_data: Dict) -> bool:
         """Check if station has all required fields for profile plotting"""
@@ -241,14 +245,14 @@ class BLASTReader:
         station_key = f'station_{station_index:03d}'
         if station_key not in self.data['stations']:
             available = sorted([int(k.split('_')[-1]) for k in self.data['stations'].keys()])
-            raise KeyError(f"Station {station_index} not found. Available stations: {available}")
+            raise BLASTDataError(f"Station {station_index} not found. Available stations: {available}")
         
         station_data = self.data['stations'][station_key].copy()
         
         # Validate required fields for profiles
         if not self._validate_station_data(station_data):
             missing = self.REQUIRED_PROFILE_FIELDS - set(station_data.keys())
-            raise ValueError(f"Station {station_index} missing required fields: {missing}")
+            raise BLASTDataError(f"Station {station_index} missing required fields: {missing}")
         
         # Process species concentrations if available
         if 'species_concentrations' in station_data:
@@ -269,13 +273,13 @@ class BLASTReader:
         station_key = f'station_{station_index:03d}'
         if station_key not in self.data['stations']:
             available = sorted([int(k.split('_')[-1]) for k in self.data['stations'].keys()])
-            raise KeyError(f"Station {station_index} not found. Available stations: {available}")
+            raise BLASTDataError(f"Station {station_index} not found. Available stations: {available}")
         
         station_data = self.data['stations'][station_key].copy()
         
         # Validate required fields for heat flux
         if not self._validate_heat_flux_data(station_data):
-            raise ValueError(f"Station {station_index} missing required heat flux fields")
+            raise BLASTDataError(f"Station {station_index} missing required heat flux fields")
         
         return station_data
     
@@ -313,10 +317,11 @@ class BLASTReader:
 class BLASTPlotter:
     """Publication-quality plotting for BLAST results with robust error handling"""
     
-    def __init__(self, reader: BLASTReader):
+    def __init__(self, reader: BLASTReader, output_format: str = 'pdf', dpi: int = 300):
         self.reader = reader
         self.fig_size = (12, 8)
-        self.dpi = 300
+        self.output_format = output_format
+        self.dpi = dpi
         
     def plot_profiles(self, station_index: int = 0, save_path: Optional[Path] = None) -> bool:
         """Plot boundary layer profiles for a given station
@@ -454,7 +459,8 @@ class BLASTPlotter:
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
         else:
             plt.show()
         
@@ -488,7 +494,8 @@ class BLASTPlotter:
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
         else:
             plt.show()
         
@@ -521,7 +528,8 @@ class BLASTPlotter:
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
         else:
             plt.show()
         
@@ -554,7 +562,8 @@ class BLASTPlotter:
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
         else:
             plt.show()
         
@@ -610,7 +619,8 @@ class BLASTPlotter:
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
         else:
             plt.show()
         
@@ -677,7 +687,8 @@ class BLASTPlotter:
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight', dpi=600)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
         else:
             plt.show()
         
@@ -757,7 +768,7 @@ class BLASTPlotter:
         for plot_name, plot_func in plots:
             save_path = output_dir / f'stagnation_{plot_name}'
             if plot_func(station_index, save_path):
-                print(f"   [OK] {plot_name}: stagnation_{plot_name}.pdf")
+                print(f"   [OK] {plot_name}: {save_path.name}.{self.output_format}")
                 success_count += 1
             else:
                 print(f"   [FAILED] {plot_name}")
@@ -807,7 +818,8 @@ class BLASTPlotter:
         plt.tight_layout()
         
         if save_path:
-            plt.savefig(f"{save_path}.pdf", format='pdf', bbox_inches='tight')
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
         else:
             plt.show()
         
@@ -1158,7 +1170,8 @@ class BLASTPlotter:
             plt.tight_layout()
             
             if save_path:
-                plt.savefig(save_path.with_suffix('.pdf'), format='pdf', bbox_inches='tight')
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                plt.savefig(save_path.with_suffix(f'.{self.output_format}'), format=self.output_format, bbox_inches='tight', dpi=self.dpi)
                 print(f"   [OK] F and g map ({len(stations_used)} stations): {save_path.name}")
             else:
                 plt.show()
@@ -1209,7 +1222,7 @@ class BLASTPlotter:
                 print(f"   [OK] Heat flux station {station_idx:03d}: {heat_flux_path.name}")
         
         # Create F and g map if possible
-        f_g_map_path = output_dir / 'F_g_eta_xi_map.png'
+        f_g_map_path = output_dir / 'F_g_eta_xi_map'
         f_g_map_created = self.plot_F_and_g_map(save_path=f_g_map_path)
         
         # Create summary data file with consistent information
@@ -1303,16 +1316,36 @@ def main():
                        help='Output directory for plots')
     parser.add_argument('--dpi', type=int, default=300,
                        help='DPI for saved figures')
+    parser.add_argument('--format', '-f', type=str, default='pdf', choices=['pdf', 'png', 'svg'],
+                       help='Output format for saved plots')
+    parser.add_argument('--suppress-warnings', type=str, default='none', choices=['none', 'plot', 'all'],
+                       help='Control warnings: none (default), plot (hide plotting-related), or all')
     parser.add_argument('--show', action='store_true',
                        help='Show plots interactively instead of saving')
     
     args = parser.parse_args()
     
+    # Configure warnings
+    def _configure_warnings(mode: str):
+        warnings.resetwarnings()
+        if mode == 'all':
+            warnings.filterwarnings('ignore')
+        elif mode == 'plot':
+            warnings.filterwarnings('ignore', category=UserWarning, module=r'matplotlib')
+            warnings.filterwarnings('ignore', category=UserWarning, module=r'seaborn')
+            warnings.filterwarnings('ignore', category=FutureWarning, module=r'h5py')
+
+    _configure_warnings(args.suppress_warnings)
+
     # Initialize reader with error handling
     try:
+        print("\n" + "="*60)
+        print("BLAST POST-PROCESSING TOOL")
+        print("="*60)
+        
         reader = BLASTReader(args.input)
         
-        print(f"Initializing {reader.format.upper()} reader for: {reader.input_path}")
+        print(f"\nInitializing {reader.format.upper()} reader for: {reader.input_path}")
         reader.load_data()
         
         valid_stations = reader.get_valid_stations()
@@ -1327,13 +1360,15 @@ def main():
             print("Error: No stations have the required fields for any type of plotting")
             return 1
         
-    except Exception as e:
+    except BLASTError as e:
         print(f"Error initializing data reader: {e}")
+        return 1
+    except Exception as e:
+        print(f"Unexpected error initializing data reader: {e}")
         return 1
     
     # Initialize plotter
-    plotter = BLASTPlotter(reader)
-    plotter.dpi = args.dpi
+    plotter = BLASTPlotter(reader, output_format=args.format, dpi=args.dpi)
     
     # Create output directory
     output_path = Path(args.output) if not args.show else None
@@ -1365,7 +1400,7 @@ def main():
                 print(f"Available profile stations: {sorted(valid_stations)}")
                 return 1
                 
-            save_path = output_path / f'profiles_station_{args.station:03d}.png' if output_path else None
+            save_path = output_path / f'profiles_station_{args.station:03d}' if output_path else None
             success = plotter.plot_profiles(args.station, save_path)
             if not success:
                 return 1
@@ -1376,7 +1411,7 @@ def main():
                 print(f"Available heat flux stations: {sorted(valid_heat_flux_stations)}")
                 return 1
                 
-            save_path = output_path / f'heat_flux_station_{args.station:03d}.png' if output_path else None
+            save_path = output_path / f'heat_flux_station_{args.station:03d}' if output_path else None
             success = plotter.plot_heat_flux(args.station, save_path)
             if not success:
                 return 1
@@ -1387,7 +1422,7 @@ def main():
             plotter.create_summary_report(output_path)
             
         elif args.plots == 'f_g_map':
-            save_path = output_path / 'F_g_eta_xi_map.png' if output_path else None
+            save_path = output_path / 'F_g_eta_xi_map' if output_path else None
             success = plotter.plot_F_and_g_map(save_path)
             if not success:
                 return 1

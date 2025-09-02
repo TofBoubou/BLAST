@@ -15,10 +15,10 @@ continuation:
   use_linear_predictor: true
   # Continuation step controls
   step_initial: 0.01
-  step_min: 0.0001
+  step_min: 0.00001
   step_max: 0.5
-  step_increase_factor: 1.3
-  step_decrease_factor: 0.5
+  step_increase_factor: 2
+  step_decrease_factor: 0.8
   max_steps: 10000
   # Mode switching thresholds
   failure_threshold: 4
@@ -56,7 +56,7 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 100
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
@@ -64,7 +64,7 @@ base:
     divergence_threshold: 1.0e6
     residual_guard: 1.0e10
     nan_policy: reduce_step               # or: fail
-    continuation_attempt_policy: only_if_residual_below_threshold  # or: always | never
+    continuation_attempt_policy: always  # or: always | never | only_if_residual_below_threshold
 
   mixture:
     name: CO2_5
@@ -97,7 +97,7 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [1000]
+    temperatures: [300]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"
 

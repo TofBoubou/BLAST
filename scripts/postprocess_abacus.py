@@ -23,9 +23,8 @@ import h5py
 from pathlib import Path
 from typing import Union, Dict, Optional
 import warnings
-warnings.filterwarnings('ignore')
 
-# Match existing plotting style
+warnings.filterwarnings('ignore', message='Unable to import Axes3D', category=UserWarning)
 plt.style.use('classic')
 plt.rcParams.update({
     'font.size': 10,
@@ -43,7 +42,16 @@ plt.rcParams.update({
     'savefig.dpi': 600,
 })
 
-class AbacusFileError(Exception):
+class AbacusError(Exception):
+    """Base exception for Abacus post-processing"""
+    pass
+
+class AbacusFileError(AbacusError):
+    """I/O or structure errors in HDF5 file"""
+    pass
+
+class AbacusDataError(AbacusError):
+    """Content/validation errors in datasets"""
     pass
 
 class AbacusReader:
@@ -58,9 +66,9 @@ class AbacusReader:
 
     def _check(self) -> None:
         if not self.input_path.exists():
-            raise FileNotFoundError(f"Input file not found: {self.input_path}")
+            raise AbacusFileError(f"Input file not found: {self.input_path}")
         if self.input_path.suffix.lower() not in ('.h5', '.hdf5'):
-            raise ValueError(f"Only HDF5 is supported. Got: {self.input_path}")
+            raise AbacusFileError(f"Only HDF5 is supported. Got: {self.input_path}")
 
     def load(self) -> Dict[str, np.ndarray]:
         self._check()
@@ -75,12 +83,12 @@ class AbacusReader:
                 q = np.array(f['heat_fluxes'])
 
                 if q.ndim != 2:
-                    raise AbacusFileError("'heat_fluxes' must be 2D [M, N]")
+                    raise AbacusDataError("'heat_fluxes' must be 2D [M, N]")
                 M, N = q.shape
                 if temps.ndim != 1 or temps.size != N:
-                    raise AbacusFileError("'temperatures'.size must equal heat_fluxes.shape[1]")
+                    raise AbacusDataError("'temperatures'.size must equal heat_fluxes.shape[1]")
                 if gammas.ndim != 1 or gammas.size != M:
-                    raise AbacusFileError("'catalyticity_values'.size must equal heat_fluxes.shape[0]")
+                    raise AbacusDataError("'catalyticity_values'.size must equal heat_fluxes.shape[0]")
 
                 self.data = {
                     'temperatures': temps,
@@ -98,15 +106,16 @@ class AbacusReader:
                 return self.data
 
         except Exception as e:
-            if isinstance(e, AbacusFileError):
+            if isinstance(e, AbacusError):
                 raise
-            raise RuntimeError(f"Failed to load HDF5: {e}")
+            raise AbacusFileError(f"Failed to load HDF5: {e}")
 
 class AbacusPlotter:
     """One figure with two subplots: map (left) + curves (right)"""
 
-    def __init__(self, reader: AbacusReader, dpi: int = 300):
+    def __init__(self, reader: AbacusReader, output_format: str = 'pdf', dpi: int = 300):
         self.reader = reader
+        self.output_format = output_format
         self.dpi = dpi
 
     def plot_map_and_curves(self, save_path: Optional[Path] = None) -> bool:
@@ -176,9 +185,9 @@ class AbacusPlotter:
         if save_path:
             save_path = Path(save_path)
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            out_pdf = save_path.with_suffix('.pdf')
-            plt.savefig(out_pdf, format='pdf', bbox_inches='tight')
-            print(f"Abacus map + curves saved to: {out_pdf}")
+            out_path = save_path.with_suffix(f'.{self.output_format}')
+            plt.savefig(out_path, format=self.output_format, bbox_inches='tight', dpi=self.dpi)
+            print(f"Abacus map + curves saved to: {out_path}")
         else:
             plt.show()
 
@@ -190,17 +199,34 @@ def main() -> int:
     parser.add_argument('--input', '-i', type=str, required=True, help='Input abacus HDF5 file')
     parser.add_argument('--output', '-o', type=str, default='result_abacus/abacus_map', help='Output path (without extension) if not --show')
     parser.add_argument('--dpi', type=int, default=300, help='Figure DPI')
+    parser.add_argument('--format', '-f', type=str, default='pdf', choices=['pdf', 'png', 'svg'], help='Output format for saved figure')
+    parser.add_argument('--suppress-warnings', type=str, default='none', choices=['none', 'plot', 'all'], help='Control warnings: none (default), plot, or all')
     parser.add_argument('--show', action='store_true', help='Show interactively instead of saving')
     args = parser.parse_args()
+
+    # Configure warnings
+    def _configure_warnings(mode: str):
+        warnings.resetwarnings()
+        if mode == 'all':
+            warnings.filterwarnings('ignore')
+        elif mode == 'plot':
+            warnings.filterwarnings('ignore', category=UserWarning, module=r'matplotlib')
+            warnings.filterwarnings('ignore', category=UserWarning, module=r'seaborn')
+            warnings.filterwarnings('ignore', category=FutureWarning, module=r'h5py')
+
+    _configure_warnings(args.suppress_warnings)
 
     try:
         reader = AbacusReader(args.input)
         reader.load()
-    except Exception as e:
+    except AbacusError as e:
         print(f"Error initializing reader: {e}")
         return 1
+    except Exception as e:
+        print(f"Unexpected error initializing reader: {e}")
+        return 1
 
-    plotter = AbacusPlotter(reader, dpi=args.dpi)
+    plotter = AbacusPlotter(reader, output_format=args.format, dpi=args.dpi)
 
     try:
         if args.show:
