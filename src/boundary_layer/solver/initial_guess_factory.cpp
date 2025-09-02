@@ -81,7 +81,9 @@ auto InitialGuessFactory::create_multi_species_guess(
     std::fill(guess.V.begin(), guess.V.end(), 0.0);
 
     // Step 1: Compute equilibrium composition at the wall
-    auto equilibrium_result = BLAST_TRY_WITH_CONTEXT(
+    std::vector<double> equilibrium_result;
+    BLAST_TRY_ASSIGN_CTX(
+        equilibrium_result,
         mixture_.equilibrium_composition(bc.Tw(), bc.P_e()),
         "Failed to compute equilibrium composition at wall conditions"
     );
@@ -94,7 +96,9 @@ auto InitialGuessFactory::create_multi_species_guess(
     }
 
     // Step 3: Compute wall equilibrium enthalpy
-    auto h_wall_equilibrium = BLAST_TRY_WITH_CONTEXT(
+    double h_wall_equilibrium;
+    BLAST_TRY_ASSIGN_CTX(
+        h_wall_equilibrium,
         mixture_.mixture_enthalpy(equilibrium_result, bc.Tw(), bc.P_e()),
         "Failed to compute wall equilibrium enthalpy"
     );

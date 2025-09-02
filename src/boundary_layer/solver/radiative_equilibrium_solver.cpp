@@ -45,7 +45,9 @@ auto RadiativeEquilibriumSolver::update_wall_temperature_iteration(int station, 
     
     // Use unified heat flux computer to eliminate duplication
     auto& heat_flux_computer = solver_.get_heat_flux_computer();
-    auto heat_flux_data = BLAST_TRY_WITH_CONTEXT(
+    coefficients::HeatFluxCoefficients heat_flux_data;
+    BLAST_TRY_ASSIGN_CTX(
+        heat_flux_data,
         heat_flux_computer.compute_heat_flux_only(solution, bc, xi, station),
         "Failed to compute heat flux for radiative equilibrium"
     );
@@ -91,7 +93,9 @@ auto RadiativeEquilibriumSolver::compute_heat_flux_analysis(int station, double 
     
     // Use unified heat flux computer for analysis
     auto& heat_flux_computer = solver_.get_heat_flux_computer();
-    auto heat_flux = BLAST_TRY_WITH_CONTEXT(
+    coefficients::HeatFluxCoefficients heat_flux;
+    BLAST_TRY_ASSIGN_CTX(
+        heat_flux,
         heat_flux_computer.compute_heat_flux_only(solution, bc, xi, station),
         "Failed to compute heat flux for analysis"
     );

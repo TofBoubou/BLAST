@@ -177,7 +177,8 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
         : conditions::interpolate_boundary_conditions(station, xi, grid_->xi_coordinates(), config_.outer_edge,
                                                       config_.wall_parameters, config_.simulation, mixture_);
 
-    auto bc = BLAST_TRY_WITH_CONTEXT(bc_result, 
+    conditions::BoundaryConditions bc;
+    BLAST_TRY_ASSIGN_CTX(bc, bc_result,
         std::format("Failed to get boundary conditions for heat flux at station {}", station));
     
     // Update wall temperature if radiative equilibrium was used
@@ -186,7 +187,9 @@ auto BoundaryLayerSolver::solve() -> std::expected<SolutionResult, SolverError> 
     }
     
     // Use unified heat flux computer to eliminate duplication
-    auto heat_flux_data = BLAST_TRY_WITH_CONTEXT(
+    coefficients::HeatFluxCoefficients heat_flux_data;
+    BLAST_TRY_ASSIGN_CTX(
+        heat_flux_data,
         heat_flux_computer_->compute_heat_flux_only(result.stations.back(), bc, xi, station),
         std::format("Failed to compute heat flux at station {}", station)
     );
