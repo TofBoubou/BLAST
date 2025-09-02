@@ -54,8 +54,11 @@ private:
   [[nodiscard]] auto parse_edge_reconstruction_config(const YAML::Node& node) const
       -> std::expected<EdgeReconstructionConfig, core::ConfigurationError>;
 
-  [[nodiscard]] auto parse_surface_chemistry_config(const YAML::Node& node) const
-      -> std::expected<SurfaceChemistryConfig, core::ConfigurationError>;
+  [[nodiscard]] auto parse_gasp2_config(const YAML::Node& node) const
+      -> std::expected<Gasp2Config, core::ConfigurationError>;
+
+  [[nodiscard]] auto parse_mutation_config(const YAML::Node& node) const
+      -> std::expected<MutationConfig, core::ConfigurationError>;
 
 public:
   explicit YamlParser(std::string file_path) : file_path_(std::move(file_path)) {} // constructor so no ->

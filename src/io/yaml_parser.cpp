@@ -361,23 +361,41 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.edge_reconstruction = EdgeReconstructionConfig{};
     }
     
-    // Parse surface chemistry configuration
-    YAML::Node surface_chemistry_node;
-    if (base_enabled && root_["base"]["surface_chemistry"]) {
-      surface_chemistry_node = root_["base"]["surface_chemistry"];
-    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["surface_chemistry"]) {
-      surface_chemistry_node = root_["edge_reconstruction"]["surface_chemistry"];
-    } else if (abacus_enabled && root_["abacus"]["surface_chemistry"]) {
-      surface_chemistry_node = root_["abacus"]["surface_chemistry"];
+    // Parse GASP2 configuration
+    YAML::Node gasp2_node;
+    if (base_enabled && root_["base"]["gasp2"]) {
+      gasp2_node = root_["base"]["gasp2"];
+    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["gasp2"]) {
+      gasp2_node = root_["edge_reconstruction"]["gasp2"];
+    } else if (abacus_enabled && root_["abacus"]["gasp2"]) {
+      gasp2_node = root_["abacus"]["gasp2"];
     } else {
-      surface_chemistry_node = root_["surface_chemistry"];
+      gasp2_node = root_["gasp2"];
     }
     
-    auto surface_chemistry_result = parse_surface_chemistry_config(surface_chemistry_node);
-    if (!surface_chemistry_result) {
-      return std::unexpected(surface_chemistry_result.error());
+    auto gasp2_result = parse_gasp2_config(gasp2_node);
+    if (!gasp2_result) {
+      return std::unexpected(gasp2_result.error());
     }
-    config.surface_chemistry = std::move(surface_chemistry_result.value());
+    config.gasp2 = std::move(gasp2_result.value());
+
+    // Parse Mutation++ configuration
+    YAML::Node mutation_node;
+    if (base_enabled && root_["base"]["mutation"]) {
+      mutation_node = root_["base"]["mutation"];
+    } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["mutation"]) {
+      mutation_node = root_["edge_reconstruction"]["mutation"];
+    } else if (abacus_enabled && root_["abacus"]["mutation"]) {
+      mutation_node = root_["abacus"]["mutation"];
+    } else {
+      mutation_node = root_["mutation"];
+    }
+    
+    auto mutation_result = parse_mutation_config(mutation_node);
+    if (!mutation_result) {
+      return std::unexpected(mutation_result.error());
+    }
+    config.mutation = std::move(mutation_result.value());
 
     return config;
 
@@ -1044,69 +1062,69 @@ auto YamlParser::parse_edge_reconstruction_config(const YAML::Node& node) const
   }
 }
 
-auto YamlParser::parse_surface_chemistry_config(const YAML::Node& node) const
-    -> std::expected<SurfaceChemistryConfig, core::ConfigurationError> {
+auto YamlParser::parse_gasp2_config(const YAML::Node& node) const
+    -> std::expected<Gasp2Config, core::ConfigurationError> {
   try {
-    SurfaceChemistryConfig config;
+    Gasp2Config config;
     
     if (!node || node.IsNull()) {
-      // No surface chemistry section - return defaults
+      // No gasp2 section - return defaults
       return config;
     }
 
-    // Surface chemistry is enabled if the section exists
-    config.enabled = true;
-
-    // Parse GASP2 options
-    if (node["gasp2"]) {
-      const auto& gasp2_node = node["gasp2"];
-      
-      if (gasp2_node["xml_file"]) {
-        config.gasp2.xml_file = gasp2_node["xml_file"].as<std::string>();
-      }
-      
-      if (gasp2_node["reaction_type"]) {
-        config.gasp2.reaction_type = gasp2_node["reaction_type"].as<std::string>();
-      }
-      
-      if (gasp2_node["temperature_exponent"]) {
-        config.gasp2.temperature_exponent = gasp2_node["temperature_exponent"].as<double>();
-      }
-      
-      if (gasp2_node["activation_energy"]) {
-        config.gasp2.activation_energy = gasp2_node["activation_energy"].as<double>();
-      }
-      
-      if (gasp2_node["pre_exponential"]) {
-        config.gasp2.pre_exponential = gasp2_node["pre_exponential"].as<double>();
-      }
-      
-      if (gasp2_node["use_xml_parameters"]) {
-        config.gasp2.use_xml_parameters = gasp2_node["use_xml_parameters"].as<bool>();
-      }
-      
-      if (gasp2_node["verbose_output"]) {
-        config.gasp2.verbose_output = gasp2_node["verbose_output"].as<bool>();
-      }
+    if (node["xml_file"]) {
+      config.xml_file = node["xml_file"].as<std::string>();
     }
     
-    // Parse Mutation++ options  
-    if (node["mutation"]) {
-      const auto& mutation_node = node["mutation"];
-      
-      if (mutation_node["gsi_file"]) {
-        config.mutation.gsi_file = mutation_node["gsi_file"].as<std::string>();
-      }
-      
-      if (mutation_node["reload_gsi_each_step"]) {
-        config.mutation.reload_gsi_each_step = mutation_node["reload_gsi_each_step"].as<bool>();
-      }
+    if (node["reaction_type"]) {
+      config.reaction_type = node["reaction_type"].as<std::string>();
+    }
+    
+    if (node["temperature_exponent"]) {
+      config.temperature_exponent = node["temperature_exponent"].as<double>();
+    }
+    
+    if (node["activation_energy"]) {
+      config.activation_energy = node["activation_energy"].as<double>();
+    }
+    
+    if (node["pre_exponential"]) {
+      config.pre_exponential = node["pre_exponential"].as<double>();
+    }
+    
+    if (node["use_xml_parameters"]) {
+      config.use_xml_parameters = node["use_xml_parameters"].as<bool>();
     }
 
     return config;
   } catch (const YAML::Exception& e) {
     return std::unexpected(
-        core::ConfigurationError(std::format("In 'surface_chemistry' section: failed to parse - {}", e.what())));
+        core::ConfigurationError(std::format("In 'gasp2' section: failed to parse - {}", e.what())));
+  }
+}
+
+auto YamlParser::parse_mutation_config(const YAML::Node& node) const
+    -> std::expected<MutationConfig, core::ConfigurationError> {
+  try {
+    MutationConfig config;
+    
+    if (!node || node.IsNull()) {
+      // No mutation section - return defaults
+      return config;
+    }
+
+    if (node["gsi_file"]) {
+      config.gsi_file = node["gsi_file"].as<std::string>();
+    }
+    
+    if (node["reload_gsi_each_step"]) {
+      config.reload_gsi_each_step = node["reload_gsi_each_step"].as<bool>();
+    }
+
+    return config;
+  } catch (const YAML::Exception& e) {
+    return std::unexpected(
+        core::ConfigurationError(std::format("In 'mutation' section: failed to parse - {}", e.what())));
   }
 }
 

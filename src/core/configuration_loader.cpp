@@ -21,7 +21,7 @@ auto ConfigurationLoader::load_configuration(const std::string& config_file)
   
   std::cout << "✓ Configuration loaded successfully" << std::endl;
   
-  auto mixture_result = thermophysics::create_mixture_with_catalysis(config.mixture, config.simulation, config.surface_chemistry);
+  auto mixture_result = thermophysics::create_mixture_with_catalysis(config.mixture, config.simulation, config.gasp2);
   if (!mixture_result) {
     return std::unexpected(ApplicationError{
       "Failed to create mixture: " + mixture_result.error().message(),

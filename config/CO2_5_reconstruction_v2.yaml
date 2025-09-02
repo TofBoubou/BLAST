@@ -9,6 +9,14 @@ continuation:
   use_linear_predictor: false
 
 # =============================================================================
+# GASP2 CONFIGURATION
+# =============================================================================
+
+gasp2:
+  xml_file: "CO2_5_gamma.xml"
+  reaction_type: "gamma"
+
+# =============================================================================
 # BASE MODE
 # =============================================================================
 
@@ -67,14 +75,6 @@ base:
     temperatures: [3000]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"
-
-  surface_chemistry: # enable = true + catalysis_provider: "gasp2" if we use gasp2
-    enabled: true 
-    
-    gasp2:
-      xml_file: "CO2_5_gamma.xml"     
-      reaction_type: "gamma"          
-  
 
 edge_reconstruction:
   enabled: false

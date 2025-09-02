@@ -110,7 +110,7 @@ public:
 
 [[nodiscard]] auto create_mixture_with_catalysis(const io::MixtureConfig& mixture_config, 
                                                  const io::SimulationConfig& sim_config,
-                                                 const io::SurfaceChemistryConfig& surface_chem_config)
+                                                 const io::Gasp2Config& gasp2_config)
     -> std::expected<std::unique_ptr<MixtureInterface>, ThermophysicsError>;
 
 } // namespace blast::thermophysics
