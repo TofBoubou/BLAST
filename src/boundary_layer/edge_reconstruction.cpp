@@ -1,6 +1,7 @@
 #include "blast/boundary_layer/edge_reconstruction.hpp"
 #include <cmath>
 #include <iostream>
+#include <cstdlib>
 #include <algorithm>
 
 namespace blast::boundary_layer {
@@ -20,7 +21,9 @@ auto EdgeTemperatureReconstructor::reconstruct()
     if (!update_result) {
       std::cerr << "Warning: Failed to update GSI catalyticity: " << update_result.error() << std::endl;
     } else {
-      std::cout << "Updated GSI file with catalyticity = " << config_.boundary_conditions.catalyticity << std::endl;
+      if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+        std::cout << "Updated GSI file with catalyticity = " << config_.boundary_conditions.catalyticity << std::endl;
+      }
       
       // Reload mixture with updated GSI
       auto reload_result = mixture_.reload_gsi();
@@ -28,7 +31,9 @@ auto EdgeTemperatureReconstructor::reconstruct()
         return std::unexpected(solver::SolverError(
             std::format("Failed to reload mixture after GSI update: {}", reload_result.error())));
       }
-      std::cout << "Mixture reloaded with updated GSI file" << std::endl;
+      if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+        std::cout << "Mixture reloaded with updated GSI file" << std::endl;
+      }
     }
   }
   
@@ -39,9 +44,11 @@ auto EdgeTemperatureReconstructor::reconstruct()
   double d = 0;
   double c_brent = a;
   
-  std::cout << "\n=== Edge Temperature Reconstruction ===" << std::endl;
-  std::cout << "Target heat flux: " << config_.target_heat_flux << " W/m²" << std::endl;
-  std::cout << "Temperature search range: [" << a << ", " << b << "] K" << std::endl;
+  if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+    std::cout << "\n=== Edge Temperature Reconstruction ===" << std::endl;
+    std::cout << "Target heat flux: " << config_.target_heat_flux << " W/m²" << std::endl;
+    std::cout << "Temperature search range: [" << a << ", " << b << "] K" << std::endl;
+  }
   
   // Compute flux at bounds
   auto qa_result = compute_heat_flux_at_temperature(a);
@@ -59,9 +66,11 @@ auto EdgeTemperatureReconstructor::reconstruct()
   double fc = fb;
   double fs;
   
-  std::cout << "\n>>> INITIAL BOUNDS EVALUATION <<<" << std::endl;
-  std::cout << "Lower bound: T_edge = " << a << " K → q = " << *qa_result << " W/m² (error: " << fa << ")" << std::endl;
-  std::cout << "Upper bound: T_edge = " << b << " K → q = " << *qb_result << " W/m² (error: " << fb << ")" << std::endl;
+  if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+    std::cout << "\n>>> INITIAL BOUNDS EVALUATION <<<" << std::endl;
+    std::cout << "Lower bound: T_edge = " << a << " K → q = " << *qa_result << " W/m² (error: " << fa << ")" << std::endl;
+    std::cout << "Upper bound: T_edge = " << b << " K → q = " << *qb_result << " W/m² (error: " << fb << ")" << std::endl;
+  }
   
   // Check if target is within bounds
   if (fa * fb > 0) {
@@ -144,11 +153,11 @@ auto EdgeTemperatureReconstructor::reconstruct()
       U = S * (T * (R - T) * (c_brent - b) - (1 - R) * (b - a));
       Q = (T - 1) * (R - 1) * (S - 1);
       s = b + U / Q;
-      std::cout << "  Using inverse quadratic interpolation → T_candidate=" << s << " K" << std::endl;
+      if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) { std::cout << "  Using inverse quadratic interpolation → T_candidate=" << s << " K" << std::endl; }
     } else {
       // Secant method
       s = b - fb * (b - a) / (fb - fa);
-      std::cout << "  Using secant method → T_candidate=" << s << " K" << std::endl;
+      if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) { std::cout << "  Using secant method → T_candidate=" << s << " K" << std::endl; }
     }
     
     bool condition2 = mflag && (std::abs(s - b) >= std::abs(b - c_brent) * 0.75);
@@ -158,27 +167,31 @@ auto EdgeTemperatureReconstructor::reconstruct()
     
     if (condition2 || condition3 || condition4 || condition5) {
       s = (a + b) / 2;
-      std::cout << "  Switching to bisection → T_candidate=" << s << " K" << std::endl;
+      if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) { std::cout << "  Switching to bisection → T_candidate=" << s << " K" << std::endl; }
       mflag = true;
     } else {
       mflag = false;
     }
     
     // Compute flux at new temperature
-    std::cout << "\n>>> INVERSION STEP " << count << " <<<" << std::endl;
-    std::cout << "Testing edge temperature: T_edge = " << s << " K" << std::endl;
-    std::cout << "Computing boundary layer solution..." << std::flush;
+    if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+      std::cout << "\n>>> INVERSION STEP " << count << " <<<" << std::endl;
+      std::cout << "Testing edge temperature: T_edge = " << s << " K" << std::endl;
+      std::cout << "Computing boundary layer solution..." << std::flush;
+    }
     auto qs_result = compute_heat_flux_at_temperature(s);
     if (!qs_result) {
       return std::unexpected(qs_result.error());
     }
     fs = *qs_result - config_.target_heat_flux;
     
-    std::cout << " DONE!" << std::endl;
-    std::cout << "Heat flux calculated: q = " << *qs_result << " W/m²" << std::endl;
-    std::cout << "Target flux:          q = " << config_.target_heat_flux << " W/m²" << std::endl;
-    std::cout << "Error:                Δq = " << fs << " W/m²" << std::endl;
-    std::cout << "Search interval:      [" << a << ", " << b << "] K" << std::endl;
+    if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+      std::cout << " DONE!" << std::endl;
+      std::cout << "Heat flux calculated: q = " << *qs_result << " W/m²" << std::endl;
+      std::cout << "Target flux:          q = " << config_.target_heat_flux << " W/m²" << std::endl;
+      std::cout << "Error:                Δq = " << fs << " W/m²" << std::endl;
+      std::cout << "Search interval:      [" << a << ", " << b << "] K" << std::endl;
+    }
     
     // Update intervals
     d = c_brent;
@@ -203,10 +216,12 @@ auto EdgeTemperatureReconstructor::reconstruct()
   // Final temperature found
   double T_edge = b;
   
-  std::cout << "\n=== Reconstruction Complete ===" << std::endl;
-  std::cout << "Edge temperature found: " << T_edge << " K" << std::endl;
-  std::cout << "Final heat flux: " << (*qb_result + fb) << " W/m²" << std::endl;
-  std::cout << "Iterations used: " << count << std::endl;
+  if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+    std::cout << "\n=== Reconstruction Complete ===" << std::endl;
+    std::cout << "Edge temperature found: " << T_edge << " K" << std::endl;
+    std::cout << "Final heat flux: " << (*qb_result + fb) << " W/m²" << std::endl;
+    std::cout << "Iterations used: " << count << std::endl;
+  }
   
   // Compute final edge conditions
   auto mass_fractions_result = mixture_.equilibrium_composition(
@@ -242,8 +257,10 @@ auto EdgeTemperatureReconstructor::reconstruct()
   }
   
   // Generate complete boundary layer solution at optimal T_edge
-  std::cout << "\n=== Generating Complete Solution ===" << std::endl;
-  std::cout << "Computing full boundary layer solution at T_edge = " << T_edge << " K..." << std::endl;
+  if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+    std::cout << "\n=== Generating Complete Solution ===" << std::endl;
+    std::cout << "Computing full boundary layer solution at T_edge = " << T_edge << " K..." << std::endl;
+  }
   
   auto final_config_result = setup_boundary_conditions(T_edge);
   if (!final_config_result) {
@@ -263,8 +280,10 @@ auto EdgeTemperatureReconstructor::reconstruct()
     final_heat_flux = final_solution_result->heat_flux_data[0].q_wall_total_dim;
   }
   
-  std::cout << "Complete solution generated successfully!" << std::endl;
-  std::cout << "Final heat flux verification: " << final_heat_flux << " W/m²" << std::endl;
+  if (full_config_.verbose || std::getenv("BLAST_VERBOSE")) {
+    std::cout << "Complete solution generated successfully!" << std::endl;
+    std::cout << "Final heat flux verification: " << final_heat_flux << " W/m²" << std::endl;
+  }
   
   // Restore GSI file before returning
   gsi_manager_.restore_gsi_file();

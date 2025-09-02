@@ -136,6 +136,9 @@ auto StationSolver::compute_stable_guess(int station, double xi) const
     
     if (!stable_config.wall_parameters.wall_temperatures.empty()) {
         stable_config.wall_parameters.wall_temperatures[0] = stable_config_.wall_temperature_stable;
+    } else {
+        // Ensure a valid wall temperature exists for stable boundary conditions
+        stable_config.wall_parameters.wall_temperatures.push_back(stable_config_.wall_temperature_stable);
     }
     
     if (!stable_config.outer_edge.edge_points.empty()) {
@@ -159,16 +162,9 @@ auto StationSolver::compute_stable_guess(int station, double xi) const
 }
 
 auto StationSolver::should_attempt_continuation(const ConvergenceError& convergence_error) const noexcept -> bool {
-    // Simple heuristic: attempt continuation if the error doesn't indicate a fundamental problem
-    const std::string& message = convergence_error.message();
-    
-    // Don't attempt continuation for clearly bad conditions
-    if (message.find("NaN") != std::string::npos ||
-        message.find("infinite") != std::string::npos ||
-        message.find("dimension") != std::string::npos) {
-        return false;
-    }
-    
+    // Avoid relying on error message parsing; default to attempting continuation.
+    // If future numeric criteria are available, they should be checked upstream.
+    (void)convergence_error; // unused parameter
     return true;
 }
 

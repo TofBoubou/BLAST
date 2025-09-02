@@ -202,6 +202,8 @@ struct Configuration {
   EdgeReconstructionConfig edge_reconstruction;
   Gasp2Config gasp2;
   MutationConfig mutation;
+  // Global verbosity flag for logging
+  bool verbose = false;
 };
 
 template <typename T>

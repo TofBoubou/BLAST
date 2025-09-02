@@ -220,31 +220,39 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
+  // Ensure workspaces sized for species and eta usage in this routine
+  ensure_workspace_size(n_species, n_eta);
 
   TransportCoefficients transport;
   transport.l0.reserve(n_eta);
   transport.l3.reserve(n_eta);
 
+  // Precompute edge composition and properties once (used for normalization)
+  auto& c_local_e = workspace_species2_;
+  for (std::size_t j = 0; j < n_species; ++j) {
+    c_local_e[j] = inputs.c(j, n_eta - 1);
+  }
+  const double P_edge = bc.P_e();
+  const double rho_e_calculated =
+      P_edge * thermo.MW[n_eta - 1] / (inputs.T[n_eta - 1] * constants::physical::universal_gas_constant);
+  auto mu_result_e = mixture_.viscosity(c_local_e, inputs.T[n_eta - 1], P_edge);
+  if (!mu_result_e) {
+    return std::unexpected(CoefficientError("Failed to compute edge viscosity"));
+  }
+  const double mu_e = mu_result_e.value();
+  if (!(rho_e_calculated > 0.0) || !(mu_e > 0.0)) {
+    return std::unexpected(CoefficientError("Invalid edge properties computed: rho_e or mu_e <= 0"));
+  }
+
   for (std::size_t i = 0; i < n_eta; ++i) {
     // Extract local composition using workspaces
     auto& c_local = workspace_species_;
-    auto& c_local_e = workspace_species2_;
     for (std::size_t j = 0; j < n_species; ++j) {
       c_local[j] = inputs.c(j, i);
     }
 
-    for (std::size_t j = 0; j < n_species; ++j) {
-      c_local_e[j] = inputs.c(j, n_eta - 1);
-    }
-
-    const double P_edge = bc.P_e();
-
-    const double rho_e_calculated =
-        bc.P_e() * thermo.MW[n_eta - 1] / (inputs.T[n_eta - 1] * constants::physical::universal_gas_constant);
-
     // Get transport properties
     auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_edge);
-    auto mu_result_e = mixture_.viscosity(c_local_e, inputs.T[n_eta - 1], P_edge);
     auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i], P_edge);
     auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], P_edge);
 
@@ -253,7 +261,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
     }
 
     const double mu = mu_result.value();
-    const double mu_e = mu_result_e.value();
     const double Cp = cp_result.value();
     const double k_fr = k_result.value();
 
@@ -263,10 +270,6 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
     }
 
     const double Pr = mu * Cp / k_fr;
-
-    if (bc.rho_e() <= 0.0 || bc.mu_e() <= 0.0) {
-      return std::unexpected(CoefficientError("Invalid edge conditions: rho_e or mu_e <= 0"));
-    }
 
     double l0_value = thermo.rho[i] * mu / (rho_e_calculated * mu_e);
     transport.l0.push_back(l0_value);
@@ -591,6 +594,8 @@ auto CoefficientCalculator::calculate_thermal_diffusion(const CoefficientInputs&
 
   const auto n_eta = inputs.T.size();
   const auto n_species = inputs.c.rows();
+  // Ensure workspaces sized for use in this routine
+  ensure_workspace_size(n_species, n_eta);
 
   ThermalDiffusionCoefficients tdr;
   tdr.tdr = core::Matrix<double>(n_species, n_eta);
@@ -650,6 +655,8 @@ auto CoefficientCalculator::calculate_species_enthalpies(const CoefficientInputs
 
   const auto n_eta = inputs.T.size();
   const auto n_species = mixture_.n_species();
+  // Ensure workspaces sized for derivative row buffer
+  ensure_workspace_size(n_species, n_eta);
 
   core::Matrix<double> h_species(n_species, n_eta);
 
@@ -699,6 +706,8 @@ auto CoefficientCalculator::calculate_wall_properties(const CoefficientInputs& i
     -> std::expected<WallProperties, CoefficientError> {
 
   const auto n_species = inputs.c.rows();
+  // Ensure workspaces sized for wall composition extraction
+  ensure_workspace_size(n_species, inputs.T.size());
 
   // Extract wall composition using workspace
   auto& c_wall = workspace_species_;
