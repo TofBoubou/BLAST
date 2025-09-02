@@ -159,28 +159,29 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
 
     // Parse configuration from the determined nodes
-    
+    // Debug: trace parsing progress
+    std::cout << "[YAML] Parsing simulation section..." << std::endl;
     auto sim_result = parse_simulation_config(sim_node, abacus_enabled, edge_reconstruction_enabled);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
     config.simulation = std::move(sim_result.value());
 
-    
+    std::cout << "[YAML] Parsing numerical section..." << std::endl;
     auto num_result = parse_numerical_config(num_node);
     if (!num_result) {
       return std::unexpected(num_result.error());
     }
     config.numerical = std::move(num_result.value());
 
-    
+    std::cout << "[YAML] Parsing mixture section..." << std::endl;
     auto mix_result = parse_mixture_config(mix_node);
     if (!mix_result) {
       return std::unexpected(mix_result.error());
     }
     config.mixture = std::move(mix_result.value());
 
-    
+    std::cout << "[YAML] Parsing output section..." << std::endl;
     auto out_result = parse_output_config(out_node);
     if (!out_result) {
       return std::unexpected(out_result.error());
@@ -189,7 +190,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Parse outer_edge only for base mode (edge_reconstruction and abacus use specialized configs)
     if (base_enabled) {
-      
+      std::cout << "[YAML] Parsing outer_edge section..." << std::endl;
       auto edge_result = parse_outer_edge_config(edge_node, false, false);
       if (!edge_result) {
         return std::unexpected(edge_result.error());
@@ -202,7 +203,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
 
     // Parse wall_parameters for modes that need it (only base mode)
     if (base_enabled) {
-      
+      std::cout << "[YAML] Parsing wall_parameters section..." << std::endl;
       auto wall_result = parse_wall_parameters_config(wall_node);
       if (!wall_result) {
         return std::unexpected(wall_result.error());
@@ -345,7 +346,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       cont_node = root_["continuation"];
     }
     
-    
+    std::cout << "[YAML] Parsing continuation section..." << std::endl;
     auto cont_result = parse_continuation_config(cont_node);
     if (!cont_result) {
       return std::unexpected(cont_result.error());
@@ -389,33 +390,51 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       gasp2_node = root_["gasp2"];
     }
     
-    
+    std::cout << "[YAML] Parsing gasp2 section..." << std::endl;
     auto gasp2_result = parse_gasp2_config(gasp2_node);
     if (!gasp2_result) {
       return std::unexpected(gasp2_result.error());
     }
     config.gasp2 = std::move(gasp2_result.value());
+    std::cout << "[YAML] GASP2 section parsed." << std::endl;
 
-    // Parse Mutation++ configuration
-    if (abacus_enabled) {
-      // In abacus mode, mutation config is not required; default it
-      config.mutation = MutationConfig{};
-    } else {
+    // Parse Mutation++ configuration only if requested via catalysis_provider
+    if (config.simulation.catalysis_provider == SimulationConfig::CatalysisProvider::MutationPP) {
+      std::cout << "[YAML] Catalysis provider: Mutation++ (parsing mutation section)" << std::endl;
       YAML::Node mutation_node;
-      if (base_enabled && root_["base"]["mutation"]) {
+      std::cout << "[YAML] Checking for mutation node in base..." << std::endl;
+      bool has_base_mut = static_cast<bool>(root_["base"]["mutation"]);
+      std::cout << "[YAML] base.mutation defined? " << std::boolalpha << has_base_mut << std::endl;
+      if (base_enabled && has_base_mut) {
         mutation_node = root_["base"]["mutation"];
-      } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["mutation"]) {
-        mutation_node = root_["edge_reconstruction"]["mutation"];
-      } else {
+      } else if (edge_reconstruction_enabled) {
+        std::cout << "[YAML] Checking for mutation node in edge_reconstruction..." << std::endl;
+        bool has_edge_mut = static_cast<bool>(root_["edge_reconstruction"]["mutation"]);
+        std::cout << "[YAML] edge_reconstruction.mutation defined? " << std::boolalpha << has_edge_mut << std::endl;
+        if (has_edge_mut) {
+          mutation_node = root_["edge_reconstruction"]["mutation"];
+        }
+      }
+      if (!mutation_node) {
+        std::cout << "[YAML] Checking for mutation node at root..." << std::endl;
         mutation_node = root_["mutation"];
+        std::cout << "[YAML] root.mutation defined? " << std::boolalpha << static_cast<bool>(mutation_node) << std::endl;
       }
 
-      
-      auto mutation_result = parse_mutation_config(mutation_node);
-      if (!mutation_result) {
-        return std::unexpected(mutation_result.error());
+      std::cout << "[YAML] Parsing mutation section..." << std::endl;
+      try {
+        auto mutation_result = parse_mutation_config(mutation_node);
+        if (!mutation_result) {
+          return std::unexpected(mutation_result.error());
+        }
+        config.mutation = std::move(mutation_result.value());
+      } catch (const YAML::Exception& e) {
+        return std::unexpected(core::ConfigurationError(std::format("In 'mutation' section (top-level): {}", e.what())));
       }
-      config.mutation = std::move(mutation_result.value());
+    } else {
+      std::cout << "[YAML] Catalysis provider: GASP2 (skip mutation section)" << std::endl;
+      // Not needed for GASP2 catalysis
+      config.mutation = MutationConfig{};
     }
 
     

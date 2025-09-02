@@ -21,7 +21,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -33,7 +33,7 @@ base:
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
     catalytic_wall: true
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
-    catalysis_provider: "gasp2"  # "mutation++" or "gasp2"
+    catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
     n_eta: 200
@@ -136,7 +136,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: true
+  enabled: false
   # Choose one:
   #   - temperature_sweep: q_wall(Tw) for each γ over a Tw range (current default)
   #   - gamma_sweep_at_Tw: q_wall(γ) at a fixed wall temperature Tw
