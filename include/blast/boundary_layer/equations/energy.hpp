@@ -52,7 +52,7 @@ build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs,
                                 const thermophysics::MixtureInterface& mixture,
                                 const coefficients::CoefficientInputs& inputs,
                                 int station,
-                                PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions;
+                                PhysicalQuantity auto d_eta) -> std::expected<EnergyBoundaryConditions, EquationError>;
 
 // Helper to compute species enthalpy terms
 [[nodiscard]] auto compute_species_enthalpy_terms(const coefficients::CoefficientInputs& inputs,

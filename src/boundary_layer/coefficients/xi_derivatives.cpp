@@ -1,7 +1,6 @@
 #include "blast/boundary_layer/coefficients/xi_derivatives.hpp"
 #include <algorithm>
 #include <iomanip>
-#include <iostream>
 
 namespace blast::boundary_layer::coefficients {
 
@@ -14,8 +13,6 @@ void XiDerivatives::update_station(int station, double xi, std::span<const doubl
     xi_minus_1_ = xi_current_;
     xi_current_ = xi;
     double d_xi = xi_current_ - xi_minus_1_;
-
-    std::cout << std::scientific << xi << std::endl;
 
     lambda0_ = 1.0 / d_xi;
     lambda1_ = -1.0 / d_xi;

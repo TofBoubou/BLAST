@@ -6,7 +6,6 @@
 #include <cmath>
 #include <expected>
 #include <format>
-#include <iostream>
 #include <source_location>
 
 namespace blast::boundary_layer::equations {
@@ -55,8 +54,6 @@ compute_geometry_factors(int station, PhysicalQuantity auto xi, const conditions
     }
 
     if (bc.d_xi_dx() <= 0.0 || bc.ue() <= 0.0 || bc.r_body() <= 0.0) {
-      std::cout << " bc.d_xi_dx() " << bc.d_xi_dx() << " bc.ue() " << bc.ue() << " bc.r_body() " << bc.r_body()
-                << std::endl;
       return std::unexpected(EquationError("Invalid boundary conditions for downstream station"));
     }
 
@@ -104,7 +101,6 @@ compute_energy_j_factor(int station, PhysicalQuantity auto xi, const conditions:
     }
 
     if (bc.d_xi_dx() <= 0.0 || bc.r_body() <= 0.0) {
-      std::cout << " bc.d_xi_dx() " << bc.d_xi_dx() << " bc.r_body() " << bc.r_body() << std::endl;
       return std::unexpected(EquationError("Invalid boundary conditions for downstream station"));
     }
 

@@ -32,7 +32,11 @@ auto solve_energy(std::span<const double> g_previous, const coefficients::Coeffi
   auto energy_coeffs = energy_coeffs_result.value();
 
   // Build boundary conditions
-  auto boundary_conds = detail::build_energy_boundary_conditions(coeffs, bc, sim_config, mixture, inputs, station, d_eta);
+  auto boundary_conds_result = detail::build_energy_boundary_conditions(coeffs, bc, sim_config, mixture, inputs, station, d_eta);
+  if (!boundary_conds_result) {
+    return std::unexpected(boundary_conds_result.error());
+  }
+  auto boundary_conds = boundary_conds_result.value();
 
   // Solve tridiagonal system
   auto solution_result = solvers::solve_momentum_energy_tridiagonal(
@@ -152,7 +156,7 @@ build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs,
                                  const thermophysics::MixtureInterface& mixture,
                                  const coefficients::CoefficientInputs& inputs,
                                  int station,
-                                 PhysicalQuantity auto d_eta) -> EnergyBoundaryConditions {
+                                 PhysicalQuantity auto d_eta) -> std::expected<EnergyBoundaryConditions, EquationError> {
   
   EnergyBoundaryConditions boundary_conds;
   
@@ -174,9 +178,9 @@ build_energy_boundary_conditions(const coefficients::CoefficientSet& coeffs,
     // Calculer J_fact en utilisant la fonction existante
     auto j_fact_result = compute_energy_j_factor(station, bc.xi, bc, sim_config);
     if (!j_fact_result) {
-      std::cerr << "Warning: Failed to compute J_fact, using 1.0" << std::endl;
+      return std::unexpected(j_fact_result.error());
     }
-    const double J_fact = j_fact_result.value_or(1.0);
+    const double J_fact = j_fact_result.value();
     
     // Calcul des termes de flux diffusifs pour la condition adiabatique
     for (std::size_t i = 0; i < n_species; ++i) {
