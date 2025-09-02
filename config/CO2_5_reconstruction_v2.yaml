@@ -21,7 +21,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -81,7 +81,7 @@ base:
 # =============================================================================
 
 edge_reconstruction:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric
@@ -91,7 +91,7 @@ edge_reconstruction:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 200
+    n_eta: 20
     eta_max: 6.0
     convergence_tolerance: 1.0e-6  
     max_iterations: 100000  
@@ -125,7 +125,7 @@ edge_reconstruction:
     delta_bl: 0.0105250000
   
   solver:
-    initial_temperature_guess: 5600
+    initial_temperature_guess: 5200
     temperature_min: 5000
     temperature_max: 6000
     tolerance: 1e-3
