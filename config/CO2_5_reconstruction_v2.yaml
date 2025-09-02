@@ -140,13 +140,13 @@ abacus:
   # Choose one:
   #   - temperature_sweep: q_wall(Tw) for each γ over a Tw range (current default)
   #   - gamma_sweep_at_Tw: q_wall(γ) at a fixed wall temperature Tw
-  mode: temperature_sweep
+  mode: gamma_sweep_at_Tw
   temperature_sweep:
     range: [3500, 4000]
     points: 5
   gamma_sweep:
-    wall_temperature: 3000
-  catalyticity_values: [0.0, 0.001, 0.01, 0.1, 1]
+    wall_temperature: [3500, 3700, 4000]
+  catalyticity_values: [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.01, 0.02, 0.03, 0.05, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 1]
   
   simulation:
     body_type: axisymmetric
@@ -171,8 +171,8 @@ abacus:
     output_directory: outputs_abacus
   
   boundary_conditions:
-    pressure: 7000  # Pressure for abacus mode (Pa)
-    temperature: 5905.5  # Edge temperature
+    pressure: 7000 
+    temperature: 5905.5  
     radius: 1.0 
     velocity: 0.0
   
