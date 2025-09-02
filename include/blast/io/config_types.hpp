@@ -114,7 +114,6 @@ struct OuterEdgeConfig {
 
 struct WallParametersConfig {
   std::vector<double> wall_temperatures;
-  bool catalytic_wall = false;
 
   double emissivity = constants::defaults::default_emissivity;                   
   double environment_temperature = constants::defaults::ambient_temperature;     

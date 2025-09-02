@@ -336,7 +336,6 @@ auto EdgeTemperatureReconstructor::setup_boundary_conditions(double T_edge)
   // Override with reconstruction parameters
   temp_config.simulation.finite_thickness = true;
   temp_config.simulation.catalytic_wall = (config_.boundary_conditions.catalyticity > 0);
-  temp_config.wall_parameters.catalytic_wall = (config_.boundary_conditions.catalyticity > 0);
   
   // Set edge conditions
   if (temp_config.outer_edge.edge_points.empty()) {
