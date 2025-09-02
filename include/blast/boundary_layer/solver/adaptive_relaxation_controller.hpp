@@ -45,7 +45,7 @@ public:
     // Specialized configurations
     [[nodiscard]] static auto for_stagnation_point() -> Config {
       Config config;
-      config.initial_factor = 0.01;
+      config.initial_factor = 0.001;
       config.max_factor = 1;          // More conservative
       config.strong_increase = 1.001;   // Slower growth
       config.moderate_increase = 1.001; // Very moderate
