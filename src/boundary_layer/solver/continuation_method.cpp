@@ -32,6 +32,10 @@ auto ContinuationMethod::solve_with_continuation(
   add_to_history(current_solution, lambda);
 
   for (int step = 0; step < MAX_STEPS; ++step) {
+    // Display progress percentage
+    double progress = lambda * 100;
+    std::cout << "\r[CONTINUATION] Progress: " << std::fixed << std::setprecision(2) << progress << "%" << std::flush;
+    
     if (lambda + lambda_step > 1.0) {
       lambda_step = 1.0 - lambda;
     }
@@ -44,22 +48,9 @@ auto ContinuationMethod::solve_with_continuation(
       try {
         predicted_solution = predict_solution(lambda_try);
         
-        // Debug: show evolution for first grid point of g component (energy)
-        const auto& p1 = history_[history_.size() - 2]; 
-        const auto& p2 = history_[history_.size() - 1];
-        if (!p1.solution.g.empty()) {
-          std::cout << "[PREDICTOR] Linear g[0]: λ=" << std::scientific << std::setprecision(3) 
-                    << p1.lambda << " -> " << std::fixed << std::setprecision(6) << p1.solution.g[0]
-                    << ", λ=" << std::scientific << std::setprecision(3)
-                    << p2.lambda << " -> " << std::fixed << std::setprecision(6) << p2.solution.g[0]
-                    << " => λ=" << std::scientific << std::setprecision(3)
-                    << lambda_try << " -> " << std::fixed << std::setprecision(6) << predicted_solution.g[0] << std::endl;
-        }
-        
-        std::cout << "[PREDICTOR] Using linear prediction for lambda=" 
-                  << std::scientific << std::setprecision(3) << lambda_try << std::endl;
+        // Using linear prediction
       } catch (const std::exception& e) {
-        std::cout << "[PREDICTOR] Prediction failed: " << e.what() 
+        std::cout << "\n[PREDICTOR] Prediction failed: " << e.what() 
                   << ", falling back to previous solution" << std::endl;
         predicted_solution = current_solution;
       }
@@ -92,20 +83,21 @@ auto ContinuationMethod::solve_with_continuation(
       consecutive_failures_ = 0;
       if (using_equilibrium_mode_) {
         consecutive_successes_in_equilibrium_++;
-        std::cout << "[CHEMICAL SWITCHING] Success in equilibrium mode (" << consecutive_successes_in_equilibrium_ 
+        std::cout << "\n[CHEMICAL SWITCHING] Success in equilibrium mode (" << consecutive_successes_in_equilibrium_ 
                   << "/" << SUCCESS_THRESHOLD << ")" << std::endl;
         
         // Switch back to original mode after SUCCESS_THRESHOLD successes
         if (consecutive_successes_in_equilibrium_ >= SUCCESS_THRESHOLD) {
           using_equilibrium_mode_ = false;
           consecutive_successes_in_equilibrium_ = 0;
-          std::cout << "[CHEMICAL SWITCHING] Switching back to " 
+          std::cout << "\n[CHEMICAL SWITCHING] Switching back to " 
                     << (original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium ? "non_equilibrium" : "original") 
                     << " mode" << std::endl;
         }
       }
 
       if (std::abs(lambda - 1.0) < 1e-10) {
+        std::cout << "\n[CONTINUATION] Completed 100%" << std::endl;
         return ContinuationResult{.solution = current_solution, .success = true, .final_lambda = lambda};
       }
 
@@ -113,7 +105,7 @@ auto ContinuationMethod::solve_with_continuation(
       lambda_step = std::min(lambda_step * STEP_INCREASE_FACTOR, LAMBDA_STEP_MAX);
       if (!predictor_enabled_ && target_config.continuation.use_linear_predictor) {
         predictor_enabled_ = true;
-        std::cout << "[PREDICTOR] Re-enabled after successful step" << std::endl;
+        std::cout << "\n[PREDICTOR] Re-enabled after successful step" << std::endl;
       }
 
     } else {
@@ -126,11 +118,11 @@ auto ContinuationMethod::solve_with_continuation(
       bool is_nan_error = error_msg.find("NaN detected") != std::string::npos;
 
       if (is_nan_error) {
-        std::cout << "[CONTINUATION] NaN detected at lambda=" << std::scientific << std::setprecision(3) << lambda_try
+        std::cout << "\n[CONTINUATION] NaN detected at lambda=" << std::scientific << std::setprecision(3) << lambda_try
                   << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step << " to "
                   << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
       } else {
-        std::cout << "[CONTINUATION] Step failed at lambda=" << std::scientific << std::setprecision(3) << lambda_try
+        std::cout << "\n[CONTINUATION] Step failed at lambda=" << std::scientific << std::setprecision(3) << lambda_try
                   << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step << " to "
                   << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
       }
@@ -142,7 +134,7 @@ auto ContinuationMethod::solve_with_continuation(
         using_equilibrium_mode_ = true;
         consecutive_failures_ = 0;
         consecutive_successes_in_equilibrium_ = 0;
-        std::cout << "[CHEMICAL SWITCHING] Switching to equilibrium mode after " << FAILURE_THRESHOLD 
+        std::cout << "\n[CHEMICAL SWITCHING] Switching to equilibrium mode after " << FAILURE_THRESHOLD 
                   << " consecutive failures" << std::endl;
       }
 
@@ -153,12 +145,12 @@ auto ContinuationMethod::solve_with_continuation(
       // Disable predictor if too many step reductions
       if (step_reductions_for_current_step_ >= MAX_STEP_REDUCTIONS && predictor_enabled_) {
         predictor_enabled_ = false;
-        std::cout << "[PREDICTOR] Disabled after " << MAX_STEP_REDUCTIONS 
+        std::cout << "\n[PREDICTOR] Disabled after " << MAX_STEP_REDUCTIONS 
                   << " step reductions" << std::endl;
       }
 
       if (lambda_step < LAMBDA_STEP_MIN) {
-        std::cout << "[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
+        std::cout << "\n[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
                   << " < " << std::scientific << std::setprecision(3) << LAMBDA_STEP_MIN
                   << "), giving up at lambda=" << std::scientific << std::setprecision(3) << lambda << std::endl;
         return ContinuationResult{.solution = current_solution, .success = false, .final_lambda = lambda};

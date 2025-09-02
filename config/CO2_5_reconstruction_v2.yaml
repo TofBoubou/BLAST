@@ -4,7 +4,7 @@
 
 continuation:
   wall_temperature_stable: 3000
-  edge_temperature_stable: 3000
+  edge_temperature_stable: 5905.5
   pressure_stable: 7000
   use_linear_predictor: true
 
@@ -21,7 +21,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -36,7 +36,7 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 20
+    n_eta: 100
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
@@ -72,7 +72,7 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [300]
+    temperatures: [1000]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"
 
@@ -81,7 +81,7 @@ base:
 # =============================================================================
 
 edge_reconstruction:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
