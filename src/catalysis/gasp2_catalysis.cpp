@@ -38,7 +38,16 @@ auto Gasp2Catalysis::compute_surface_fluxes(std::span<const double> partial_dens
     return std::unexpected(CatalysisError(std::format("GASP2 flux computation failed: {}", flux_result.error().message)));
   }
 
-  return flux_result.value().cat_fluxes;
+  // Align sign convention with Mutation++ (invert sign like Mutation++ does)
+  // GASP2 returns destruction rates (positive = consumption)
+  // Mutation++ convention expects production rates, then inverts to get outgoing flux
+  // To match, we need to invert GASP2's sign
+  auto fluxes = flux_result.value().cat_fluxes;
+  for (auto& flux : fluxes) {
+    flux = -flux;
+  }
+
+  return fluxes;
 }
 
 auto Gasp2Catalysis::species_names() const -> std::vector<std::string> {
