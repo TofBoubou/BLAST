@@ -33,7 +33,6 @@ private:
   std::string xml_file_;
   std::vector<std::string> species_order_;
   std::vector<double> molar_masses_;
-  bool initialized_;
 };
 
 } // namespace blast::catalysis

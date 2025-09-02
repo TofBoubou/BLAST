@@ -1174,26 +1174,6 @@ auto YamlParser::parse_gasp2_config(const YAML::Node& node) const
     if (node["xml_file"]) {
       config.xml_file = node["xml_file"].as<std::string>();
     }
-    
-    if (node["reaction_type"]) {
-      config.reaction_type = node["reaction_type"].as<std::string>();
-    }
-    
-    if (node["temperature_exponent"]) {
-      config.temperature_exponent = node["temperature_exponent"].as<double>();
-    }
-    
-    if (node["activation_energy"]) {
-      config.activation_energy = node["activation_energy"].as<double>();
-    }
-    
-    if (node["pre_exponential"]) {
-      config.pre_exponential = node["pre_exponential"].as<double>();
-    }
-    
-    if (node["use_xml_parameters"]) {
-      config.use_xml_parameters = node["use_xml_parameters"].as<bool>();
-    }
 
     return config;
   } catch (const YAML::Exception& e) {

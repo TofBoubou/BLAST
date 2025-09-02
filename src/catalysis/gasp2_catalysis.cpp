@@ -1,28 +1,21 @@
 #include "blast/catalysis/gasp2_catalysis.hpp"
 #include <gasp2/gasp2.hpp>
 #include <format>
-#include <iostream>
 
 namespace blast::catalysis {
 
 Gasp2Catalysis::Gasp2Catalysis(const std::string& xml_file, const std::vector<std::string>& species_order, 
                                const std::vector<double>& molar_masses)
-      : xml_file_(xml_file), species_order_(species_order), molar_masses_(molar_masses), initialized_(false) {
-  // Initialize GASP2 using the provided XML definition.
-  auto init_result = gasp2::initialize_catalysis(species_order_, molar_masses_, xml_file_);
+      : xml_file_(xml_file), species_order_(species_order), molar_masses_(molar_masses) {
+  // Initialize GASP2 using the provided XML definition (disable verbose debug).
+  auto init_result = gasp2::initialize_catalysis(species_order_, molar_masses_, xml_file_, /*debug=*/false);
   if (!init_result) {
     throw CatalysisError(std::format("Failed to initialize GASP2: {}", init_result.error().message));
   }
-  
-  initialized_ = true;
 }
 
 auto Gasp2Catalysis::compute_surface_fluxes(std::span<const double> partial_densities, double wall_temperature) const
     -> std::expected<std::vector<double>, CatalysisError> {
-  
-  if (!initialized_) {
-    return std::unexpected(CatalysisError("GASP2 not initialized"));
-  }
 
   if (partial_densities.size() != species_order_.size()) {
     return std::unexpected(CatalysisError(std::format("Size mismatch: expected {} species, got {}", 

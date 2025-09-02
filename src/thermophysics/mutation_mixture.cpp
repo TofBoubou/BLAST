@@ -1,6 +1,7 @@
 #include "blast/thermophysics/mutation_mixture.hpp"
 #include "blast/thermophysics/hybrid_mixture.hpp"
 #include "blast/catalysis/gasp2_catalysis.hpp"
+#include "blast/catalysis/mutation_catalysis.hpp"
 #include "blast/core/constants.hpp"
 #include <algorithm>
 #include <cmath>
@@ -543,37 +544,45 @@ auto create_mixture_with_catalysis(const io::MixtureConfig& mixture_config,
   }
   auto base_mixture = std::move(base_mixture_result.value());
 
-  // If catalysis is disabled or using Mutation++, return base mixture directly
-  if (!sim_config.catalytic_wall || 
-      sim_config.catalysis_provider == io::SimulationConfig::CatalysisProvider::MutationPP) {
+  // If catalysis is disabled, return base mixture directly
+  if (!sim_config.catalytic_wall) {
     return base_mixture;
   }
 
-  // Create GASP2 catalysis provider
-  if (sim_config.catalysis_provider == io::SimulationConfig::CatalysisProvider::GASP2) {
+  // Build catalysis provider according to selection and always return a HybridMixture
+  switch (sim_config.catalysis_provider) {
+  case io::SimulationConfig::CatalysisProvider::MutationPP: {
+    try {
+      auto provider = std::make_unique<catalysis::MutationCatalysis>(*base_mixture);
+      return std::make_unique<HybridMixture>(std::move(base_mixture), std::move(provider));
+    } catch (const std::exception& e) {
+      return std::unexpected(
+          ThermophysicsError(std::format("Failed to create Mutation++ catalysis wrapper: {}", e.what())));
+    }
+  }
+  case io::SimulationConfig::CatalysisProvider::GASP2: {
     try {
       // Extract species information from base mixture
       std::vector<std::string> species_names;
       std::vector<double> molar_masses;
-      
+
+      species_names.reserve(base_mixture->n_species());
+      molar_masses.reserve(base_mixture->n_species());
       for (std::size_t i = 0; i < base_mixture->n_species(); ++i) {
         species_names.emplace_back(base_mixture->species_name(i));
         molar_masses.push_back(base_mixture->species_molecular_weight(i));
       }
 
-      std::cout << "Creating GASP2 " << gasp2_config.reaction_type 
-                << " catalysis for " << species_names.size() 
+      std::cout << "Creating GASP2 catalysis for " << species_names.size()
                 << " species using: " << gasp2_config.xml_file << std::endl;
 
-      auto gasp2_catalysis = std::make_unique<catalysis::Gasp2Catalysis>(
-          gasp2_config.xml_file, species_names, molar_masses);
+      auto provider = std::make_unique<catalysis::Gasp2Catalysis>(gasp2_config.xml_file, species_names, molar_masses);
+      return std::make_unique<HybridMixture>(std::move(base_mixture), std::move(provider));
 
-      return std::make_unique<HybridMixture>(std::move(base_mixture), 
-                                           std::move(gasp2_catalysis));
-                                           
     } catch (const std::exception& e) {
       return std::unexpected(ThermophysicsError(std::format("Failed to create GASP2 catalysis: {}", e.what())));
     }
+  }
   }
 
   return std::unexpected(ThermophysicsError("Unknown catalysis provider"));

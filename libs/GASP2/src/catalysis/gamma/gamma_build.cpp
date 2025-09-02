@@ -1,7 +1,6 @@
 #include "gasp2/catalysis/gamma/gamma_build.hpp"
 
 #include <cmath>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -12,29 +11,17 @@ namespace gasp2::catalysis::gamma {
 compute_gamma(const ReactionInput &reaction, std::string_view species,
               double T_wall, const SpeciesData &data,
               const std::unordered_map<std::string, std::size_t> &index) {
-  std::cout << "DEBUG compute_gamma - species: " << species << ", reaction.type: " << static_cast<int>(reaction.type) << std::endl;
-  std::cout.flush();
-  std::cout << "DEBUG compute_gamma - reaction.gammas has_value: " << (reaction.gammas.has_value() ? "true" : "false") << std::endl;
-  std::cout.flush();
-  if (reaction.gammas.has_value()) {
-    std::cout << "DEBUG compute_gamma - reaction.gammas size: " << reaction.gammas->size() << std::endl;
-    for (const auto& [sp, val] : *reaction.gammas) {
-      std::cout << "DEBUG compute_gamma - gammas map contains: " << sp << " -> " << val << std::endl;
-    }
-  }
+  // Removed verbose debug prints
   
   switch (reaction.type) {
   case CatalysisModel::GammaGiven: {
     if (!reaction.gammas.has_value()) {
-      std::cout << "DEBUG compute_gamma - ERROR: reaction.gammas is null!" << std::endl;
       return 0.0;
     }
     if (reaction.gammas->find(std::string(species)) == reaction.gammas->end()) {
-      std::cout << "DEBUG compute_gamma - ERROR: species " << species << " not found in gammas map!" << std::endl;
       return 0.0;
     }
     double gamma_val = reaction.gammas->at(std::string(species));
-    std::cout << "DEBUG compute_gamma - returning gamma: " << gamma_val << " for species: " << species << std::endl;
     return gamma_val;
   }
   case CatalysisModel::GammaT: {
