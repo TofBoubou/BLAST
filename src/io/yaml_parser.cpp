@@ -175,7 +175,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     // Parse configuration from the determined nodes
     // Debug: trace parsing progress
     if (config.verbose) { std::cout << "[YAML] Parsing simulation section..." << std::endl; }
-    auto sim_result = parse_simulation_config(sim_node, abacus_enabled, edge_reconstruction_enabled);
+    auto sim_result = parse_simulation_config(sim_node, abacus_enabled, edge_reconstruction_enabled, config.verbose);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
@@ -205,7 +205,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     // Parse outer_edge only for base mode (edge_reconstruction and abacus use specialized configs)
     if (base_enabled) {
       if (config.verbose) { std::cout << "[YAML] Parsing outer_edge section..." << std::endl; }
-      auto edge_result = parse_outer_edge_config(edge_node, false, false);
+      auto edge_result = parse_outer_edge_config(edge_node, false, false, config.verbose);
       if (!edge_result) {
         return std::unexpected(edge_result.error());
       }
@@ -467,7 +467,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
   }
 }
 
-auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mode, bool edge_reconstruction_mode) const
+auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mode, bool edge_reconstruction_mode, bool verbose) const
     -> std::expected<SimulationConfig, core::ConfigurationError> {
 
   SimulationConfig config;
@@ -487,7 +487,7 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mod
       if (node["only_stagnation_point"]) {
         bool user_value = node["only_stagnation_point"].as<bool>();
         if (!user_value) {
-          if (config.verbose) std::cout << "INFO: Ignoring 'only_stagnation_point: false' in " 
+          if (verbose) std::cout << "INFO: Ignoring 'only_stagnation_point: false' in " 
                     << (abacus_mode ? "abacus" : "edge_reconstruction") 
                     << " mode. Forcing to true." << std::endl;
         }
@@ -536,7 +536,7 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mod
       if (node["chemical_mode"]) {
         std::string user_value = node["chemical_mode"].as<std::string>();
         if (user_value != "non_equilibrium" && user_value != "nonequilibrium") {
-          if (config.verbose) std::cout << "INFO: Ignoring 'chemical_mode: " << user_value << "' in " 
+          if (verbose) std::cout << "INFO: Ignoring 'chemical_mode: " << user_value << "' in " 
                     << (abacus_mode ? "abacus" : "edge_reconstruction") 
                     << " mode. Forcing to non_equilibrium." << std::endl;
         }
@@ -558,7 +558,7 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mod
       if (node["catalytic_wall"]) {
         bool user_value = node["catalytic_wall"].as<bool>();
         if (!user_value) {
-          if (config.verbose) std::cout << "INFO: Ignoring 'catalytic_wall: false' in " 
+          if (verbose) std::cout << "INFO: Ignoring 'catalytic_wall: false' in " 
                     << (abacus_mode ? "abacus" : "edge_reconstruction") 
                     << " mode. Forcing to true." << std::endl;
         }
@@ -708,7 +708,7 @@ auto YamlParser::parse_output_config(const YAML::Node& node) const
   }
 }
 
-auto YamlParser::parse_outer_edge_config(const YAML::Node& node, bool edge_reconstruction_mode, bool abacus_mode) const
+auto YamlParser::parse_outer_edge_config(const YAML::Node& node, bool edge_reconstruction_mode, bool abacus_mode, bool verbose) const
     -> std::expected<OuterEdgeConfig, core::ConfigurationError> {
 
   OuterEdgeConfig config;
@@ -728,7 +728,7 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node, bool edge_recon
         point.x = 0.0;
         // Warn if x is specified in config but will be ignored
         if (point_node["x"]) {
-          if (config.verbose) std::cout << "INFO: Ignoring 'x' value in edge_points for " << (edge_reconstruction_mode ? "edge_reconstruction" : "abacus") << " mode. Using x=0.0 (stagnation point)." << std::endl;
+          if (verbose) std::cout << "INFO: Ignoring 'x' value in edge_points for " << (edge_reconstruction_mode ? "edge_reconstruction" : "abacus") << " mode. Using x=0.0 (stagnation point)." << std::endl;
         }
       } else {
         // Base mode - x is required
