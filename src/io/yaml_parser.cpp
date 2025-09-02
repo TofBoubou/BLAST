@@ -503,6 +503,9 @@ auto YamlParser::parse_simulation_config(const YAML::Node& node, bool abacus_mod
                     << " mode. Forcing to true." << std::endl;
         }
       }
+      
+      // Force catalysis_provider to MutationPP for specialized modes
+      config.catalysis_provider = SimulationConfig::CatalysisProvider::MutationPP;
     } else {
       // Base mode - catalytic_wall is optional, defaults to true
       if (node["catalytic_wall"]) {
