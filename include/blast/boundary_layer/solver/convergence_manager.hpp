@@ -104,9 +104,9 @@ private:
      * @return New solution state or error
      */
     [[nodiscard]] auto execute_solver_pipeline(int station, double xi,
-                                              const conditions::BoundaryConditions& bc,
-                                              const equations::SolutionState& solution,
-                                              int iteration) -> std::expected<equations::SolutionState, SolverError>;
+                                              conditions::BoundaryConditions& bc,
+                                              equations::SolutionState& solution,
+                                              int iteration) -> std::expected<void, SolverError>;
 
     /**
      * @brief Update wall temperature for radiative equilibrium

@@ -34,13 +34,8 @@ auto ConvergenceManager::iterate_station_adaptive(int station, double xi,
             return std::unexpected(pipeline_result.error());
         }
 
-        // Complete new solution construction
-        equations::SolutionState solution_new(n_eta, n_species);
-        solution_new.V = solution.V;
-        solution_new.F = solution.F;
-        solution_new.g = solution.g;
-        solution_new.c = solution.c;
-        solution_new.T = solution.T;
+        // New solution after pipeline execution
+        equations::SolutionState solution_new = solution;
 
         // Convergence check
         conv_info = check_convergence(solution_old, solution_new);
@@ -66,8 +61,7 @@ auto ConvergenceManager::iterate_station_adaptive(int station, double xi,
 
         // Check convergence first
         if (conv_info.converged) {
-            // If converged, use the new solution directly without further relaxation
-            solution = solution_new;
+            // Already at new solution state from pipeline
             return conv_info;
         }
 
@@ -183,23 +177,17 @@ auto ConvergenceManager::initialize_relaxation_for_station(int station) -> void 
 }
 
 auto ConvergenceManager::execute_solver_pipeline(int station, double xi,
-                                                const conditions::BoundaryConditions& bc,
-                                                const equations::SolutionState& solution,
-                                                int iteration) -> std::expected<equations::SolutionState, SolverError> {
+                                                conditions::BoundaryConditions& bc,
+                                                equations::SolutionState& solution,
+                                                int iteration) -> std::expected<void, SolverError> {
 
-    // Initialize coefficients and inputs
+    // Initialize coefficients container (filled by steps)
     coefficients::CoefficientSet coeffs;
-    coefficients::CoefficientInputs inputs{.xi = xi,
-                                          .F = solution.F,
-                                          .c = solution.c,
-                                          .dc_deta = core::Matrix<double>(),
-                                          .dc_deta2 = core::Matrix<double>(),
-                                          .T = solution.T};
 
-    // Create context
-    SolverContext ctx{.solution = const_cast<equations::SolutionState&>(solution),
-                     .solution_old = const_cast<equations::SolutionState&>(solution),
-                     .bc = const_cast<conditions::BoundaryConditions&>(bc),
+    // Create context (no const_cast; pipeline mutates state explicitly)
+    SolverContext ctx{.solution = solution,
+                     .solution_old = solution,
+                     .bc = bc,
                      .coeffs = coeffs,
                      .mixture = mixture_,
                      .station = station,
@@ -217,7 +205,7 @@ auto ConvergenceManager::execute_solver_pipeline(int station, double xi,
                                                         station, iteration, pipeline_result.error().what())));
     }
 
-    return solution;
+    return {};
 }
 
 auto ConvergenceManager::update_wall_temperature_radiative(int station, double xi,

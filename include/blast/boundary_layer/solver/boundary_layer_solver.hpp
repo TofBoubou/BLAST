@@ -161,6 +161,10 @@ public:
 
   auto set_config(const io::Configuration& config) noexcept -> void { config_ = config; }
 
+  // Continuation mode control (RAII-friendly)
+  auto enter_continuation() noexcept -> void { in_continuation_ = true; }
+  auto exit_continuation() noexcept -> void { in_continuation_ = false; }
+
 private:
   // =============================================================================
   // PRIVATE ORCHESTRATION METHODS

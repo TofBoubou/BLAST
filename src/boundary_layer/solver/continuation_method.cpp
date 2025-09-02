@@ -1,5 +1,6 @@
 #include "blast/boundary_layer/solver/continuation_method.hpp"
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
+#include "blast/boundary_layer/solver/continuation_scope.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -70,114 +71,97 @@ auto ContinuationMethod::solve_with_continuation(
     }
 
     solver.set_config(interp_config);
-    solver.in_continuation_ = true;
-    auto result = solver.solve_station(station, xi, predicted_solution);
-    solver.in_continuation_ = false;
-    solver.set_config(original_config);
-
-    if (result) {
-      current_solution = result.value();
-      lambda = lambda_try;
-      
-      // Add successful point to history
-      add_to_history(current_solution, lambda);
-      
-      // Reset step reduction counter on success
-      step_reductions_for_current_step_ = 0;
-
-      // Reset failure counter and handle success in equilibrium mode
-      consecutive_failures_ = 0;
-      if (using_equilibrium_mode_) {
-        consecutive_successes_in_equilibrium_++;
-        if (verbose) {
-          std::cout << "\n[CHEMICAL SWITCHING] Success in equilibrium mode (" << consecutive_successes_in_equilibrium_ 
-                    << "/" << SUCCESS_THRESHOLD << ")" << std::endl;
-        }
-        
-        // Switch back to original mode after SUCCESS_THRESHOLD successes
-        if (consecutive_successes_in_equilibrium_ >= SUCCESS_THRESHOLD) {
-          using_equilibrium_mode_ = false;
-          consecutive_successes_in_equilibrium_ = 0;
+    {
+      ContinuationScope scope(solver);
+      auto result = solver.solve_station(station, xi, predicted_solution);
+      if (result) {
+        current_solution = result.value();
+        lambda = lambda_try;
+        add_to_history(current_solution, lambda);
+        step_reductions_for_current_step_ = 0;
+        consecutive_failures_ = 0;
+        if (using_equilibrium_mode_) {
+          consecutive_successes_in_equilibrium_++;
           if (verbose) {
-            std::cout << "\n[CHEMICAL SWITCHING] Switching back to " 
-                      << (original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium ? "non_equilibrium" : "original") 
-                      << " mode" << std::endl;
+            std::cout << "\n[CHEMICAL SWITCHING] Success in equilibrium mode (" << consecutive_successes_in_equilibrium_
+                      << "/" << SUCCESS_THRESHOLD << ")" << std::endl;
+          }
+          if (consecutive_successes_in_equilibrium_ >= SUCCESS_THRESHOLD) {
+            using_equilibrium_mode_ = false;
+            consecutive_successes_in_equilibrium_ = 0;
+            if (verbose) {
+              std::cout << "\n[CHEMICAL SWITCHING] Switching back to "
+                        << (original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium ?
+                                "non_equilibrium" :
+                                "original")
+                        << " mode" << std::endl;
+            }
           }
         }
-      }
-
-      if (std::abs(lambda - 1.0) < 1e-10) {
-        if (verbose) {
-          std::cout << "\n[CONTINUATION] Completed 100%" << std::endl;
+        if (std::abs(lambda - 1.0) < 1e-10) {
+          if (verbose) {
+            std::cout << "\n[CONTINUATION] Completed 100%" << std::endl;
+          }
+          solver.set_config(original_config);
+          return ContinuationResult{.solution = current_solution, .success = true, .final_lambda = lambda};
         }
-        return ContinuationResult{.solution = current_solution, .success = true, .final_lambda = lambda};
-      }
-
-      // Increase step after success and re-enable predictor if it was disabled
-      lambda_step = std::min(lambda_step * STEP_INCREASE_FACTOR, LAMBDA_STEP_MAX);
-      if (!predictor_enabled_ && target_config.continuation.use_linear_predictor) {
-        predictor_enabled_ = true;
-        if (verbose) {
-          std::cout << "\n[PREDICTOR] Re-enabled after successful step" << std::endl;
+        lambda_step = std::min(lambda_step * STEP_INCREASE_FACTOR, LAMBDA_STEP_MAX);
+        if (!predictor_enabled_ && target_config.continuation.use_linear_predictor) {
+          predictor_enabled_ = true;
+          if (verbose) {
+            std::cout << "\n[PREDICTOR] Re-enabled after successful step" << std::endl;
+          }
         }
-      }
-
-    } else {
-      // Handle failure - increment failure counter and check for chemical mode switching
-      consecutive_failures_++;
-      consecutive_successes_in_equilibrium_ = 0;  // Reset success counter on any failure
-      
-      // Check if the failure was due to NaN detection
-      const std::string error_msg = result.error().message();
-      bool is_nan_error = error_msg.find("NaN detected") != std::string::npos;
-
-      if (verbose) {
-        if (is_nan_error) {
-          std::cout << "\n[CONTINUATION] NaN detected at lambda=" << std::scientific << std::setprecision(3) << lambda_try
-                    << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step << " to "
-                    << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
-        } else {
-          std::cout << "\n[CONTINUATION] Step failed at lambda=" << std::scientific << std::setprecision(3) << lambda_try
-                    << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step << " to "
-                    << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR << std::endl;
-        }
-      }
-
-      // Check for chemical mode switching (only for NonEquilibrium -> Equilibrium)
-      if (!using_equilibrium_mode_ && 
-          original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium &&
-          consecutive_failures_ >= FAILURE_THRESHOLD) {
-        using_equilibrium_mode_ = true;
-        consecutive_failures_ = 0;
+      } else {
+        consecutive_failures_++;
         consecutive_successes_in_equilibrium_ = 0;
+        const std::string error_msg = result.error().message();
+        bool is_nan_error = error_msg.find("NaN detected") != std::string::npos;
         if (verbose) {
-          std::cout << "\n[CHEMICAL SWITCHING] Switching to equilibrium mode after " << FAILURE_THRESHOLD 
-                    << " consecutive failures" << std::endl;
+          if (is_nan_error) {
+            std::cout << "\n[CONTINUATION] NaN detected at lambda=" << std::scientific << std::setprecision(3) << lambda_try
+                      << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step
+                      << " to " << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR
+                      << std::endl;
+          } else {
+            std::cout << "\n[CONTINUATION] Step failed at lambda=" << std::scientific << std::setprecision(3) << lambda_try
+                      << ", reducing step from " << std::scientific << std::setprecision(3) << lambda_step
+                      << " to " << std::scientific << std::setprecision(3) << lambda_step * STEP_DECREASE_FACTOR
+                      << std::endl;
+          }
         }
-      }
-
-      // Decrease step after failure (including NaN errors)
-      lambda_step *= STEP_DECREASE_FACTOR;
-      step_reductions_for_current_step_++;
-      
-      // Disable predictor if too many step reductions
-      if (step_reductions_for_current_step_ >= MAX_STEP_REDUCTIONS && predictor_enabled_) {
-        predictor_enabled_ = false;
-        if (verbose) {
-          std::cout << "\n[PREDICTOR] Disabled after " << MAX_STEP_REDUCTIONS 
-                    << " step reductions" << std::endl;
+        if (!using_equilibrium_mode_ &&
+            original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium &&
+            consecutive_failures_ >= FAILURE_THRESHOLD) {
+          using_equilibrium_mode_ = true;
+          consecutive_failures_ = 0;
+          consecutive_successes_in_equilibrium_ = 0;
+          if (verbose) {
+            std::cout << "\n[CHEMICAL SWITCHING] Switching to equilibrium mode after " << FAILURE_THRESHOLD
+                      << " consecutive failures" << std::endl;
+          }
         }
-      }
-
-      if (lambda_step < LAMBDA_STEP_MIN) {
-        if (verbose) {
-          std::cout << "\n[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
-                    << " < " << std::scientific << std::setprecision(3) << LAMBDA_STEP_MIN
-                    << "), giving up at lambda=" << std::scientific << std::setprecision(3) << lambda << std::endl;
+        lambda_step *= STEP_DECREASE_FACTOR;
+        step_reductions_for_current_step_++;
+        if (step_reductions_for_current_step_ >= MAX_STEP_REDUCTIONS && predictor_enabled_) {
+          predictor_enabled_ = false;
+          if (verbose) {
+            std::cout << "\n[PREDICTOR] Disabled after " << MAX_STEP_REDUCTIONS << " step reductions" << std::endl;
+          }
         }
-        return ContinuationResult{.solution = current_solution, .success = false, .final_lambda = lambda};
+        if (lambda_step < LAMBDA_STEP_MIN) {
+          if (verbose) {
+            std::cout << "\n[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
+                      << " < " << std::scientific << std::setprecision(3) << LAMBDA_STEP_MIN
+                      << "), giving up at lambda=" << std::scientific << std::setprecision(3) << lambda
+                      << std::endl;
+          }
+          solver.set_config(original_config);
+          return ContinuationResult{.solution = current_solution, .success = false, .final_lambda = lambda};
+        }
       }
     }
+    solver.set_config(original_config);
   }
 
   return std::unexpected(ConvergenceError("Continuation max steps exceeded"));
