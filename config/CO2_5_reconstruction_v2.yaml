@@ -25,7 +25,7 @@ continuation:
   success_threshold: 1
   # Predictor block (takes precedence over use_linear_predictor)
   predictor:
-    enabled: true
+    enabled: false
     max_step_reductions: 3
 
 # =============================================================================
@@ -41,7 +41,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -56,10 +56,10 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 200
+    n_eta: 100
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
-    max_iterations: 500000
+    max_iterations: 50000
     # Global numerical guards and policies
     divergence_threshold: 1.0e6
     residual_guard: 1.0e10
@@ -161,7 +161,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: false
+  enabled: true
   # Choose one:
   #   - temperature_sweep: q_wall(Tw) for each γ over a Tw range (current default)
   #   - gamma_sweep_at_Tw: q_wall(γ) at a fixed wall temperature Tw
@@ -170,8 +170,8 @@ abacus:
     range: [1000, 2000]
     points: 11
   gamma_sweep:
-    wall_temperature: [3500, 4000]
-  catalyticity_values: [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 1]
+    wall_temperature: [3000]
+  catalyticity_values: [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]
   # catalyticity_values: [0, 0.001, 0.01, 0.1, 1]
   simulation:
     body_type: axisymmetric
@@ -181,7 +181,7 @@ abacus:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 500
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-10
     max_iterations: 100000

@@ -119,6 +119,188 @@ class AbacusPlotter:
         self.dpi = dpi
         self.mode = mode
 
+    def plot_individual_map(self, save_path: Optional[Path] = None) -> bool:
+        """Plot only the 2D map of heat flux vs (gamma, T_w)"""
+        if not self.reader.data:
+            self.reader.load()
+
+        T = self.reader.data['temperatures']           # (N,)
+        G = self.reader.data['catalyticity_values']    # (M,)
+        Q = self.reader.data['heat_fluxes']            # (M, N)
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6), dpi=self.dpi)
+        
+        if self.mode == 'gamma_sweep':
+            fig.suptitle('Abacus: Heat Flux Map (γ-sweep)', fontsize=14, fontweight='bold')
+            
+            if T.size >= 2:
+                # 2D map with gamma on X-axis (log scale)
+                G_grid, T_grid = np.meshgrid(G, T)
+                im = ax.pcolormesh(
+                    G_grid, T_grid, Q.T,
+                    cmap='Greys_r',
+                    shading='auto'
+                )
+                ax.set_xscale('log')
+                ax.set_xlabel('Catalyticity γ (log scale)', fontsize=12)
+                ax.set_ylabel('Wall Temperature T_w (K)', fontsize=12)
+                ax.grid(True, alpha=0.15, which='both')
+                cbar = plt.colorbar(im, ax=ax)
+                cbar.set_label('Heat Flux q_wall (W/m²)', fontsize=12)
+            else:
+                ax.axis('off')
+                ax.text(0.5, 0.5, f'Single T_w = {float(T[0]):.1f} K',
+                        ha='center', va='center', fontsize=14)
+            
+        else:  # temperature_sweep mode
+            fig.suptitle('Abacus: Heat Flux Map (T_w-sweep)', fontsize=14, fontweight='bold')
+            
+            if T.size >= 2:
+                # 2D map
+                im = ax.imshow(
+                    Q,
+                    extent=[T.min(), T.max(), G.min(), G.max()],
+                    aspect='auto',
+                    origin='lower',
+                    cmap='Greys_r',
+                    interpolation='bicubic'
+                )
+                ax.set_xlabel('Wall Temperature T_w (K)', fontsize=12)
+                ax.set_ylabel('Catalyticity γ', fontsize=12)
+                ax.grid(True, alpha=0.15)
+                cbar = plt.colorbar(im, ax=ax)
+                cbar.set_label('Heat Flux q_wall (W/m²)', fontsize=12)
+            else:
+                ax.axis('off')
+                ax.text(0.5, 0.5, f'Single T_w = {float(T[0]):.1f} K',
+                        ha='center', va='center', fontsize=14)
+
+        plt.tight_layout()
+
+        if save_path:
+            save_path = Path(save_path)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path = save_path.with_suffix(f'.{self.output_format}')
+            plt.savefig(out_path, format=self.output_format, bbox_inches='tight', dpi=self.dpi)
+        else:
+            plt.show()
+
+        plt.close()
+        return True
+
+    def plot_individual_curves(self, save_path: Optional[Path] = None) -> bool:
+        """Plot only the curves of heat flux"""
+        if not self.reader.data:
+            self.reader.load()
+
+        T = self.reader.data['temperatures']           # (N,)
+        G = self.reader.data['catalyticity_values']    # (M,)
+        Q = self.reader.data['heat_fluxes']            # (M, N)
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6), dpi=self.dpi)
+        
+        if self.mode == 'gamma_sweep':
+            fig.suptitle('Abacus: Heat Flux Curves (γ-sweep)', fontsize=14, fontweight='bold')
+            
+            # q_wall(gamma) curves for each T_w
+            colors = ['black', 'red', 'blue', 'green', 'purple', 'orange', 'brown']
+            markers = ['o', 's', '^', 'v', 'D', 'p', '*']
+            line_styles = ['-', '--', '-.', ':']
+            
+            for j in range(min(10, T.size)):  # Limit to 10 curves for clarity
+                color = colors[j % len(colors)]
+                marker = markers[j % len(markers)]
+                style = line_styles[j % len(line_styles)]
+                ax.semilogx(
+                    G, Q[:, j],
+                    color=color,
+                    linestyle=style,
+                    marker=marker,
+                    markevery=max(1, len(G)//15),
+                    linewidth=2,
+                    markersize=6,
+                    label=f'T_w = {T[j]:.0f} K'
+                )
+            
+            ax.set_xlabel('Catalyticity γ (log scale)', fontsize=12)
+            ax.set_ylabel('Heat Flux q_wall (W/m²)', fontsize=12)
+            ax.grid(True, alpha=0.3, which='both')
+            ax.legend(loc='best')
+            
+        else:  # temperature_sweep mode
+            fig.suptitle('Abacus: Heat Flux Curves (T_w-sweep)', fontsize=14, fontweight='bold')
+            
+            if T.size >= 2:
+                # q_wall(T_w) curves for each gamma
+                line_styles = ['-', '--', '-.', ':']
+                markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
+
+                for i in range(min(10, Q.shape[0])):  # Limit to 10 curves for clarity
+                    style = line_styles[i % len(line_styles)]
+                    marker = markers[i % len(markers)]
+                    ax.plot(
+                        T, Q[i, :],
+                        color='black',
+                        linestyle=style,
+                        marker=(marker if marker else None),
+                        markevery=max(1, len(T)//10),
+                        linewidth=1.5,
+                        markersize=3.5,
+                        label=f'γ = {G[i]:g}'
+                    )
+
+                ax.set_xlabel('Wall Temperature T_w (K)', fontsize=12)
+                ax.set_ylabel('Heat Flux q_wall (W/m²)', fontsize=12)
+                ax.grid(True, alpha=0.3)
+                ax.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
+            else:
+                # Single temperature
+                ax.plot(G, Q[:, 0], color='black', marker='o')
+                ax.set_xlabel('Catalyticity γ', fontsize=12)
+                ax.set_ylabel('Heat Flux q_wall (W/m²)', fontsize=12)
+                ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+
+        if save_path:
+            save_path = Path(save_path)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path = save_path.with_suffix(f'.{self.output_format}')
+            plt.savefig(out_path, format=self.output_format, bbox_inches='tight', dpi=self.dpi)
+        else:
+            plt.show()
+
+        plt.close()
+        return True
+
+    def plot_individual_all(self, output_dir: Path) -> bool:
+        """Generate all individual plots (map and curves separately)"""
+        output_dir = Path(output_dir)
+        output_dir.mkdir(exist_ok=True)
+        
+        print(f"\nGenerating individual abacus plots in: {output_dir}")
+        print("-" * 60)
+        
+        # Generate both plots
+        plots = [
+            ('abacus_map', self.plot_individual_map),
+            ('abacus_curves', self.plot_individual_curves)
+        ]
+        
+        success_count = 0
+        for plot_name, plot_func in plots:
+            save_path = output_dir / plot_name
+            if plot_func(save_path):
+                print(f"   [OK] {plot_name}: {save_path.name}.{self.output_format}")
+                success_count += 1
+            else:
+                print(f"   [FAILED] {plot_name}")
+        
+        print("-" * 60)
+        print(f"Individual abacus plots completed: {success_count}/{len(plots)} successful")
+        
+        return success_count == len(plots)
+
     def plot_map_and_curves(self, save_path: Optional[Path] = None) -> bool:
         if not self.reader.data:
             self.reader.load()
@@ -254,6 +436,9 @@ def main() -> int:
     parser.add_argument('--output', '-o', type=str, default='result_abacus/abacus_map', help='Output path (without extension) if not --show')
     parser.add_argument('--mode', '-m', type=str, choices=['gamma_sweep', 'temperature_sweep'], required=True, 
                         help='Plotting mode: gamma_sweep (q vs γ) or temperature_sweep (q vs T_w)')
+    parser.add_argument('--plots', '-p', type=str, default='combined', 
+                        choices=['combined', 'individual'], 
+                        help='Type of plots to generate: combined (map + curves in one figure) or individual (separate PDFs)')
     parser.add_argument('--dpi', type=int, default=300, help='Figure DPI')
     parser.add_argument('--format', '-f', type=str, default='pdf', choices=['pdf', 'png', 'svg'], help='Output format for saved figure')
     parser.add_argument('--suppress-warnings', type=str, default='none', choices=['none', 'plot', 'all'], help='Control warnings: none (default), plot, or all')
@@ -285,10 +470,20 @@ def main() -> int:
     plotter = AbacusPlotter(reader, output_format=args.format, dpi=args.dpi, mode=args.mode)
 
     try:
-        if args.show:
-            ok = plotter.plot_map_and_curves(save_path=None)
-        else:
-            ok = plotter.plot_map_and_curves(save_path=Path(args.output))
+        if args.plots == 'individual':
+            if args.show:
+                # Show individual plots interactively (show map only)
+                ok = plotter.plot_individual_map(save_path=None)
+            else:
+                # Generate separate PDF files for map and curves
+                output_dir = Path(args.output).parent if Path(args.output).suffix else Path(args.output)
+                ok = plotter.plot_individual_all(output_dir)
+        else:  # combined
+            if args.show:
+                ok = plotter.plot_map_and_curves(save_path=None)
+            else:
+                ok = plotter.plot_map_and_curves(save_path=Path(args.output))
+        
         if not ok:
             return 1
         print("Post-processing completed successfully!")
@@ -299,3 +494,22 @@ def main() -> int:
 
 if __name__ == '__main__':
     exit(main())
+
+"""
+Usage examples:
+
+# Generate combined plot (map + curves in one figure) - default
+python3 postprocess_abacus.py --input abacus.h5 --mode temperature_sweep --output result_abacus/abacus_map
+
+# Generate individual PDF files (map and curves separately)
+python3 postprocess_abacus.py --input abacus.h5 --mode temperature_sweep --plots individual --output result_abacus/
+
+# Gamma sweep mode with individual plots
+python3 postprocess_abacus.py --input abacus.h5 --mode gamma_sweep --plots individual --output result_abacus/
+
+# Interactive display (combined)
+python3 postprocess_abacus.py --input abacus.h5 --mode temperature_sweep --show
+
+# Interactive display (individual map only)
+python3 postprocess_abacus.py --input abacus.h5 --mode temperature_sweep --plots individual --show
+"""
