@@ -135,18 +135,19 @@ class AbacusPlotter:
             fig.suptitle('Abacus: γ-sweep at fixed T_w', fontsize=16, fontweight='bold')
             
             if T.size >= 2:
-                # LEFT: 2D map with gamma on X-axis
-                im = ax_map.imshow(
-                    Q.T,  # Transpose for gamma sweep
-                    extent=[G.min(), G.max(), T.min(), T.max()],
-                    aspect='auto',
-                    origin='lower',
+                # LEFT: 2D map with gamma on X-axis (log scale)
+                # For imshow with log scale, we need to use pcolormesh instead
+                import numpy as np
+                G_grid, T_grid = np.meshgrid(G, T)
+                im = ax_map.pcolormesh(
+                    G_grid, T_grid, Q.T,
                     cmap='Greys_r',
-                    interpolation='bicubic'
+                    shading='auto'
                 )
-                ax_map.set_xlabel('Catalyticity γ')
+                ax_map.set_xscale('log')  # Set log scale for gamma axis
+                ax_map.set_xlabel('Catalyticity γ (log scale)')
                 ax_map.set_ylabel('Wall Temperature T_w (K)')
-                ax_map.grid(True, alpha=0.15)
+                ax_map.grid(True, alpha=0.15, which='both')
                 cbar = plt.colorbar(im, ax=ax_map)
                 cbar.set_label('Heat Flux q_wall (W/m²)')
             else:
@@ -164,7 +165,7 @@ class AbacusPlotter:
                 color = colors[j % len(colors)]
                 marker = markers[j % len(markers)]
                 style = line_styles[j % len(line_styles)]
-                ax_curves.plot(
+                ax_curves.semilogx(  # Use semilogx for log scale on x-axis
                     G, Q[:, j],
                     color=color,
                     linestyle=style,
@@ -175,9 +176,9 @@ class AbacusPlotter:
                     label=f'T_w = {T[j]:.0f} K'
                 )
             
-            ax_curves.set_xlabel('Catalyticity γ')
+            ax_curves.set_xlabel('Catalyticity γ (log scale)')
             ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
-            ax_curves.grid(True, alpha=0.3)
+            ax_curves.grid(True, alpha=0.3, which='both')  # Grid for both major and minor ticks
             ax_curves.legend(loc='best')
             
         else:  # temperature_sweep mode

@@ -2,7 +2,7 @@
 # GLOBAL LOGGING
 # =============================================================================
 
-verbose: false
+verbose: true
 
 # =============================================================================
 # CONTINUATION METHOD PARAMETERS FOR CONVERGENCE
@@ -15,9 +15,9 @@ continuation:
   use_linear_predictor: true
   # Continuation step controls
   step_initial: 0.01
-  step_min: 0.0000001
+  step_min: 0.000001
   step_max: 0.5
-  step_increase_factor: 2
+  step_increase_factor: 1.5
   step_decrease_factor: 0.8
   max_steps: 10000
   # Mode switching thresholds
@@ -41,7 +41,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -56,10 +56,10 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 50
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
-    max_iterations: 50000
+    max_iterations: 500000
     # Global numerical guards and policies
     divergence_threshold: 1.0e6
     residual_guard: 1.0e10
@@ -161,7 +161,7 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: true
+  enabled: false
   # Choose one:
   #   - temperature_sweep: q_wall(Tw) for each γ over a Tw range (current default)
   #   - gamma_sweep_at_Tw: q_wall(γ) at a fixed wall temperature Tw
@@ -181,9 +181,9 @@ abacus:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 20
+    n_eta: 500
     eta_max: 6.0
-    convergence_tolerance: 1.0e-9
+    convergence_tolerance: 1.0e-10
     max_iterations: 100000
   
   mixture:
