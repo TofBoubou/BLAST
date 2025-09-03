@@ -54,6 +54,9 @@ private:
   [[nodiscard]] auto parse_edge_reconstruction_config(const YAML::Node& node) const
       -> std::expected<EdgeReconstructionConfig, core::ConfigurationError>;
 
+  [[nodiscard]] auto parse_catalysis_reconstruction_config(const YAML::Node& node) const
+      -> std::expected<CatalysisReconstructionConfig, core::ConfigurationError>;
+
   [[nodiscard]] auto parse_gasp2_config(const YAML::Node& node) const
       -> std::expected<Gasp2Config, core::ConfigurationError>;
 

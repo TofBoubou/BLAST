@@ -164,6 +164,12 @@ struct ContinuationConfig {
   // Predictor parameters
   bool predictor_enabled = true;
   int predictor_max_step_reductions = 3;
+  
+  // Success threshold for accepting solution
+  double acceptable_lambda_threshold = 0.995;
+  
+  // Threshold above which chemical switching is disabled (0.9 = 90%)
+  double no_switch_threshold = 0.90;
 };
 
 struct EdgeReconstructionConfig {
@@ -204,6 +210,44 @@ struct EdgeReconstructionConfig {
   } solver;
 };
 
+struct CatalysisReconstructionConfig {
+  bool enabled = false;
+  
+  // Target values
+  double target_heat_flux = 0.0;  // [W/m²] Target heat flux at wall
+  
+  // Boundary conditions
+  struct BoundaryConditions {
+    double pressure = 0.0;           // [Pa] Pressure at edge (fixed)
+    double wall_temperature = 0.0;   // [K] Wall temperature (fixed)
+    double edge_temperature = 0.0;   // [K] Edge temperature (fixed)
+    double radius = 1.0;              // [m] Radius at stagnation point
+  } boundary_conditions;
+  
+  // Flow parameters
+  struct FlowParameters {
+    double velocity_gradient_stagnation = 0.0;  // [1/s]
+    double freestream_density = 0.0;            // [kg/m³]
+    double freestream_velocity = 0.0;           // [m/s]
+  } flow_parameters;
+  
+  // Finite thickness parameters (required for reconstruction)
+  struct FiniteThicknessParams {
+    double v_edge = 0.0;              // [m/s] Edge normal velocity
+    double d2_ue_dxdy = 0.0;          // [1/s²] Second derivative
+    double delta_bl = 0.0;            // [m] Boundary layer thickness
+  } finite_thickness_params;
+  
+  // Solver configuration for catalysis search
+  struct SolverSettings {
+    double initial_catalyticity_guess = 0.5;    // Initial catalysis guess (0-1)
+    double catalyticity_min = 0.0;              // Lower bound for catalysis
+    double catalyticity_max = 1.0;              // Upper bound for catalysis
+    double tolerance = 1.0e-6;                  // Convergence tolerance
+    int max_iterations = 50;                    // Maximum iterations
+  } solver;
+};
+
 // GASP2 specific configuration (only used when catalysis_provider = GASP2)
 struct Gasp2Config {
   std::string xml_file = "config/surface_chemistry/CO2_5_finite_rate.xml";
@@ -226,6 +270,7 @@ struct Configuration {
   AbacusConfig abacus;
   ContinuationConfig continuation;
   EdgeReconstructionConfig edge_reconstruction;
+  CatalysisReconstructionConfig catalysis_reconstruction;
   Gasp2Config gasp2;
   MutationConfig mutation;
   // Global verbosity flag for logging

@@ -48,6 +48,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     // Check which modes are enabled to determine which config sections to use
     bool base_enabled = false;
     bool edge_reconstruction_enabled = false;
+    bool catalysis_reconstruction_enabled = false;
     bool abacus_enabled = false;
     
     // Debug markers to trace parsing (disabled)
@@ -60,21 +61,25 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       edge_reconstruction_enabled = root_["edge_reconstruction"]["enabled"].as<bool>();
     }
     
+    if (root_["catalysis_reconstruction"] && root_["catalysis_reconstruction"]["enabled"]) {
+      catalysis_reconstruction_enabled = root_["catalysis_reconstruction"]["enabled"].as<bool>();
+    }
+    
     if (root_["abacus"] && root_["abacus"]["enabled"]) {
       abacus_enabled = root_["abacus"]["enabled"].as<bool>();
     }
     
     // Check for conflicting modes - only one can be enabled at a time
-    int enabled_count = (base_enabled ? 1 : 0) + (edge_reconstruction_enabled ? 1 : 0) + (abacus_enabled ? 1 : 0);
+    int enabled_count = (base_enabled ? 1 : 0) + (edge_reconstruction_enabled ? 1 : 0) + (catalysis_reconstruction_enabled ? 1 : 0) + (abacus_enabled ? 1 : 0);
     
     if (enabled_count == 0) {
       return std::unexpected(core::ConfigurationError(
-          "No simulation mode enabled. Please enable exactly one mode: base.enabled, edge_reconstruction.enabled, or abacus.enabled."));
+          "No simulation mode enabled. Please enable exactly one mode: base.enabled, edge_reconstruction.enabled, catalysis_reconstruction.enabled, or abacus.enabled."));
     }
     
     if (enabled_count > 1) {
       return std::unexpected(core::ConfigurationError(
-          "Multiple simulation modes enabled. Please enable only one mode at a time: base, edge_reconstruction, or abacus."));
+          "Multiple simulation modes enabled. Please enable only one mode at a time: base, edge_reconstruction, catalysis_reconstruction, or abacus."));
     }
 
     // Determine which configuration sections to use based on active mode (strict mode - no fallbacks)
@@ -113,6 +118,33 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       out_node = root_["base"]["output"];
       edge_node = root_["base"]["outer_edge"];
       wall_node = root_["base"]["wall_parameters"];
+      
+    } else if (catalysis_reconstruction_enabled) {
+      // Catalysis reconstruction mode - only basic sections, no outer_edge (uses specialized config)
+      if (!root_["catalysis_reconstruction"]["simulation"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'simulation' section in catalysis_reconstruction mode."));
+      }
+      if (!root_["catalysis_reconstruction"]["numerical"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'numerical' section in catalysis_reconstruction mode."));
+      }
+      if (!root_["catalysis_reconstruction"]["mixture"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'mixture' section in catalysis_reconstruction mode."));
+      }
+      if (!root_["catalysis_reconstruction"]["output"]) {
+        return std::unexpected(core::ConfigurationError(
+            "Missing required 'output' section in catalysis_reconstruction mode."));
+      }
+      // catalysis_reconstruction uses boundary_conditions instead of wall_parameters
+      
+      sim_node = root_["catalysis_reconstruction"]["simulation"];
+      num_node = root_["catalysis_reconstruction"]["numerical"];
+      mix_node = root_["catalysis_reconstruction"]["mixture"];
+      out_node = root_["catalysis_reconstruction"]["output"];
+      wall_node = YAML::Node(); // Empty - catalysis_reconstruction uses boundary_conditions
+      edge_node = YAML::Node(); // Empty - catalysis reconstruction uses specialized config
       
     } else if (edge_reconstruction_enabled) {
       // Edge reconstruction mode - only basic sections, no outer_edge (uses specialized config)
@@ -175,7 +207,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     // Parse configuration from the determined nodes
     // Debug: trace parsing progress
     if (config.verbose) { std::cout << "[YAML] Parsing simulation section..." << std::endl; }
-    auto sim_result = parse_simulation_config(sim_node, abacus_enabled, edge_reconstruction_enabled, config.verbose);
+    auto sim_result = parse_simulation_config(sim_node, abacus_enabled, edge_reconstruction_enabled || catalysis_reconstruction_enabled, config.verbose);
     if (!sim_result) {
       return std::unexpected(sim_result.error());
     }
@@ -202,7 +234,7 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
     }
     config.output = std::move(out_result.value());
 
-    // Parse outer_edge only for base mode (edge_reconstruction and abacus use specialized configs)
+    // Parse outer_edge only for base mode (edge_reconstruction, catalysis_reconstruction and abacus use specialized configs)
     if (base_enabled) {
       if (config.verbose) { std::cout << "[YAML] Parsing outer_edge section..." << std::endl; }
       auto edge_result = parse_outer_edge_config(edge_node, false, false, config.verbose);
@@ -356,6 +388,8 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       cont_node = root_["base"]["continuation"];
     } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["continuation"]) {
       cont_node = root_["edge_reconstruction"]["continuation"];
+    } else if (catalysis_reconstruction_enabled && root_["catalysis_reconstruction"]["continuation"]) {
+      cont_node = root_["catalysis_reconstruction"]["continuation"];
     } else if (abacus_enabled && root_["abacus"]["continuation"]) {
       cont_node = root_["abacus"]["continuation"];
     } else {
@@ -394,12 +428,41 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
       config.edge_reconstruction = EdgeReconstructionConfig{};
     }
     
+    // Parse catalysis reconstruction config only if in catalysis_reconstruction mode
+    if (catalysis_reconstruction_enabled) {
+      
+      auto catalysis_recon_result = parse_catalysis_reconstruction_config(root_["catalysis_reconstruction"]);
+      if (!catalysis_recon_result) {
+        return std::unexpected(catalysis_recon_result.error());
+      }
+      config.catalysis_reconstruction = std::move(catalysis_recon_result.value());
+      
+      // Force parameters for catalysis reconstruction mode
+      if (config.catalysis_reconstruction.enabled) {
+        config.simulation.finite_thickness = true;
+        config.simulation.only_stagnation_point = true;
+        config.simulation.catalytic_wall = true;
+        config.simulation.wall_mode = SimulationConfig::WallMode::ImposedTemperature;
+        config.simulation.chemical_mode = SimulationConfig::ChemicalMode::NonEquilibrium;
+        // Force catalysis provider to MutationPP for catalysis reconstruction
+        config.simulation.catalysis_provider = SimulationConfig::CatalysisProvider::MutationPP;
+        // x_stations are automatically derived from edge_points (single point at x=0 for stagnation)
+        
+        // Catalysis reconstruction has its own specialized config, no outer_edge needed
+      }
+    } else {
+      // Default catalysis reconstruction config for non-catalysis_reconstruction modes
+      config.catalysis_reconstruction = CatalysisReconstructionConfig{};
+    }
+    
     // Parse GASP2 configuration
     YAML::Node gasp2_node;
     if (base_enabled && root_["base"]["gasp2"]) {
       gasp2_node = root_["base"]["gasp2"];
     } else if (edge_reconstruction_enabled && root_["edge_reconstruction"]["gasp2"]) {
       gasp2_node = root_["edge_reconstruction"]["gasp2"];
+    } else if (catalysis_reconstruction_enabled && root_["catalysis_reconstruction"]["gasp2"]) {
+      gasp2_node = root_["catalysis_reconstruction"]["gasp2"];
     } else if (abacus_enabled && root_["abacus"]["gasp2"]) {
       gasp2_node = root_["abacus"]["gasp2"];
     } else {
@@ -429,6 +492,13 @@ auto YamlParser::parse() const -> std::expected<Configuration, core::Configurati
         if (config.verbose) { std::cout << "[YAML] edge_reconstruction.mutation defined? " << std::boolalpha << has_edge_mut << std::endl; }
         if (has_edge_mut) {
           mutation_node = root_["edge_reconstruction"]["mutation"];
+        }
+      } else if (catalysis_reconstruction_enabled) {
+        if (config.verbose) { std::cout << "[YAML] Checking for mutation node in catalysis_reconstruction..." << std::endl; }
+        bool has_catalysis_mut = static_cast<bool>(root_["catalysis_reconstruction"]["mutation"]);
+        if (config.verbose) { std::cout << "[YAML] catalysis_reconstruction.mutation defined? " << std::boolalpha << has_catalysis_mut << std::endl; }
+        if (has_catalysis_mut) {
+          mutation_node = root_["catalysis_reconstruction"]["mutation"];
         }
       }
       if (!mutation_node) {
@@ -1233,6 +1303,133 @@ auto YamlParser::parse_edge_reconstruction_config(const YAML::Node& node) const
   } catch (const YAML::Exception& e) {
     return std::unexpected(
         core::ConfigurationError(std::format("In 'edge_reconstruction' section: failed to parse - {}", e.what())));
+  }
+}
+
+auto YamlParser::parse_catalysis_reconstruction_config(const YAML::Node& node) const
+    -> std::expected<CatalysisReconstructionConfig, core::ConfigurationError> {
+
+  CatalysisReconstructionConfig config;
+
+  if (!node) {
+    return config;
+  }
+
+  try {
+    if (node["enabled"]) {
+      config.enabled = node["enabled"].as<bool>();
+    }
+
+    if (config.enabled) {
+      // Target values
+      if (!node["target_heat_flux"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'target_heat_flux' in catalysis_reconstruction"));
+      }
+      config.target_heat_flux = node["target_heat_flux"].as<double>();
+
+      // Boundary conditions
+      if (!node["boundary_conditions"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'boundary_conditions' in catalysis_reconstruction"));
+      }
+      auto bc_node = node["boundary_conditions"];
+      if (!bc_node["pressure"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'pressure' in catalysis_reconstruction.boundary_conditions"));
+      }
+      config.boundary_conditions.pressure = bc_node["pressure"].as<double>();
+      
+      if (!bc_node["wall_temperature"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'wall_temperature' in catalysis_reconstruction.boundary_conditions"));
+      }
+      config.boundary_conditions.wall_temperature = bc_node["wall_temperature"].as<double>();
+      
+      if (!bc_node["edge_temperature"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'edge_temperature' in catalysis_reconstruction.boundary_conditions"));
+      }
+      config.boundary_conditions.edge_temperature = bc_node["edge_temperature"].as<double>();
+      
+      // Optional radius (defaults to 1.0)
+      if (bc_node["radius"]) {
+        config.boundary_conditions.radius = bc_node["radius"].as<double>();
+      }
+
+      // Flow parameters
+      if (!node["flow_parameters"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'flow_parameters' in catalysis_reconstruction"));
+      }
+      auto flow_node = node["flow_parameters"];
+      if (!flow_node["velocity_gradient_stagnation"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'velocity_gradient_stagnation' in catalysis_reconstruction.flow_parameters"));
+      }
+      config.flow_parameters.velocity_gradient_stagnation = flow_node["velocity_gradient_stagnation"].as<double>();
+      
+      if (!flow_node["freestream_density"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'freestream_density' in catalysis_reconstruction.flow_parameters"));
+      }
+      config.flow_parameters.freestream_density = flow_node["freestream_density"].as<double>();
+      
+      if (!flow_node["freestream_velocity"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'freestream_velocity' in catalysis_reconstruction.flow_parameters"));
+      }
+      config.flow_parameters.freestream_velocity = flow_node["freestream_velocity"].as<double>();
+
+      // Finite thickness params
+      if (!node["finite_thickness_params"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'finite_thickness_params' in catalysis_reconstruction"));
+      }
+      auto ft_node = node["finite_thickness_params"];
+      if (!ft_node["v_edge"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'v_edge' in catalysis_reconstruction.finite_thickness_params"));
+      }
+      config.finite_thickness_params.v_edge = ft_node["v_edge"].as<double>();
+      
+      if (!ft_node["d2_ue_dxdy"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'd2_ue_dxdy' in catalysis_reconstruction.finite_thickness_params"));
+      }
+      config.finite_thickness_params.d2_ue_dxdy = ft_node["d2_ue_dxdy"].as<double>();
+      
+      if (!ft_node["delta_bl"]) {
+        return std::unexpected(
+            core::ConfigurationError("Missing required 'delta_bl' in catalysis_reconstruction.finite_thickness_params"));
+      }
+      config.finite_thickness_params.delta_bl = ft_node["delta_bl"].as<double>();
+
+      // Solver settings (optional with defaults)
+      if (node["solver"]) {
+        auto solver_node = node["solver"];
+        if (solver_node["initial_catalyticity_guess"]) {
+          config.solver.initial_catalyticity_guess = solver_node["initial_catalyticity_guess"].as<double>();
+        }
+        if (solver_node["catalyticity_min"]) {
+          config.solver.catalyticity_min = solver_node["catalyticity_min"].as<double>();
+        }
+        if (solver_node["catalyticity_max"]) {
+          config.solver.catalyticity_max = solver_node["catalyticity_max"].as<double>();
+        }
+        if (solver_node["tolerance"]) {
+          config.solver.tolerance = solver_node["tolerance"].as<double>();
+        }
+        if (solver_node["max_iterations"]) {
+          config.solver.max_iterations = solver_node["max_iterations"].as<int>();
+        }
+      }
+    }
+
+    return config;
+  } catch (const YAML::Exception& e) {
+    return std::unexpected(
+        core::ConfigurationError(std::format("In 'catalysis_reconstruction' section: failed to parse - {}", e.what())));
   }
 }
 
