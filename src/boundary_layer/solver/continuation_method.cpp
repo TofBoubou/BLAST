@@ -1,4 +1,4 @@
-#include "blast/boundary_layer/solver/continuation_method.hpp"
+﻿#include "blast/boundary_layer/solver/continuation_method.hpp"
 #include "blast/boundary_layer/solver/boundary_layer_solver.hpp"
 #include "blast/boundary_layer/solver/continuation_scope.hpp"
 #include <algorithm>
@@ -69,6 +69,8 @@ auto ContinuationMethod::solve_with_continuation(
     if (using_equilibrium_mode_) {
       interp_config = create_equilibrium_config(interp_config);
     }
+    // Track whether this step was actually solved in equilibrium
+    const bool solved_in_equilibrium_this_step = using_equilibrium_mode_;
 
     solver.set_config(interp_config);
     {
@@ -99,6 +101,78 @@ auto ContinuationMethod::solve_with_continuation(
           }
         }
         if (std::abs(lambda - 1.0) < 1e-10) {
+          if (solved_in_equilibrium_this_step &&
+              original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium) {
+            if (verbose) {
+              std::cout << "\n[CHEMICAL SWITCHING] Final attempt at lambda=1 in original mode (NonEquilibrium)"
+                        << std::endl;
+            }
+
+            auto final_config = target_config;
+            final_config.simulation.chemical_mode = original_chemical_mode_;
+
+            solver.set_config(final_config);
+            auto final_res = solver.solve_station(station, xi, current_solution);
+            if (final_res) {
+              current_solution = final_res.value();
+              using_equilibrium_mode_ = false;
+              if (verbose) {
+                std::cout << "[CHEMICAL SWITCHING] Final attempt succeeded; finishing in original mode" << std::endl;
+              }
+            } else {
+              if (verbose) {
+                std::cout << "[CHEMICAL SWITCHING] Final attempt failed in original mode: "
+                          << final_res.error().message() << std::endl;
+                std::cout << "[CONTINUATION] Handling as failure at lambda=1.0; reducing step" << std::endl;
+              }
+
+              if (history_.size() >= 2) {
+                auto previous = history_[history_.size() - 2];
+                lambda = previous.lambda;
+                history_.pop_back();
+                current_solution = previous.solution;
+              }
+
+              consecutive_failures_++;
+              consecutive_successes_in_equilibrium_ = 0;
+
+              lambda_step *= cc.step_decrease_factor;
+              step_reductions_for_current_step_++;
+              if (step_reductions_for_current_step_ >= cc.predictor_max_step_reductions && predictor_enabled_) {
+                predictor_enabled_ = false;
+                if (verbose) {
+                  std::cout << "[PREDICTOR] Disabled after " << cc.predictor_max_step_reductions
+                            << " step reductions" << std::endl;
+                }
+              }
+
+              if (!using_equilibrium_mode_ &&
+                  original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium &&
+                  consecutive_failures_ >= cc.failure_threshold) {
+                using_equilibrium_mode_ = true;
+                consecutive_failures_ = 0;
+                consecutive_successes_in_equilibrium_ = 0;
+                if (verbose) {
+                  std::cout << "[CHEMICAL SWITCHING] Switching to equilibrium mode after " << cc.failure_threshold
+                            << " consecutive failures" << std::endl;
+                }
+              }
+
+              if (lambda_step < cc.step_min) {
+                if (verbose) {
+                  std::cout << "[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
+                            << " < " << std::scientific << std::setprecision(3) << cc.step_min
+                            << "), giving up at lambda=" << std::scientific << std::setprecision(3) << lambda
+                            << std::endl;
+                }
+                solver.set_config(original_config);
+                return ContinuationResult{.solution = current_solution, .success = false, .final_lambda = lambda};
+              }
+
+              continue;
+            }
+          }
+
           if (verbose) {
             std::cout << "\n[CONTINUATION] Completed 100%" << std::endl;
           }
@@ -273,3 +347,4 @@ void ContinuationMethod::reset_predictor_state() const {
 }
 
 } // namespace blast::boundary_layer::solver
+
