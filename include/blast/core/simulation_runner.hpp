@@ -56,6 +56,13 @@ private:
     PerformanceMetrics& metrics) 
     -> std::expected<boundary_layer::solver::SolutionResult, ApplicationError>;
     
+  // Run catalysis reconstruction
+  [[nodiscard]] auto run_catalysis_reconstruction(
+    thermophysics::MixtureInterface& mixture,
+    const io::Configuration& config,
+    PerformanceMetrics& metrics) 
+    -> std::expected<boundary_layer::solver::SolutionResult, ApplicationError>;
+    
   // Display standard simulation results
   auto display_standard_results(const boundary_layer::solver::SolutionResult& solution,
                                 const thermophysics::MixtureInterface& mixture) const -> void;

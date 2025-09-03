@@ -173,7 +173,7 @@ catalysis_reconstruction:
   numerical:
     n_eta: 200
     eta_max: 6.0
-    convergence_tolerance: 1.0e-6  
+    convergence_tolerance: 1.0e-9  
     max_iterations: 100000  
   
   mixture:
@@ -185,7 +185,6 @@ catalysis_reconstruction:
   output:
     output_directory: test_outputs_catalysis_reconstruction
   
-  # Catalysis reconstruction specific parameters
   target_heat_flux: 900000
   
   boundary_conditions:
@@ -208,7 +207,7 @@ catalysis_reconstruction:
     initial_catalyticity_guess: 0.2
     catalyticity_min: 0.01
     catalyticity_max: 0.4
-    tolerance: 1e-4
+    tolerance: 1e-9
     max_iterations: 50
 
 # =============================================================================

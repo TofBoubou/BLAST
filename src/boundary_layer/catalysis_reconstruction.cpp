@@ -84,8 +84,8 @@ auto CatalysisReconstructor::reconstruct()
   
   int count = 0;
   int max_iter = config_.solver.max_iterations;
-  double conv = std::pow(config_.solver.tolerance, 1.0/3.0);
-  double step_tol = std::max(0.001, std::pow(config_.solver.tolerance, 2.0/3.0)); // Minimum step for catalyticity
+  double conv = config_.solver.tolerance;  // Use tolerance directly
+  double step_tol = std::max(config_.solver.tolerance * 1000, 1e-8); // Adaptive step tolerance
   
   while (count < max_iter && std::abs(fb) > conv) {
     count++;

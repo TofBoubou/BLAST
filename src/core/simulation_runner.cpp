@@ -1,6 +1,7 @@
 #include "blast/core/simulation_runner.hpp"
 #include "blast/core/constants.hpp"
 #include "blast/boundary_layer/edge_reconstruction.hpp"
+#include "blast/boundary_layer/catalysis_reconstruction.hpp"
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
@@ -29,6 +30,18 @@ auto SimulationRunner::run_simulation(
       .solution = std::move(reconstruction_result.value()),
       .is_abacus = false,
       .is_edge_reconstruction = true,
+      .output_filename = case_name
+    };
+  } else if (config.catalysis_reconstruction.enabled) {
+    auto reconstruction_result = run_catalysis_reconstruction(mixture, config, metrics);
+    if (!reconstruction_result) {
+      return std::unexpected(reconstruction_result.error());
+    }
+    
+    return SimulationResult{
+      .solution = std::move(reconstruction_result.value()),
+      .is_abacus = false,
+      .is_edge_reconstruction = false,
       .output_filename = case_name
     };
   } else if (config.abacus.enabled) {
@@ -273,6 +286,63 @@ auto SimulationRunner::run_edge_reconstruction(
   
   // Create a copy to avoid issues with destructor ordering
   auto solution_copy = edge.full_solution;
+  return solution_copy;
+}
+
+auto SimulationRunner::run_catalysis_reconstruction(
+  thermophysics::MixtureInterface& mixture,
+  const io::Configuration& config,
+  PerformanceMetrics& metrics) 
+  -> std::expected<boundary_layer::solver::SolutionResult, ApplicationError> {
+    
+  std::cout << "\n=== CATALYSIS RECONSTRUCTION ===" << std::endl;
+  
+  auto reconstruction_start = std::chrono::high_resolution_clock::now();
+  
+  // Create catalysis reconstructor
+  boundary_layer::CatalysisReconstructor reconstructor(
+      config.catalysis_reconstruction, config, mixture);
+  
+  // Run reconstruction
+  auto reconstruction_result = reconstructor.reconstruct();
+  
+  if (!reconstruction_result) {
+    return std::unexpected(ApplicationError{
+      "Catalysis reconstruction failed: " + reconstruction_result.error().message(),
+      constants::indexing::second
+    });
+  }
+  
+  auto reconstruction_end = std::chrono::high_resolution_clock::now();
+  auto reconstruction_duration = std::chrono::duration_cast<std::chrono::milliseconds>(reconstruction_end - reconstruction_start);
+  
+  const auto& catalysis = reconstruction_result.value();
+  
+  std::cout << "\n=== CATALYSIS RECONSTRUCTION RESULTS ===" << std::endl;
+  std::cout << "Optimal catalyticity found: " << catalysis.catalyticity << std::endl;
+  std::cout << "Edge temperature (fixed): " << catalysis.edge_temperature << " K" << std::endl;
+  std::cout << "Edge pressure: " << catalysis.pressure << " Pa" << std::endl;
+  std::cout << "Edge enthalpy: " << catalysis.enthalpy << " J/kg" << std::endl;
+  std::cout << "Edge density: " << catalysis.density << " kg/m³" << std::endl;
+  std::cout << "Edge viscosity: " << catalysis.viscosity << " Pa·s" << std::endl;
+  
+  std::cout << "\nEdge mass fractions:" << std::endl;
+  for (size_t i = 0; i < catalysis.mass_fractions.size(); ++i) {
+    std::cout << "  " << mixture.species_name(i) << ": " << catalysis.mass_fractions[i] << std::endl;
+  }
+  
+  std::cout << "\nTarget heat flux: " << config.catalysis_reconstruction.target_heat_flux << " W/m²" << std::endl;
+  std::cout << "Achieved heat flux: " << catalysis.heat_flux_achieved << " W/m²" << std::endl;
+  std::cout << "Relative error: " << std::abs(catalysis.heat_flux_achieved - config.catalysis_reconstruction.target_heat_flux) 
+            / config.catalysis_reconstruction.target_heat_flux * 100 << " %" << std::endl;
+  std::cout << "Iterations used: " << catalysis.iterations_used << std::endl;
+  std::cout << "Reconstruction time: " << reconstruction_duration.count() << " ms" << std::endl;
+  
+  // Update performance metrics
+  metrics.reconstruction_time = reconstruction_duration;
+  
+  // Create a copy to avoid issues with destructor ordering
+  auto solution_copy = catalysis.full_solution;
   return solution_copy;
 }
 
