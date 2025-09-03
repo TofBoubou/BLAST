@@ -83,7 +83,7 @@ auto ApplicationRunner::run(int argc, char* argv[]) -> ApplicationResult {
     // Display results and performance
     simulation_runner_->display_simulation_results(result, *mixture, metrics);
     display_performance_summary(metrics);
-    display_completion_message(output_files, result.is_abacus ? result.output_filename : "");
+    display_completion_message(output_files, result.is_abacus ? result.output_filename : "", result.abacus_mode);
     
     cleanup();
     
@@ -141,7 +141,8 @@ auto ApplicationRunner::display_performance_summary(const PerformanceMetrics& me
 
 auto ApplicationRunner::display_completion_message(
     const std::vector<std::filesystem::path>& output_files,
-    const std::string& abacus_filename) const -> void {
+    const std::string& abacus_filename,
+    io::AbacusConfig::Mode abacus_mode) const -> void {
   std::cout << "\n=== CALCULATION COMPLETED SUCCESSFULLY ===" << std::endl;
   std::cout << "\nPost-processing recommendations:" << std::endl;
   std::cout << "  • Open .h5 files with HDFView or Python (h5py, pandas)" << std::endl;
@@ -170,8 +171,11 @@ auto ApplicationRunner::display_completion_message(
   // Display post-processing command for abacus files
   if (!abacus_filename.empty()) {
     std::cout << "\nRecommended abacus post-processing command:" << std::endl;
+    const char* mode_str = (abacus_mode == io::AbacusConfig::Mode::GammaSweepAtTw) 
+                           ? "gamma_sweep" : "temperature_sweep";
     std::cout << "  python3 scripts/postprocess_abacus.py --input " 
-              << abacus_filename << " --output result_abacus/abacus_map" << std::endl;
+              << abacus_filename << " --output result_abacus/abacus_map --mode " 
+              << mode_str << std::endl;
   }
 }
 

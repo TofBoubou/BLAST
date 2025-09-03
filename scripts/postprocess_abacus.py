@@ -113,10 +113,11 @@ class AbacusReader:
 class AbacusPlotter:
     """One figure with two subplots: map (left) + curves (right)"""
 
-    def __init__(self, reader: AbacusReader, output_format: str = 'pdf', dpi: int = 300):
+    def __init__(self, reader: AbacusReader, output_format: str = 'pdf', dpi: int = 300, mode: str = 'temperature_sweep'):
         self.reader = reader
         self.output_format = output_format
         self.dpi = dpi
+        self.mode = mode
 
     def plot_map_and_curves(self, save_path: Optional[Path] = None) -> bool:
         if not self.reader.data:
@@ -128,57 +129,109 @@ class AbacusPlotter:
 
         # Figure with two subplots in one row
         fig, (ax_map, ax_curves) = plt.subplots(1, 2, figsize=(16, 7), dpi=self.dpi)
-        fig.suptitle('Abacus: q_wall(γ, T_w)', fontsize=16, fontweight='bold')
-
-        if T.size >= 2:
-            # LEFT: 2D map (imshow) with explicit extent; axis 0 = gamma
-            im = ax_map.imshow(
-                Q,
-                extent=[T.min(), T.max(), G.min(), G.max()],
-                aspect='auto',
-                origin='lower',
-                cmap='Greys_r',
-                interpolation='bicubic'
-            )
-            ax_map.set_xlabel('Wall Temperature T_w (K)')
-            ax_map.set_ylabel('Catalyticity γ')
-            ax_map.grid(True, alpha=0.15)
-            cbar = plt.colorbar(im, ax=ax_map)
-            cbar.set_label('Heat Flux q_wall (W/m²)')
-
-            # RIGHT: q_wall(T_w) curves for each gamma (no extra interpolation)
-            # Black-only, varied linestyles/markers to differentiate series
-            line_styles = ['-', '--', '-.', ':']
-            markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
-
-            for i in range(Q.shape[0]):
-                style = line_styles[i % len(line_styles)]
-                marker = markers[i % len(markers)]
-                ax_curves.plot(
-                    T, Q[i, :],
-                    color='black',
-                    linestyle=style,
-                    marker=(marker if marker else None),
-                    markevery=max(1, len(T)//10),
-                    linewidth=1.5,
-                    markersize=3.5,
-                    label=f'γ = {G[i]:g}'
+        
+        if self.mode == 'gamma_sweep':
+            # Gamma sweep mode: plot q(γ) for each T_w
+            fig.suptitle('Abacus: γ-sweep at fixed T_w', fontsize=16, fontweight='bold')
+            
+            if T.size >= 2:
+                # LEFT: 2D map with gamma on X-axis
+                im = ax_map.imshow(
+                    Q.T,  # Transpose for gamma sweep
+                    extent=[G.min(), G.max(), T.min(), T.max()],
+                    aspect='auto',
+                    origin='lower',
+                    cmap='Greys_r',
+                    interpolation='bicubic'
                 )
-
-            ax_curves.set_xlabel('Wall Temperature T_w (K)')
-            ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
-            ax_curves.grid(True, alpha=0.3)
-            ax_curves.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
-        else:
-            # Single-temperature mode: show γ → q_wall curve on the right, annotate left
-            ax_map.axis('off')
-            ax_map.text(0.5, 0.5, f'Single T_w = {float(T[0]):.1f} K',
-                        ha='center', va='center', fontsize=14)
-
-            ax_curves.plot(G, Q[:, 0], color='black', marker='o')
+                ax_map.set_xlabel('Catalyticity γ')
+                ax_map.set_ylabel('Wall Temperature T_w (K)')
+                ax_map.grid(True, alpha=0.15)
+                cbar = plt.colorbar(im, ax=ax_map)
+                cbar.set_label('Heat Flux q_wall (W/m²)')
+            else:
+                # Single temperature
+                ax_map.axis('off')
+                ax_map.text(0.5, 0.5, f'Single T_w = {float(T[0]):.1f} K',
+                            ha='center', va='center', fontsize=14)
+            
+            # RIGHT: q_wall(gamma) curves for each T_w
+            colors = ['black', 'red', 'blue', 'green', 'purple', 'orange', 'brown']
+            markers = ['o', 's', '^', 'v', 'D', 'p', '*']
+            line_styles = ['-', '--', '-.', ':']
+            
+            for j in range(T.size):
+                color = colors[j % len(colors)]
+                marker = markers[j % len(markers)]
+                style = line_styles[j % len(line_styles)]
+                ax_curves.plot(
+                    G, Q[:, j],
+                    color=color,
+                    linestyle=style,
+                    marker=marker,
+                    markevery=max(1, len(G)//15),
+                    linewidth=2,
+                    markersize=6,
+                    label=f'T_w = {T[j]:.0f} K'
+                )
+            
             ax_curves.set_xlabel('Catalyticity γ')
             ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
             ax_curves.grid(True, alpha=0.3)
+            ax_curves.legend(loc='best')
+            
+        else:  # temperature_sweep mode
+            fig.suptitle('Abacus: T_w-sweep at various γ', fontsize=16, fontweight='bold')
+            
+            if T.size >= 2:
+                # LEFT: 2D map (imshow) with explicit extent; axis 0 = gamma
+                im = ax_map.imshow(
+                    Q,
+                    extent=[T.min(), T.max(), G.min(), G.max()],
+                    aspect='auto',
+                    origin='lower',
+                    cmap='Greys_r',
+                    interpolation='bicubic'
+                )
+                ax_map.set_xlabel('Wall Temperature T_w (K)')
+                ax_map.set_ylabel('Catalyticity γ')
+                ax_map.grid(True, alpha=0.15)
+                cbar = plt.colorbar(im, ax=ax_map)
+                cbar.set_label('Heat Flux q_wall (W/m²)')
+
+                # RIGHT: q_wall(T_w) curves for each gamma (no extra interpolation)
+                # Black-only, varied linestyles/markers to differentiate series
+                line_styles = ['-', '--', '-.', ':']
+                markers = ['', 'o', 's', '^', 'v', 'D', 'p', '*', 'h', 'H', '+', 'x']
+
+                for i in range(min(10, Q.shape[0])):  # Limit to 10 curves for clarity
+                    style = line_styles[i % len(line_styles)]
+                    marker = markers[i % len(markers)]
+                    ax_curves.plot(
+                        T, Q[i, :],
+                        color='black',
+                        linestyle=style,
+                        marker=(marker if marker else None),
+                        markevery=max(1, len(T)//10),
+                        linewidth=1.5,
+                        markersize=3.5,
+                        label=f'γ = {G[i]:g}'
+                    )
+
+                ax_curves.set_xlabel('Wall Temperature T_w (K)')
+                ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
+                ax_curves.grid(True, alpha=0.3)
+                ax_curves.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.)
+            else:
+                # Single-temperature mode: show γ → q_wall curve on the right, annotate left
+                ax_map.axis('off')
+                ax_map.text(0.5, 0.5, f'Single T_w = {float(T[0]):.1f} K',
+                            ha='center', va='center', fontsize=14)
+
+                ax_curves.plot(G, Q[:, 0], color='black', marker='o')
+                ax_curves.set_xlabel('Catalyticity γ')
+                ax_curves.set_ylabel('Heat Flux q_wall (W/m²)')
+                ax_curves.grid(True, alpha=0.3)
 
         plt.tight_layout()
 
@@ -198,6 +251,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description='BLAST Abacus Post-Processing (map + curves)')
     parser.add_argument('--input', '-i', type=str, required=True, help='Input abacus HDF5 file')
     parser.add_argument('--output', '-o', type=str, default='result_abacus/abacus_map', help='Output path (without extension) if not --show')
+    parser.add_argument('--mode', '-m', type=str, choices=['gamma_sweep', 'temperature_sweep'], required=True, 
+                        help='Plotting mode: gamma_sweep (q vs γ) or temperature_sweep (q vs T_w)')
     parser.add_argument('--dpi', type=int, default=300, help='Figure DPI')
     parser.add_argument('--format', '-f', type=str, default='pdf', choices=['pdf', 'png', 'svg'], help='Output format for saved figure')
     parser.add_argument('--suppress-warnings', type=str, default='none', choices=['none', 'plot', 'all'], help='Control warnings: none (default), plot, or all')
@@ -226,7 +281,7 @@ def main() -> int:
         print(f"Unexpected error initializing reader: {e}")
         return 1
 
-    plotter = AbacusPlotter(reader, output_format=args.format, dpi=args.dpi)
+    plotter = AbacusPlotter(reader, output_format=args.format, dpi=args.dpi, mode=args.mode)
 
     try:
         if args.show:

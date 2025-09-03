@@ -2,7 +2,7 @@
 # GLOBAL LOGGING
 # =============================================================================
 
-verbose: true
+verbose: false
 
 # =============================================================================
 # CONTINUATION METHOD PARAMETERS FOR CONVERGENCE
@@ -15,14 +15,14 @@ continuation:
   use_linear_predictor: true
   # Continuation step controls
   step_initial: 0.01
-  step_min: 0.00001
+  step_min: 0.0000001
   step_max: 0.5
   step_increase_factor: 2
   step_decrease_factor: 0.8
   max_steps: 10000
   # Mode switching thresholds
   failure_threshold: 4
-  success_threshold: 3
+  success_threshold: 1
   # Predictor block (takes precedence over use_linear_predictor)
   predictor:
     enabled: true
@@ -41,7 +41,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -56,7 +56,7 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 200
+    n_eta: 50
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
@@ -161,18 +161,18 @@ edge_reconstruction:
 # =============================================================================
 
 abacus:
-  enabled: false
+  enabled: true
   # Choose one:
   #   - temperature_sweep: q_wall(Tw) for each γ over a Tw range (current default)
   #   - gamma_sweep_at_Tw: q_wall(γ) at a fixed wall temperature Tw
-  mode: temperature_sweep
+  mode: gamma_sweep_at_Tw
   temperature_sweep:
     range: [1000, 2000]
     points: 11
   gamma_sweep:
-    wall_temperature: [3500, 3700, 4000]
-  # catalyticity_values: [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 1]
-  catalyticity_values: [0, 0.001, 0.01, 0.1, 1]
+    wall_temperature: [3500, 4000]
+  catalyticity_values: [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 1]
+  # catalyticity_values: [0, 0.001, 0.01, 0.1, 1]
   simulation:
     body_type: axisymmetric
     finite_thickness: false

@@ -39,7 +39,8 @@ private:
   
   // Display completion message
   auto display_completion_message(const std::vector<std::filesystem::path>& output_files,
-                                  const std::string& abacus_filename) const -> void;
+                                  const std::string& abacus_filename,
+                                  io::AbacusConfig::Mode abacus_mode = io::AbacusConfig::Mode::TemperatureSweep) const -> void;
   
   // Cleanup resources
   auto cleanup() -> void;

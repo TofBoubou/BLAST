@@ -41,7 +41,8 @@ auto SimulationRunner::run_simulation(
       .solution = {},
       .is_abacus = true,
       .is_edge_reconstruction = false,
-      .output_filename = abacus_filename.value()
+      .output_filename = abacus_filename.value(),
+      .abacus_mode = config.abacus.mode
     };
   } else {
     auto solution = run_standard_simulation(solver, metrics);

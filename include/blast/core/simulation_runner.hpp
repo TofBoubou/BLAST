@@ -16,6 +16,7 @@ public:
     bool is_abacus = false;
     bool is_edge_reconstruction = false;
     std::string output_filename;
+    io::AbacusConfig::Mode abacus_mode = io::AbacusConfig::Mode::TemperatureSweep;
   };
 
   // Run simulation (either standard or abacus)
