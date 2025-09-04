@@ -19,6 +19,8 @@ auto ContinuationMethod::solve_with_continuation(
   consecutive_successes_in_equilibrium_ = 0;
   using_equilibrium_mode_ = false;
   original_chemical_mode_ = target_config.simulation.chemical_mode;
+  had_nonequilibrium_success_since_switch_ = true;  // Start true to allow first switch
+  last_nonequilibrium_success_ = std::nullopt;
   
   // Initialize predictor state
   history_.clear();
@@ -82,6 +84,25 @@ auto ContinuationMethod::solve_with_continuation(
         add_to_history(current_solution, lambda);
         step_reductions_for_current_step_ = 0;
         consecutive_failures_ = 0;
+        
+        // Track successful non-equilibrium solutions (always save the highest)
+        if (!using_equilibrium_mode_ && 
+            original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium) {
+          // Mark that we had a success in non-equilibrium mode
+          had_nonequilibrium_success_since_switch_ = true;
+          
+          // Always update if we don't have one yet, or if this lambda is higher
+          if (!last_nonequilibrium_success_.has_value() || 
+              lambda > last_nonequilibrium_success_->lambda) {
+            last_nonequilibrium_success_ = ContinuationHistoryPoint{current_solution, lambda};
+            if (verbose && lambda >= cc.no_switch_threshold) {
+              std::cout << "\n[CONTINUATION] Saved non-equilibrium solution at lambda="
+                        << std::fixed << std::setprecision(1) << lambda * 100 
+                        << "%" << std::endl;
+            }
+          }
+        }
+        
         if (using_equilibrium_mode_) {
           consecutive_successes_in_equilibrium_++;
           if (verbose) {
@@ -89,17 +110,55 @@ auto ContinuationMethod::solve_with_continuation(
                       << "/" << cc.success_threshold << ")" << std::endl;
           }
           if (consecutive_successes_in_equilibrium_ >= cc.success_threshold) {
-            using_equilibrium_mode_ = false;
-            consecutive_successes_in_equilibrium_ = 0;
+            // Before switching back, try to converge at the same lambda with the equilibrium solution
             if (verbose) {
-              std::cout << "\n[CHEMICAL SWITCHING] Switching back to "
-                        << (original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium ?
-                                "non_equilibrium" :
-                                "original")
-                        << " mode" << std::endl;
+              std::cout << "\n[CHEMICAL SWITCHING] Attempting to switch back to non-equilibrium at lambda="
+                        << std::fixed << std::setprecision(3) << lambda
+                        << " using equilibrium solution as initialization" << std::endl;
+            }
+            
+            // Create non-equilibrium configuration at current lambda
+            auto nonequilibrium_config = interpolate_config(target_config, lambda);
+            solver.set_config(nonequilibrium_config);
+            
+            // Try to solve at the same lambda with equilibrium solution as initial guess
+            {
+              ContinuationScope scope(solver);
+              auto result = solver.solve_station(station, xi, current_solution);
+              if (result) {
+                // Success! Update solution and continue in non-equilibrium mode
+                current_solution = result.value();
+                using_equilibrium_mode_ = false;
+                consecutive_successes_in_equilibrium_ = 0;
+                had_nonequilibrium_success_since_switch_ = false;
+                add_to_history(current_solution, lambda);
+                
+                // Mark that we had a success in non-equilibrium mode
+                had_nonequilibrium_success_since_switch_ = true;
+                
+                // Update saved non-equilibrium solution
+                if (!last_nonequilibrium_success_.has_value() || 
+                    lambda > last_nonequilibrium_success_->lambda) {
+                  last_nonequilibrium_success_ = ContinuationHistoryPoint{current_solution, lambda};
+                }
+                
+                if (verbose) {
+                  std::cout << "[CHEMICAL SWITCHING] Successfully switched back to non-equilibrium mode at lambda="
+                            << std::fixed << std::setprecision(3) << lambda << std::endl;
+                }
+              } else {
+                // Failed to switch back, stay in equilibrium mode for now
+                consecutive_successes_in_equilibrium_ = 0;  // Reset to try again later
+                if (verbose) {
+                  std::cout << "[CHEMICAL SWITCHING] Failed to switch back to non-equilibrium: "
+                            << result.error().message() << ", staying in equilibrium mode" << std::endl;
+                }
+              }
             }
           }
         }
+        // Already handled in the tracking above
+        
         if (std::abs(lambda - 1.0) < 1e-10) {
           if (solved_in_equilibrium_this_step &&
               original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium) {
@@ -123,6 +182,24 @@ auto ContinuationMethod::solve_with_continuation(
               if (verbose) {
                 std::cout << "[CHEMICAL SWITCHING] Final attempt failed in original mode: "
                           << final_res.error().message() << std::endl;
+              }
+              
+              // Check if we have a successful non-equilibrium solution above threshold
+              if (last_nonequilibrium_success_.has_value()) {
+                if (verbose) {
+                  std::cout << "[CONTINUATION] Using last successful non-equilibrium solution at lambda=" 
+                            << std::fixed << std::setprecision(1) << last_nonequilibrium_success_->lambda * 100 
+                            << "% (above acceptable threshold)" << std::endl;
+                }
+                solver.set_config(original_config);
+                return ContinuationResult{
+                  .solution = last_nonequilibrium_success_->solution, 
+                  .success = true, 
+                  .final_lambda = last_nonequilibrium_success_->lambda
+                };
+              }
+              
+              if (verbose) {
                 std::cout << "[CONTINUATION] Handling as failure at lambda=1.0; reducing step" << std::endl;
               }
 
@@ -134,7 +211,10 @@ auto ContinuationMethod::solve_with_continuation(
               }
 
               consecutive_failures_++;
-              consecutive_successes_in_equilibrium_ = 0;
+              // Reset equilibrium counter when switching to equilibrium or when in non-equilibrium mode
+              if (!using_equilibrium_mode_) {
+                consecutive_successes_in_equilibrium_ = 0;
+              }
 
               lambda_step *= cc.step_decrease_factor;
               step_reductions_for_current_step_++;
@@ -149,16 +229,61 @@ auto ContinuationMethod::solve_with_continuation(
               if (!using_equilibrium_mode_ &&
                   original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium &&
                   consecutive_failures_ >= cc.failure_threshold) {
-                using_equilibrium_mode_ = true;
-                consecutive_failures_ = 0;
-                consecutive_successes_in_equilibrium_ = 0;
-                if (verbose) {
-                  std::cout << "[CHEMICAL SWITCHING] Switching to equilibrium mode after " << cc.failure_threshold
-                            << " consecutive failures" << std::endl;
+                // Don't switch to equilibrium if we're above the no-switch threshold
+                if (lambda >= cc.no_switch_threshold) {
+                  if (verbose) {
+                    std::cout << "[CHEMICAL SWITCHING] Would switch to equilibrium after " << cc.failure_threshold
+                              << " failures, but lambda=" << std::fixed << std::setprecision(1) << lambda * 100
+                              << "% is above no-switch threshold" << std::endl;
+                  }
+                } else if (!had_nonequilibrium_success_since_switch_) {
+                  if (verbose) {
+                    std::cout << "[CHEMICAL SWITCHING] Would switch to equilibrium after " << cc.failure_threshold
+                              << " failures, but no non-equilibrium success since last switch" << std::endl;
+                  }
+                } else {
+                  using_equilibrium_mode_ = true;
+                  consecutive_failures_ = 0;
+                  consecutive_successes_in_equilibrium_ = 0;
+                  if (verbose) {
+                    std::cout << "[CHEMICAL SWITCHING] Switching to equilibrium mode after " << cc.failure_threshold
+                              << " consecutive failures" << std::endl;
+                  }
                 }
               }
 
               if (lambda_step < cc.step_min) {
+                // Check if we have a successful non-equilibrium solution above threshold
+                if (last_nonequilibrium_success_.has_value()) {
+                  if (verbose) {
+                    std::cout << "[CONTINUATION] Step size too small, using last successful non-equilibrium solution at lambda=" 
+                              << std::fixed << std::setprecision(1) << last_nonequilibrium_success_->lambda * 100 
+                              << "%" << std::endl;
+                  }
+                  solver.set_config(original_config);
+                  return ContinuationResult{
+                    .solution = last_nonequilibrium_success_->solution, 
+                    .success = true, 
+                    .final_lambda = last_nonequilibrium_success_->lambda
+                  };
+                }
+                
+                // If we have a saved non-equilibrium solution above no-switch threshold, use it
+                if (last_nonequilibrium_success_.has_value() && 
+                    last_nonequilibrium_success_->lambda >= cc.no_switch_threshold) {
+                  if (verbose) {
+                    std::cout << "[CONTINUATION] Step size too small, but using saved non-equilibrium solution at lambda="
+                              << std::fixed << std::setprecision(1) << last_nonequilibrium_success_->lambda * 100
+                              << "% (above " << cc.no_switch_threshold * 100 << "% threshold)" << std::endl;
+                  }
+                  solver.set_config(original_config);
+                  return ContinuationResult{
+                    .solution = last_nonequilibrium_success_->solution,
+                    .success = true,
+                    .final_lambda = last_nonequilibrium_success_->lambda
+                  };
+                }
+                
                 if (verbose) {
                   std::cout << "[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
                             << " < " << std::scientific << std::setprecision(3) << cc.step_min
@@ -188,7 +313,10 @@ auto ContinuationMethod::solve_with_continuation(
         }
       } else {
         consecutive_failures_++;
-        consecutive_successes_in_equilibrium_ = 0;
+        // Only reset equilibrium success counter if we're switching away from equilibrium mode
+        if (!using_equilibrium_mode_) {
+          consecutive_successes_in_equilibrium_ = 0;
+        }
         const std::string error_msg = result.error().message();
         bool is_nan_error = error_msg.find("NaN detected") != std::string::npos;
         if (verbose) {
@@ -207,12 +335,27 @@ auto ContinuationMethod::solve_with_continuation(
         if (!using_equilibrium_mode_ &&
             original_chemical_mode_ == io::SimulationConfig::ChemicalMode::NonEquilibrium &&
             consecutive_failures_ >= cc.failure_threshold) {
-          using_equilibrium_mode_ = true;
-          consecutive_failures_ = 0;
-          consecutive_successes_in_equilibrium_ = 0;
-          if (verbose) {
-            std::cout << "\n[CHEMICAL SWITCHING] Switching to equilibrium mode after " << cc.failure_threshold
-                      << " consecutive failures" << std::endl;
+          // Don't switch to equilibrium if we're above the no-switch threshold
+          if (lambda >= cc.no_switch_threshold) {
+            if (verbose) {
+              std::cout << "\n[CHEMICAL SWITCHING] Would switch to equilibrium after " << cc.failure_threshold
+                        << " failures, but lambda=" << std::fixed << std::setprecision(1) << lambda * 100
+                        << "% is above no-switch threshold (" 
+                        << std::fixed << std::setprecision(1) << cc.no_switch_threshold * 100 << "%)" << std::endl;
+            }
+          } else if (!had_nonequilibrium_success_since_switch_) {
+            if (verbose) {
+              std::cout << "\n[CHEMICAL SWITCHING] Would switch to equilibrium after " << cc.failure_threshold
+                        << " failures, but no non-equilibrium success since last switch (preventing oscillation)" << std::endl;
+            }
+          } else {
+            using_equilibrium_mode_ = true;
+            consecutive_failures_ = 0;
+            consecutive_successes_in_equilibrium_ = 0;
+            if (verbose) {
+              std::cout << "\n[CHEMICAL SWITCHING] Switching to equilibrium mode after " << cc.failure_threshold
+                        << " consecutive failures" << std::endl;
+            }
           }
         }
         lambda_step *= cc.step_decrease_factor;
@@ -224,6 +367,37 @@ auto ContinuationMethod::solve_with_continuation(
           }
         }
         if (lambda_step < cc.step_min) {
+          // Check if we have a successful non-equilibrium solution above threshold
+          if (last_nonequilibrium_success_.has_value()) {
+            if (verbose) {
+              std::cout << "\n[CONTINUATION] Step size too small, using last successful non-equilibrium solution at lambda=" 
+                        << std::fixed << std::setprecision(1) << last_nonequilibrium_success_->lambda * 100 
+                        << "%" << std::endl;
+            }
+            solver.set_config(original_config);
+            return ContinuationResult{
+              .solution = last_nonequilibrium_success_->solution, 
+              .success = true, 
+              .final_lambda = last_nonequilibrium_success_->lambda
+            };
+          }
+          
+          // If we have a saved non-equilibrium solution above no-switch threshold, use it
+          if (last_nonequilibrium_success_.has_value() && 
+              last_nonequilibrium_success_->lambda >= cc.no_switch_threshold) {
+            if (verbose) {
+              std::cout << "\n[CONTINUATION] Step size too small, but using saved non-equilibrium solution at lambda="
+                        << std::fixed << std::setprecision(1) << last_nonequilibrium_success_->lambda * 100
+                        << "% (above " << cc.no_switch_threshold * 100 << "% threshold)" << std::endl;
+            }
+            solver.set_config(original_config);
+            return ContinuationResult{
+              .solution = last_nonequilibrium_success_->solution,
+              .success = true,
+              .final_lambda = last_nonequilibrium_success_->lambda
+            };
+          }
+          
           if (verbose) {
             std::cout << "\n[CONTINUATION] Step size too small (" << std::scientific << std::setprecision(3) << lambda_step
                       << " < " << std::scientific << std::setprecision(3) << cc.step_min
