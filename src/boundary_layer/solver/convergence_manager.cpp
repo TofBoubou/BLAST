@@ -150,7 +150,6 @@ auto ConvergenceManager::check_convergence(const equations::SolutionState& old_s
             << " | g_wall=" << std::format("{:.12g}", new_solution.g[0])
             << " | g_mid="  << std::format("{:.12g}", new_solution.g[new_solution.g.size()/2])
             << std::endl; */
-
     
     // Print mass fractions at wall (eta=0)
 /*     std::cout << "Mass fractions at wall: ";

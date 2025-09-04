@@ -167,7 +167,9 @@ auto StationSolver::should_attempt_continuation(std::optional<double> residual) 
       case CAP::Always:
         return true;
       case CAP::OnlyIfResidualBelowGuard:
-        return residual.has_value() && (residual.value() < config_.numerical.residual_guard);
+        // If no residual is available (e.g., pipeline error before residual computation),
+        // allow continuation attempt under this policy. When a residual exists, enforce the guard.
+        return !residual.has_value() || (residual.value() < config_.numerical.residual_guard);
       case CAP::Never:
       default:
         return false;

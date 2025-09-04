@@ -376,6 +376,8 @@ auto BoundaryLayerSolver::update_edge_properties(conditions::BoundaryConditions&
   const double MW_edge = MW_result.value();
   const double rho_e_new = P_edge * MW_edge / (T_edge * constants::physical::universal_gas_constant);
 
+  // std::cout << T_edge << " " << P_edge << std::endl;
+
   // Calculate equilibrium composition at edge conditions
   auto eq_result = mixture_.equilibrium_composition(T_edge, P_edge);
   if (!eq_result) {
@@ -383,6 +385,8 @@ auto BoundaryLayerSolver::update_edge_properties(conditions::BoundaryConditions&
         NumericError(std::format("Failed to compute edge equilibrium composition: {}", eq_result.error().message())));
   }
   auto edge_composition_eq = eq_result.value();
+
+  // std::cout << edge_composition_eq[0] << " " << edge_composition_eq[1] << " " << edge_composition_eq[2] << " " << edge_composition_eq[3] << " " << edge_composition_eq[4] << std::endl;
 
   // Calculate new edge viscosity using equilibrium composition
   auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);

@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
+#include "blast/core/constants.hpp"
 
 namespace blast::boundary_layer::equations {
 
@@ -103,108 +104,42 @@ auto apply_charge_neutrality(core::Matrix<double>& species_matrix, const thermop
 
   const auto n_eta = species_matrix.cols();
   const auto n_species = species_matrix.rows();
+
+  // Charges are stored as z_i * N_A / M_i (1/kg). Recover valences using M_i and N_A.
   auto charges = mixture.species_charges();
+  const double NA = blast::constants::physical::avogadro_number;
 
-  // Electrons are typically the first species (index 0)
+  const double M_e = mixture.species_molecular_weight(0);
+  const double z_e = charges[0] * M_e / NA; // expected ~ -1 for electrons
+  if (!(std::abs(z_e) > 0.0)) {
+    return; // avoid division by zero if electron charge info unavailable
+  }
+
   for (std::size_t i = 0; i < n_eta; ++i) {
-
-    // Get mass fractions for this eta point
-    std::vector<double> mass_fractions(n_species);
-    for (std::size_t j = 0; j < n_species; ++j) {
-      mass_fractions[j] = species_matrix(j, i);
-    }
-
-    // Convert mass fractions to mole fractions
-    auto mole_fractions_result = mixture.mass_fractions_to_mole_fractions(mass_fractions);
-    if (!mole_fractions_result) {
-      // If conversion fails, fall back to original (incorrect) method
-      double charge_sum = 0.0;
-      for (std::size_t j = 1; j < n_species; ++j) {
-        charge_sum += species_matrix(j, i) * charges[j];
-      }
-      if (std::abs(charges[0]) > 1e-15) {
-        species_matrix(0, i) = -charge_sum / charges[0];
-      }
-      continue;
-    }
-    auto mole_fractions = mole_fractions_result.value();
-
-    // Calculate mixture molecular weight for molar concentration conversion
-    auto mixture_mw_result = mixture.mixture_molecular_weight(mass_fractions);
-    if (!mixture_mw_result) {
-      // Fall back to original method if MW calculation fails
-      double charge_sum = 0.0;
-      for (std::size_t j = 1; j < n_species; ++j) {
-        charge_sum += species_matrix(j, i) * charges[j];
-      }
-      if (std::abs(charges[0]) > 1e-15) {
-        species_matrix(0, i) = -charge_sum / charges[0];
-      }
-      continue;
-    }
-    double mixture_mw = mixture_mw_result.value();
-
-    // Convert mole fractions to molar concentrations
-    // Assume total molar density = 1.0 mol/m³ (relative calculation)
-    const double total_molar_density = 1.0;
-    std::vector<double> molar_concentrations(n_species);
-    for (std::size_t j = 0; j < n_species; ++j) {
-      molar_concentrations[j] = mole_fractions[j] * total_molar_density;
-    }
-
-    // Apply charge neutrality: ∑(c_i × z_i) = 0
-    // Calculate charge sum from all non-electron species
-    double charge_sum = 0.0;
+    // Sum S = Σ_{j>0} z_j * Y_j / M_j over non-electron species
+    double S = 0.0;
+    double sumY_heavy = 0.0;
     for (std::size_t j = 1; j < n_species; ++j) {
-      // Convert charge from C/kg to elementary charges
-      const double species_mw = mixture.species_molecular_weight(j);
-      const double elementary_charge_per_mol = charges[j] * species_mw / (1.602176634e-19 * 6.02214076e23);
-      charge_sum += molar_concentrations[j] * elementary_charge_per_mol;
+      const double Yj = species_matrix(j, i);
+      const double Mj = mixture.species_molecular_weight(j);
+      const double zj = charges[j] * Mj / NA;
+      sumY_heavy += Yj;
+      S += zj * (Yj / Mj);
     }
 
-    // Set electron molar concentration to ensure neutrality
-    const double electron_mw = mixture.species_molecular_weight(0);
-    const double electron_elementary_charge_per_mol = charges[0] * electron_mw / (1.602176634e-19 * 6.02214076e23);
-    if (std::abs(electron_elementary_charge_per_mol) > 1e-15) {
-      molar_concentrations[0] = -charge_sum / electron_elementary_charge_per_mol;
+    // Enforce neutrality: z_e * Y_e / M_e + S = 0 -> Y_e = -(M_e/z_e) * S
+    double Ye = -(M_e / z_e) * S;
+    if (!std::isfinite(Ye) || Ye < 0.0) {
+      Ye = 0.0; // fallback to non-negative
     }
+    species_matrix(0, i) = Ye;
 
-    // Convert back to mole fractions
-    double total_moles = 0.0;
-    for (std::size_t j = 0; j < n_species; ++j) {
-      total_moles += molar_concentrations[j];
-    }
-    if (total_moles > 1e-15) {
+    // Renormalize mass fractions to ensure sum(Y)=1 without breaking neutrality
+    const double sumY = sumY_heavy + Ye;
+    if (sumY > 0.0) {
       for (std::size_t j = 0; j < n_species; ++j) {
-        mole_fractions[j] = molar_concentrations[j] / total_moles;
+        species_matrix(j, i) /= sumY;
       }
-    }
-
-    // Convert mole fractions back to mass fractions
-    // Y_i = X_i * M_i / MW_mix
-    double new_mixture_mw = 0.0;
-    for (std::size_t j = 0; j < n_species; ++j) {
-      new_mixture_mw += mole_fractions[j] * mixture.species_molecular_weight(j);
-    }
-
-    for (std::size_t j = 0; j < n_species; ++j) {
-      mass_fractions[j] = mole_fractions[j] * mixture.species_molecular_weight(j) / new_mixture_mw;
-    }
-
-    // Renormalize to ensure mass conservation
-    double sum = 0.0;
-    for (std::size_t j = 0; j < n_species; ++j) {
-      sum += mass_fractions[j];
-    }
-    if (sum > 1e-15) {
-      for (std::size_t j = 0; j < n_species; ++j) {
-        mass_fractions[j] /= sum;
-      }
-    }
-
-    // Update species matrix
-    for (std::size_t j = 0; j < n_species; ++j) {
-      species_matrix(j, i) = mass_fractions[j];
     }
   }
 }

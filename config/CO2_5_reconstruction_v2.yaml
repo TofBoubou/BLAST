@@ -10,20 +10,21 @@ verbose: true
 
 continuation:
   wall_temperature_stable: 3000
-  edge_temperature_stable: 5905.5
+  edge_temperature_stable: 5000
   pressure_stable: 7000
-  use_linear_predictor: true
+
   # Continuation step controls
   step_initial: 0.01
   step_min: 0.000001
   step_max: 0.5
-  step_increase_factor: 1.5
-  step_decrease_factor: 0.8
-  max_steps: 10000
+  step_increase_factor: 2
+  step_decrease_factor: 0.5
+  max_steps: 20
+
   # Mode switching thresholds
-  failure_threshold: 4
+  failure_threshold: 8
   success_threshold: 1
-  # Predictor block (takes precedence over use_linear_predictor)
+
   predictor:
     enabled: false
     max_step_reductions: 3
@@ -41,7 +42,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -51,7 +52,7 @@ base:
     consider_thermal_diffusion: false
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
-    catalytic_wall: true
+    catalytic_wall: false
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
@@ -63,11 +64,11 @@ base:
     # Global numerical guards and policies
     divergence_threshold: 1.0e6
     residual_guard: 1.0e10
-    nan_policy: reduce_step               # or: fail
+    nan_policy: fail               # or: fail
     continuation_attempt_policy: always  # or: always | never | only_if_residual_below_threshold
 
   mixture:
-    name: CO2_5
+    name: air_5
     thermodynamic_database: RRHO  
     viscosity_algorithm: chapman_enskog_ldlt  
     thermal_conductivity_algorithm: chapman_enskog_ldlt 
@@ -81,13 +82,13 @@ base:
       - x: 0.0
         radius: 1
         velocity: 0
-        temperature: 5905.5
+        temperature: 6150
         pressure: 7000
         boundary_override: 
           enabled: false
-          mass_fraction_condition: [2.746334e-05, 5.391048e-01, 8.388689e-05, 4.190457e-01, 4.173816e-02]
+          mass_fraction_condition: [0.422681, 0.231989, 0.00171201, 0.343602, 0.00001599]
     
-    velocity_gradient_stagnation: 4027.1213622326
+    velocity_gradient_stagnation: 3650
     freestream_density: 0.0019382429
     freestream_velocity: 500000
     
@@ -97,7 +98,7 @@ base:
       delta_bl: 0.0105250000
 
   wall_parameters:
-    temperatures: [300]
+    temperatures: [350]
     emissivity: 0  # Only used when wall_mode is "radiative"
     environment_temperature: 300  # Only used when wall_mode is "radiative"
 
@@ -161,7 +162,7 @@ edge_reconstruction:
 # =============================================================================
 
 catalysis_reconstruction:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric
@@ -171,7 +172,7 @@ catalysis_reconstruction:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 200
+    n_eta: 50
     eta_max: 6.0
     convergence_tolerance: 1.0e-9  
     max_iterations: 100000  
@@ -190,11 +191,11 @@ catalysis_reconstruction:
   boundary_conditions:
     pressure: 7000
     wall_temperature: 3000
-    edge_temperature: 5915.45
+    edge_temperature: 5905.5
     radius: 1
   
   flow_parameters:
-    velocity_gradient_stagnation: 4027.1213622326
+    velocity_gradient_stagnation: 3650
     freestream_density: 0.0019382429
     freestream_velocity: 500000
   
@@ -204,10 +205,10 @@ catalysis_reconstruction:
     delta_bl: 0.0105250000
   
   solver:
-    initial_catalyticity_guess: 0.2
-    catalyticity_min: 0.01
-    catalyticity_max: 0.4
-    tolerance: 1e-9
+    initial_catalyticity_guess: 0.1
+    catalyticity_min: 0.0
+    catalyticity_max: 0.2
+    tolerance: 1e-6
     max_iterations: 50
 
 # =============================================================================
