@@ -37,6 +37,12 @@ private:
   mutable bool using_equilibrium_mode_ = false;
   mutable io::SimulationConfig::ChemicalMode original_chemical_mode_;
   
+  // Track if we had success in non-equilibrium since last switch to equilibrium
+  mutable bool had_nonequilibrium_success_since_switch_ = true;
+  
+  // Track last successful non-equilibrium solution above threshold
+  mutable std::optional<ContinuationHistoryPoint> last_nonequilibrium_success_;
+  
   // Mutable state for polynomial predictor
   mutable std::deque<ContinuationHistoryPoint> history_;
   mutable int step_reductions_for_current_step_ = 0;
