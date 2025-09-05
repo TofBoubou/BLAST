@@ -26,7 +26,7 @@ continuation:
   success_threshold: 1
 
   predictor:
-    enabled: false
+    enabled: true
     max_step_reductions: 3
 
 # =============================================================================
@@ -52,7 +52,7 @@ base:
     consider_thermal_diffusion: false
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
-    catalytic_wall: false
+    catalytic_wall: true
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 

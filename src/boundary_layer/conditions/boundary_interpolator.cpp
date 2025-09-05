@@ -177,11 +177,15 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
   }
   auto species_fractions = species_fractions_result.value();
 
-  auto h_result = mixture.mixture_enthalpy(species_fractions, edge_point.temperature, edge_point.pressure);
-  if (!h_result) {
-    return std::unexpected(BoundaryConditionError("Failed to compute mixture enthalpy"));
+  // Use enthalpy from config if provided; otherwise compute from mixture
+  double enthalpy = edge_point.enthalpy;
+  if (!(enthalpy > 0.0)) {
+    auto h_result = mixture.mixture_enthalpy(species_fractions, edge_point.temperature, edge_point.pressure);
+    if (!h_result) {
+      return std::unexpected(BoundaryConditionError("Failed to compute mixture enthalpy"));
+    }
+    enthalpy = h_result.value();
   }
-  auto enthalpy = h_result.value();
 
   auto mw_result = mixture.mixture_molecular_weight(species_fractions);
   if (!mw_result) {
@@ -372,11 +376,24 @@ constexpr auto compute_beta(int station, double xi, const io::SimulationConfig& 
   }
 
   // Thermophysical properties based on chosen composition
-  auto h_result = mixture.mixture_enthalpy(species_fractions, temperature_interp, pressure_interp);
-  if (!h_result) {
-    return std::unexpected(BoundaryConditionError("Failed to compute enthalpy"));
+  double enthalpy_interp;
+  // Interpolate enthalpy if provided in config; otherwise compute from mixture
+  const bool have_enthalpy_series = std::all_of(edge_config.edge_points.begin(), edge_config.edge_points.end(),
+                                                [](const auto& p) { return p.enthalpy > 0.0; });
+  if (have_enthalpy_series) {
+    std::vector<double> h_values;
+    h_values.reserve(edge_config.edge_points.size());
+    for (const auto& pt : edge_config.edge_points) {
+      h_values.push_back(pt.enthalpy);
+    }
+    enthalpy_interp = interpolate_property(h_values, ix1, ix2, x_grid, x_interp);
+  } else {
+    auto h_result = mixture.mixture_enthalpy(species_fractions, temperature_interp, pressure_interp);
+    if (!h_result) {
+      return std::unexpected(BoundaryConditionError("Failed to compute enthalpy"));
+    }
+    enthalpy_interp = h_result.value();
   }
-  const double enthalpy_interp = h_result.value();
 
   auto mw_result = mixture.mixture_molecular_weight(species_fractions);
   if (!mw_result) {

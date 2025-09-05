@@ -841,6 +841,16 @@ auto YamlParser::parse_outer_edge_config(const YAML::Node& node, bool edge_recon
         return std::unexpected(temperature_result.error());
       point.temperature = temperature_result.value();
 
+      // Optional enthalpy at edge (legacy compatibility)
+      if (point_node["enthalpy"]) {
+        auto enthalpy_result = extract_value<double>(point_node, "enthalpy");
+        if (!enthalpy_result)
+          return std::unexpected(enthalpy_result.error());
+        point.enthalpy = enthalpy_result.value();
+      } else {
+        point.enthalpy = 0.0; // mark as unspecified
+      }
+
       auto pressure_result = extract_value<double>(point_node, "pressure");
       if (!pressure_result)
         return std::unexpected(pressure_result.error());

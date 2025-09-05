@@ -100,7 +100,8 @@ private:
     [[nodiscard]] auto execute_solver_pipeline(int station, double xi,
                                               conditions::BoundaryConditions& bc,
                                               equations::SolutionState& solution,
-                                              int iteration) -> std::expected<void, SolverError>;
+                                              int iteration,
+                                              equations::SolutionState& solution_old_snapshot) -> std::expected<void, SolverError>;
 
     /**
      * @brief Update wall temperature for radiative equilibrium

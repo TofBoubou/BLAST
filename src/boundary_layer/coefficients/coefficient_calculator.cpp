@@ -185,10 +185,19 @@ auto CoefficientCalculator::calculate_thermodynamic_coefficients(const Coefficie
   }
   thermo.d_rho_deta = d_rho_deta_result.value();
 
-  // Compute wall enthalpy using local workspace
+  // Compute wall enthalpy using composition at the wall
   std::vector<double> c_wall(n_species);
-  for (std::size_t j = 0; j < n_species; ++j) {
-    c_wall[j] = inputs.c(j, 0);
+  if (sim_config_.chemical_mode == io::SimulationConfig::ChemicalMode::Equilibrium) {
+    // Enforce equilibrium composition at wall for consistency
+    auto ceq_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
+    if (!ceq_result) {
+      return std::unexpected(CoefficientError("Failed to compute wall equilibrium composition"));
+    }
+    c_wall = std::move(ceq_result.value());
+  } else {
+    for (std::size_t j = 0; j < n_species; ++j) {
+      c_wall[j] = inputs.c(j, 0);
+    }
   }
 
   auto h_wall_result = mixture_.mixture_enthalpy(c_wall, bc.Tw(), bc.P_e());
@@ -236,10 +245,19 @@ auto CoefficientCalculator::calculate_transport_coefficients(const CoefficientIn
       c_local[j] = inputs.c(j, i);
     }
 
-    // Get transport properties
-    auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_edge);
-    auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i], P_edge);
-    auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], P_edge);
+    // Compute local gas constant R_mix_local and local pressure P_local
+    double R_mix_local = 0.0;
+    for (std::size_t j = 0; j < n_species; ++j) {
+      const double Mw_j = mixture_.species_molecular_weight(j);
+      R_mix_local += c_local[j] * constants::physical::universal_gas_constant / Mw_j;
+    }
+    const double rho_local = bc.P_e() * thermo.MW[i] / (inputs.T[i] * constants::physical::universal_gas_constant);
+    const double P_local = rho_local * R_mix_local * inputs.T[i];
+
+    // Get transport properties using local pressure (legacy behavior)
+    auto mu_result = mixture_.viscosity(c_local, inputs.T[i], P_local);
+    auto cp_result = mixture_.frozen_cp(c_local, inputs.T[i], P_local);
+    auto k_result = mixture_.frozen_thermal_conductivity(c_local, inputs.T[i], P_local);
 
     if (!mu_result || !cp_result || !k_result) {
       return std::unexpected(CoefficientError(std::format("Failed to compute transport properties at eta={}", i)));
@@ -314,10 +332,28 @@ auto CoefficientCalculator::calculate_diffusion_coefficients(const CoefficientIn
     return std::unexpected(CoefficientError("Invalid edge pressure: P_e <= 0"));
   }
 
-  // Calculate binary diffusion coefficients
+  // Calculate binary diffusion coefficients (use local pressure like legacy)
   for (std::size_t i = 0; i < n_eta; ++i) {
-    // Get binary diffusion coefficients using edge pressure
-    auto dij_result = mixture_.binary_diffusion_coefficients(inputs.T[i], P_edge);
+    // Compute local pressure from ideal gas and mixture gas constant
+    // Rebuild local composition for gas constant
+    std::vector<double> c_local(n_species);
+    double R_mix_local = 0.0;
+    for (std::size_t j = 0; j < n_species; ++j) {
+      c_local[j] = inputs.c(j, i);
+      const double Mw_j = mixture_.species_molecular_weight(j);
+      R_mix_local += c_local[j] * constants::physical::universal_gas_constant / Mw_j;
+    }
+    // Recompute local mixture MW for density (consistent with thermodynamics stage)
+    auto mw_result = mixture_.mixture_molecular_weight(c_local);
+    if (!mw_result) {
+      return std::unexpected(CoefficientError(std::format("Failed to compute MW at eta={}", i)));
+    }
+    const double MW_local = mw_result.value();
+    const double rho_local = bc.P_e() * MW_local / (inputs.T[i] * constants::physical::universal_gas_constant);
+    const double P_local = rho_local * R_mix_local * inputs.T[i];
+
+    // Get binary diffusion coefficients using local pressure
+    auto dij_result = mixture_.binary_diffusion_coefficients(inputs.T[i], P_local);
     if (!dij_result) {
       return std::unexpected(CoefficientError(std::format("Failed to compute Dij at eta={}", i)));
     }
@@ -671,11 +707,19 @@ auto CoefficientCalculator::calculate_wall_properties(const CoefficientInputs& i
     -> std::expected<WallProperties, CoefficientError> {
 
   const auto n_species = inputs.c.rows();
-  // Extract wall composition using thread-local reusable buffer
+  // Extract wall composition; for equilibrium mode use eq(Tw,Pe)
   static thread_local std::vector<double> c_wall;
   c_wall.resize(n_species);
-  for (std::size_t j = 0; j < n_species; ++j) {
-    c_wall[j] = inputs.c(j, 0);
+  if (sim_config_.chemical_mode == io::SimulationConfig::ChemicalMode::Equilibrium) {
+    auto ceq_result = mixture_.equilibrium_composition(bc.Tw(), bc.P_e());
+    if (!ceq_result) {
+      return std::unexpected(CoefficientError("Failed to compute wall equilibrium composition for transport"));
+    }
+    c_wall = std::move(ceq_result.value());
+  } else {
+    for (std::size_t j = 0; j < n_species; ++j) {
+      c_wall[j] = inputs.c(j, 0);
+    }
   }
 
   // Get wall transport properties using edge pressure
@@ -743,26 +787,29 @@ auto compute_eta_derivative(Range&& values, double d_eta) -> std::expected<std::
 
   const double dx12 = 12.0 * d_eta;
 
-  // Forward 5-point stencil O(h^4) for first 2 points
+  // Stencils alignés sur l'ancien code
+  // i = 0
   derivatives[0] =
       (-25.0 * values[0] + 48.0 * values[1] - 36.0 * values[2] + 16.0 * values[3] - 3.0 * values[4]) / dx12;
-
+  // i = 1
   derivatives[1] =
-      (-25.0 * values[1] + 48.0 * values[2] - 36.0 * values[3] + 16.0 * values[4] - 3.0 * values[5]) / dx12;
+      (-3.0 * values[0] - 10.0 * values[1] + 18.0 * values[2] - 6.0 * values[3] + 1.0 * values[4]) / dx12;
 
   // Central 5-point stencil O(h^4) for interior points
   for (std::size_t i = 2; i < n - 2; ++i) {
     derivatives[i] = (values[i - 2] - 8.0 * values[i - 1] + 8.0 * values[i + 1] - values[i + 2]) / dx12;
   }
 
-  // Backward 5-point stencil O(h^4) for last 2 points
+  // Fin alignée sur l'ancien code
+  // i = n-2
   derivatives[n - 2] =
-      (-1.0 * values[n - 5] + 6.0 * values[n - 4] - 18.0 * values[n - 3] + 10.0 * values[n - 2] + 3.0 * values[n - 1]) /
+      (3.0 * values[n - 6] - 16.0 * values[n - 5] + 36.0 * values[n - 4] - 48.0 * values[n - 3] + 25.0 * values[n - 2]) /
       dx12;
 
-  derivatives[n - 1] = (3.0 * values[n - 5] - 16.0 * values[n - 4] + 36.0 * values[n - 3] - 48.0 * values[n - 2] +
-                        25.0 * values[n - 1]) /
-                       dx12;
+  // i = n-1
+  derivatives[n - 1] =
+      (3.0 * values[n - 5] - 16.0 * values[n - 4] + 36.0 * values[n - 3] - 48.0 * values[n - 2] + 25.0 * values[n - 1]) /
+      dx12;
 
   return derivatives;
 }

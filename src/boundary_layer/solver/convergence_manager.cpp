@@ -26,10 +26,10 @@ auto ConvergenceManager::iterate_station_adaptive(int station, double xi,
     ConvergenceInfo conv_info;
 
     for (int iter = 0; iter < config_.numerical.max_iterations; ++iter) {
-        const auto solution_old = solution;
+        auto solution_old = solution;
 
         // Execute solver pipeline for this iteration
-        auto pipeline_result = execute_solver_pipeline(station, xi, bc_dynamic, solution, iter);
+        auto pipeline_result = execute_solver_pipeline(station, xi, bc_dynamic, solution, iter, solution_old);
         if (!pipeline_result) {
             return std::unexpected(pipeline_result.error());
         }
@@ -198,14 +198,15 @@ auto ConvergenceManager::initialize_relaxation_for_station(int station) -> void 
 auto ConvergenceManager::execute_solver_pipeline(int station, double xi,
                                                 conditions::BoundaryConditions& bc,
                                                 equations::SolutionState& solution,
-                                                int iteration) -> std::expected<void, SolverError> {
+                                                int iteration,
+                                                equations::SolutionState& solution_old_snapshot) -> std::expected<void, SolverError> {
 
     // Initialize coefficients container (filled by steps)
     coefficients::CoefficientSet coeffs;
 
     // Create context (no const_cast; pipeline mutates state explicitly)
     SolverContext ctx{.solution = solution,
-                     .solution_old = solution,
+                     .solution_old = solution_old_snapshot,
                      .bc = bc,
                      .coeffs = coeffs,
                      .mixture = mixture_,

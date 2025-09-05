@@ -11,6 +11,7 @@
 #include "solver_errors.hpp"
 #include <expected>
 #include <memory>
+#include <optional>
 
 namespace blast::boundary_layer::solver {
 
@@ -23,7 +24,8 @@ class BoundaryLayerSolver;
 
 struct SolverContext {
   equations::SolutionState& solution;
-  equations::SolutionState& solution_old;
+  const equations::SolutionState& solution_old;
+  std::optional<std::vector<double>> F_new_pending;
   conditions::BoundaryConditions& bc;
   coefficients::CoefficientSet& coeffs;
   const thermophysics::MixtureInterface& mixture;

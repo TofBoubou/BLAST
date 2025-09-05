@@ -349,62 +349,16 @@ auto BoundaryLayerSolver::update_edge_properties(conditions::BoundaryConditions&
                                                  const core::Matrix<double>& species_matrix) const
     -> std::expected<void, SolverError> {
 
-  const auto n_eta = grid_->n_eta();
-  const auto n_species = mixture_.n_species();
+  // Freeze edge reference properties (rho_e, mu_e, c_e) during station iterations.
+  // Rationale: Align with legacy BLAST behavior where edge thermodynamic
+  // references are provided once and held constant, avoiding iteration-to-iteration
+  // drifts that change geometry factors (J_fact, W_fact, bc_fact) and the
+  // normalization of the energy equation.
 
-  if (n_eta == 0 || inputs.T.empty()) {
-    return {}; // No data to update
-  }
-
-  // Get edge conditions (last point in eta grid)
-  const auto edge_idx = n_eta - 1;
-  const double T_edge = inputs.T[edge_idx];
-  const double P_edge = bc.P_e();
-
-  // Get edge composition
-  std::vector<double> edge_composition(n_species);
-  for (std::size_t j = 0; j < n_species; ++j) {
-    edge_composition[j] = species_matrix(j, edge_idx);
-  }
-
-  // Calculate new edge density using equation of state
-  auto MW_result = mixture_.mixture_molecular_weight(edge_composition);
-  if (!MW_result) {
-    return std::unexpected(
-        NumericError(std::format("Failed to compute edge molecular weight: {}", MW_result.error().message())));
-  }
-  const double MW_edge = MW_result.value();
-  const double rho_e_new = P_edge * MW_edge / (T_edge * constants::physical::universal_gas_constant);
-
-  // std::cout << T_edge << " " << P_edge << std::endl;
-
-  // Calculate equilibrium composition at edge conditions
-  auto eq_result = mixture_.equilibrium_composition(T_edge, P_edge);
-  if (!eq_result) {
-    return std::unexpected(
-        NumericError(std::format("Failed to compute edge equilibrium composition: {}", eq_result.error().message())));
-  }
-  auto edge_composition_eq = eq_result.value();
-
-  // std::cout << edge_composition_eq[0] << " " << edge_composition_eq[1] << " " << edge_composition_eq[2] << " " << edge_composition_eq[3] << " " << edge_composition_eq[4] << std::endl;
-
-  // Calculate new edge viscosity using equilibrium composition
-  auto mu_result = mixture_.viscosity(edge_composition, T_edge, P_edge);
-  if (!mu_result) {
-    return std::unexpected(
-        NumericError(std::format("Failed to compute edge viscosity: {}", mu_result.error().message())));
-  }
-  const double mu_e_new = mu_result.value();
-
-  // Update boundary conditions with new values
-  bc.update_edge_density(rho_e_new);
-  bc.update_edge_viscosity(mu_e_new);
-
-  // Only update species fractions if boundary_override is false
-  if (!bc.edge.boundary_override) {
-    bc.edge.species_fractions = edge_composition_eq;
-  }
-
+  // Keep current BoundaryConditions as-is.
+  (void)bc;              // unused in frozen mode
+  (void)inputs;          // unused in frozen mode
+  (void)species_matrix;  // unused in frozen mode
   return {};
 }
 

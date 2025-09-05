@@ -15,19 +15,22 @@ ThermodynamicConsistencyStep::ThermodynamicConsistencyStep(thermodynamics::Entha
 }
 
 auto ThermodynamicConsistencyStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
-  // 1. Temperature update from enthalpy
-  std::vector<double> enthalpy_field(ctx.solution.g.size());
+  // 1. Temperature update from enthalpy (use previous iteration g and c)
+  std::vector<double> enthalpy_field(ctx.solution_old.g.size());
   for (std::size_t i = 0; i < enthalpy_field.size(); ++i) {
-    enthalpy_field[i] = ctx.solution.g[i] * ctx.bc.he();
+    enthalpy_field[i] = ctx.solution_old.g[i] * ctx.bc.he();
   }
 
-  auto T_result = h2t_solver_.solve(enthalpy_field, ctx.solution.c, ctx.bc, ctx.solution.T);
+  auto T_result = h2t_solver_.solve(enthalpy_field, ctx.solution_old.c, ctx.bc, ctx.solution.T);
   if (!T_result) {
     return std::unexpected(
         StepExecutionError(name(), std::format("Temperature update failed: {}", T_result.error().message())));
   }
 
   ctx.solution.T = std::move(T_result.value().temperatures);
+
+  // Note: in equilibrium mode, composition is enforced in the species step,
+  // not here, to keep coefficient assembly based on previous-iteration fields.
 
   // 2. Update edge properties for thermodynamic consistency
   auto dummy_inputs = coefficients::CoefficientInputs{.xi = ctx.xi,
@@ -64,18 +67,18 @@ auto MechanicalResolutionStep::execute(SolverContext& ctx) -> std::expected<void
   }
   ctx.solution.V = std::move(V_result.value());
 
-  // 2. Compute all derivatives after V update
-  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+  // 2. Compute derivatives from previous iteration fields for coefficient assembly
+  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution_old);
   if (!all_derivatives_result) {
     return std::unexpected(StepExecutionError(
         name(), std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
   }
   auto all_derivatives = all_derivatives_result.value();
 
-  // 3. Create updated inputs with consistent state
+  // 3. Create updated inputs with previous iteration fields
   auto updated_inputs = coefficients::CoefficientInputs{.xi = ctx.xi,
-                                                        .F = ctx.solution.F,
-                                                        .c = ctx.solution.c,
+                                                        .F = ctx.solution_old.F,
+                                                        .c = ctx.solution_old.c,
                                                         .dc_deta = all_derivatives.dc_deta,
                                                         .dc_deta2 = all_derivatives.dc_deta2,
                                                         .T = ctx.solution.T};
@@ -88,8 +91,8 @@ auto MechanicalResolutionStep::execute(SolverContext& ctx) -> std::expected<void
   }
   ctx.coeffs = std::move(coeffs_result.value());
 
-  // 5. Solve momentum equation
-  auto F_result = ctx.solver.solve_momentum_equation(ctx.solution, ctx.coeffs, ctx.bc, ctx.xi);
+  // 5. Solve momentum equation using F_old for consistency
+  auto F_result = ctx.solver.solve_momentum_equation(ctx.solution_old, ctx.coeffs, ctx.bc, ctx.xi);
   if (!F_result) {
     return std::unexpected(
         StepExecutionError(name(), std::format("Momentum equation failed: {}", F_result.error().message())));
@@ -100,7 +103,8 @@ auto MechanicalResolutionStep::execute(SolverContext& ctx) -> std::expected<void
   if (!F_new.empty()) {
     F_new.back() = 1.0;
   }
-  ctx.solution.F = std::move(F_new);
+  // Defer committing F_new until after energy step to emulate legacy pipeline
+  ctx.F_new_pending = std::move(F_new);
 
   return {};
 }
@@ -113,7 +117,7 @@ auto MechanicalResolutionStep::solve_continuity(SolverContext& ctx) -> std::expe
 
   std::vector<double> y_field(n_eta);
   for (std::size_t i = 0; i < n_eta; ++i) {
-    y_field[i] = -(2.0 * ctx.xi * lambda0 + 1.0) * ctx.solution.F[i] - 2.0 * ctx.xi * F_derivatives[i];
+    y_field[i] = -(2.0 * ctx.xi * lambda0 + 1.0) * ctx.solution_old.F[i] - 2.0 * ctx.xi * F_derivatives[i];
   }
 
   return equations::solve_continuity(y_field, d_eta, 0.0);
@@ -124,7 +128,7 @@ auto MechanicalResolutionStep::solve_continuity(SolverContext& ctx) -> std::expe
 // =============================================================================
 
 auto ThermalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
-  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution_old);
   if (!all_derivatives_result) {
     return std::unexpected(StepExecutionError(
         name(), std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
@@ -138,8 +142,24 @@ auto ThermalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, S
                                                         .dc_deta2 = derivatives.dc_deta2,
                                                         .T = ctx.solution.T};
 
-  auto g_result =
-      ctx.solver.solve_energy_equation(ctx.solution, thermal_inputs, ctx.coeffs, ctx.bc, ctx.mixture, ctx.station);
+  // Build inputs for energy using OLD state: F_old, c_old, dc_old, dc2_old, T(h_old)
+  auto deriv_old_result = ctx.solver.compute_all_derivatives(ctx.solution_old);
+  if (!deriv_old_result) {
+    return std::unexpected(
+        StepExecutionError(name(), std::format("All derivatives (old) computation failed: {}", deriv_old_result.error().message())));
+  }
+  auto deriv_old = deriv_old_result.value();
+
+  auto thermal_inputs_old = coefficients::CoefficientInputs{.xi = ctx.xi,
+                                                            .F = ctx.solution_old.F,
+                                                            .c = ctx.solution_old.c,
+                                                            .dc_deta = deriv_old.dc_deta,
+                                                            .dc_deta2 = deriv_old.dc_deta2,
+                                                            // T has been updated from g (old) just above
+                                                            .T = ctx.solution.T};
+
+  auto g_result = ctx.solver.solve_energy_equation(ctx.solution_old, thermal_inputs_old, ctx.coeffs, ctx.bc, ctx.mixture,
+                                                   ctx.station);
   if (!g_result) {
     return std::unexpected(
         StepExecutionError(name(), std::format("Energy equation failed: {}", g_result.error().message())));
@@ -153,6 +173,12 @@ auto ThermalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, S
   }
   ctx.solution.g = std::move(g_new);
 
+  // Now commit pending F_new (momentum) after energy has been updated
+  if (ctx.F_new_pending && !ctx.F_new_pending->empty()) {
+    ctx.solution.F = std::move(*ctx.F_new_pending);
+    ctx.F_new_pending.reset();
+  }
+
   return {};
 }
 
@@ -161,7 +187,7 @@ auto ThermalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, S
 // =============================================================================
 
 auto ChemicalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
-  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution_old);
   if (!all_derivatives_result) {
     return std::unexpected(StepExecutionError(
         name(), std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
@@ -191,7 +217,7 @@ auto ChemicalResolutionStep::execute(SolverContext& ctx) -> std::expected<void, 
 // =============================================================================
 
 auto InputCalculationStep::execute(SolverContext& ctx) -> std::expected<void, StepExecutionError> {
-  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution);
+  auto all_derivatives_result = ctx.solver.compute_all_derivatives(ctx.solution_old);
   if (!all_derivatives_result) {
     return std::unexpected(StepExecutionError(
         name(), std::format("All derivatives computation failed: {}", all_derivatives_result.error().message())));
@@ -244,17 +270,15 @@ auto SolverPipeline::execute_all(SolverContext& ctx) -> std::expected<void, Step
 
     // Backup current context to allow rollback on failure
     auto solution_backup = ctx.solution;
-    auto old_solution_backup = ctx.solution_old;
-    auto bc_backup = ctx.bc;
+        auto bc_backup = ctx.bc;
     auto coeffs_backup = ctx.coeffs;
 
     auto result = step->execute(ctx);
     if (!result) {
       // Restore previous state to keep context consistent
-      ctx.solution = std::move(solution_backup);
-      ctx.solution_old = std::move(old_solution_backup);
-      ctx.bc = std::move(bc_backup);
-      ctx.coeffs = std::move(coeffs_backup);
+      ctx.solution = solution_backup;
+            ctx.bc = bc_backup;
+      ctx.coeffs = coeffs_backup;
 
       // Add context information about which step failed
       return std::unexpected(StepExecutionError(std::format("Step {}/{}: {}", i + 1, steps_.size(), step->name()),
@@ -265,3 +289,4 @@ auto SolverPipeline::execute_all(SolverContext& ctx) -> std::expected<void, Step
 }
 
 } // namespace blast::boundary_layer::solver
+
