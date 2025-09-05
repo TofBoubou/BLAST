@@ -41,88 +41,95 @@ inline auto compute_average_diffusion_coefficient(std::span<const double> x, con
   return 1.0 / sum;
 }
 
-// Stefan-Maxwell flux calculation for single eta point
+// Stefan-Maxwell flux calculation at a single eta point using reusable workspace
 auto calculate_stefan_maxwell_at_point(std::span<const double> c, std::span<const double> dc_deta,
                                        std::span<const double> x, double rho, double P,
                                        const core::Matrix<double>& D_bin_local, double MW, double dMW_deta,
                                        std::span<const double> tdr_term, double der_fact,
-                                       const thermophysics::MixtureInterface& mixture) -> std::vector<double> {
+                                       const thermophysics::MixtureInterface& mixture, Eigen::VectorXd& J_vec,
+                                       Eigen::VectorXd& driving_force, Eigen::VectorXd& diffusion_flux,
+                                       Eigen::VectorXd& mass_weight, Eigen::VectorXd& electric_mobility,
+                                       Eigen::MatrixXd& A, Eigen::PartialPivLU<Eigen::MatrixXd>& lu) -> void {
 
-  const auto n_species = c.size();
+  const auto n_species = static_cast<std::size_t>(c.size());
   const double full_der_fact = der_fact * rho;
   const double sum_c = std::accumulate(c.begin(), c.end(), 0.0);
 
   // Use Eigen through the wrapper
   auto& D_bin = D_bin_local.eigen();
 
-  // Initialize vectors
-  Eigen::VectorXd driving_force(n_species);
-  Eigen::VectorXd diffusion_flux(n_species);
-  Eigen::VectorXd mass_weight(n_species);
-  Eigen::MatrixXd A = Eigen::MatrixXd::Identity(n_species, n_species);
+  // Ensure correct sizes for workspace (no heap allocation if already sized)
+  if (static_cast<std::size_t>(driving_force.size()) != n_species) {
+    driving_force.resize(static_cast<Eigen::Index>(n_species));
+    diffusion_flux.resize(static_cast<Eigen::Index>(n_species));
+    mass_weight.resize(static_cast<Eigen::Index>(n_species));
+    electric_mobility.resize(static_cast<Eigen::Index>(n_species));
+    J_vec.resize(static_cast<Eigen::Index>(n_species));
+  }
+  if (A.rows() != static_cast<Eigen::Index>(n_species) || A.cols() != static_cast<Eigen::Index>(n_species)) {
+    A.resize(static_cast<Eigen::Index>(n_species), static_cast<Eigen::Index>(n_species));
+  }
+  A.setIdentity();
 
   // Build Stefan-Maxwell system
   for (std::size_t i = 0; i < n_species; ++i) {
     const double MW_i = mixture.species_molecular_weight(i);
 
-    // Driving force: concentration gradient + molecular weight gradient +
-    // thermal diffusion
-    driving_force[i] = MW / MW_i * dc_deta[i] + c[i] / MW_i * dMW_deta;
+    // Driving force: concentration gradient + molecular weight gradient + thermal diffusion
+    driving_force[static_cast<Eigen::Index>(i)] = MW / MW_i * dc_deta[i] + c[i] / MW_i * dMW_deta;
     if (!tdr_term.empty()) {
-      driving_force[i] += tdr_term[i];
+      driving_force[static_cast<Eigen::Index>(i)] += tdr_term[i];
     }
 
     // Average diffusion coefficient
     const double D_im = compute_average_diffusion_coefficient(x, D_bin, i);
 
     // Flux and mass weight terms
-    diffusion_flux[i] = -rho * MW_i / MW * D_im * driving_force[i] * full_der_fact;
-    mass_weight[i] = c[i] * D_im * MW;
+    diffusion_flux[static_cast<Eigen::Index>(i)] = -rho * MW_i / MW * D_im * driving_force[static_cast<Eigen::Index>(i)] * full_der_fact;
+    mass_weight[static_cast<Eigen::Index>(i)] = c[i] * D_im * MW;
 
     // Build matrix row
     for (std::size_t j = 0; j < n_species; ++j) {
-      A(i, j) -= mass_weight[i] / (mixture.species_molecular_weight(j) * D_bin(i, j));
+      A(static_cast<Eigen::Index>(i), static_cast<Eigen::Index>(j)) -=
+          mass_weight[static_cast<Eigen::Index>(i)] /
+          (mixture.species_molecular_weight(j) * D_bin(static_cast<Eigen::Index>(i), static_cast<Eigen::Index>(j)));
     }
   }
 
   // Apply mass conservation constraint (last row)
-  A.row(n_species - 1).setConstant(c[n_species - 1] / sum_c);
-  diffusion_flux[n_species - 1] = 0.0;
+  A.row(static_cast<Eigen::Index>(n_species - 1)).setConstant(c[n_species - 1] / sum_c);
+  diffusion_flux[static_cast<Eigen::Index>(n_species - 1)] = 0.0;
 
-  // Solve linear system
-  Eigen::VectorXd J_vec = A.lu().solve(diffusion_flux);
+  // Solve linear system using reusable LU object
+  lu.compute(A);
+  J_vec = lu.solve(diffusion_flux);
 
   // Apply ambipolar electric field correction for ionized mixtures
   if (mixture.has_electrons()) {
-    auto charges = mixture.species_charges();
-    Eigen::VectorXd electric_mobility(n_species);
-
+    const auto charges = mixture.species_charges();
+    // Reuse electric_mobility, Map charges without allocation
     for (std::size_t i = 0; i < n_species; ++i) {
       const double D_im = compute_average_diffusion_coefficient(x, D_bin, i);
-      electric_mobility[i] = rho / P * D_im * mixture.species_molecular_weight(i) / MW * charges[i] * rho * c[i];
+      electric_mobility[static_cast<Eigen::Index>(i)] = rho / P * D_im * mixture.species_molecular_weight(i) / MW *
+                                                       charges[i] * rho * c[i];
     }
 
-    // Calculate electric field strength - Convert span to Eigen vector for dot
-    // product
-    Eigen::VectorXd charges_vec = Eigen::Map<const Eigen::VectorXd>(charges.data(), charges.size());
+    const Eigen::Map<const Eigen::VectorXd> charges_vec(charges.data(), static_cast<Eigen::Index>(charges.size()));
     const double charge_flux = charges_vec.dot(diffusion_flux);
     const double current_flux = charges_vec.dot(J_vec);
     const double charge_mobility = charges_vec.dot(electric_mobility);
 
     if (std::abs(charge_mobility) > 1e-30) {
       const double E_field = -(charge_flux + current_flux) / charge_mobility;
-      J_vec += E_field * electric_mobility;
+      J_vec.noalias() += E_field * electric_mobility;
     }
   }
 
-  // Apply mass conservation correction
+  // Apply mass conservation correction in-place
   const double sum_J = J_vec.sum();
-  std::vector<double> J_result(n_species);
   for (std::size_t i = 0; i < n_species; ++i) {
-    J_result[i] = J_vec[i] - c[i] / sum_c * sum_J;
+    J_vec[static_cast<Eigen::Index>(i)] -= c[i] / sum_c * sum_J;
   }
-
-  return J_result;
 }
 
 } // anonymous namespace
@@ -163,11 +170,19 @@ auto compute_stefan_maxwell_fluxes(const CoefficientInputs& inputs,
   const int station = xi_der.station();
   const double der_fact = compute_derivative_factor(station, inputs.xi, bc, sim_config) * coeffs.transport.K_bl;
 
-  // Pre-allocate work arrays
+  // Pre-allocate work arrays (std::vector + Eigen workspace) to avoid per-η allocations
   std::vector<double> c_local(n_species);
   std::vector<double> dc_deta_local(n_species);
   std::vector<double> x_local(n_species);
   core::Matrix<double> D_bin_local(n_species, n_species);
+  // Reusable Eigen objects
+  Eigen::VectorXd driving_force(static_cast<Eigen::Index>(n_species));
+  Eigen::VectorXd diffusion_flux(static_cast<Eigen::Index>(n_species));
+  Eigen::VectorXd mass_weight(static_cast<Eigen::Index>(n_species));
+  Eigen::VectorXd electric_mobility(static_cast<Eigen::Index>(n_species));
+  Eigen::VectorXd J_vec(static_cast<Eigen::Index>(n_species));
+  Eigen::MatrixXd A(static_cast<Eigen::Index>(n_species), static_cast<Eigen::Index>(n_species));
+  Eigen::PartialPivLU<Eigen::MatrixXd> lu;
 
   // Process each eta point
   for (std::size_t i = 0; i < n_eta; ++i) {
@@ -194,13 +209,14 @@ auto compute_stefan_maxwell_fluxes(const CoefficientInputs& inputs,
 
     // Calculate fluxes
     try {
-      auto J_local = calculate_stefan_maxwell_at_point(c_local, dc_deta_local, x_local, coeffs.thermodynamic.rho[i],
-                                                       bc.P_e(), D_bin_local, coeffs.thermodynamic.MW[i],
-                                                       coeffs.thermodynamic.d_MW_deta[i], tdr_span, der_fact, mixture);
+      calculate_stefan_maxwell_at_point(c_local, dc_deta_local, x_local, coeffs.thermodynamic.rho[i], bc.P_e(),
+                                        D_bin_local, coeffs.thermodynamic.MW[i],
+                                        coeffs.thermodynamic.d_MW_deta[i], tdr_span, der_fact, mixture, J_vec,
+                                        driving_force, diffusion_flux, mass_weight, electric_mobility, A, lu);
 
-      // Store results
+      // Store results from reusable J_vec
       for (std::size_t j = 0; j < n_species; ++j) {
-        J(j, i) = J_local[j];
+        J(j, i) = J_vec[static_cast<Eigen::Index>(j)];
       }
     } catch (const std::exception& e) {
       return std::unexpected(
