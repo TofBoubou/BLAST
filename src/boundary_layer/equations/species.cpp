@@ -260,30 +260,29 @@ auto compute_fake_fluxes(const core::Matrix<double>& dc_deta_fixed, const coeffi
   core::Matrix<double> J_fake(n_species, n_eta);
   core::Matrix<double> dJ_fake_deta(n_species, n_eta);
 
-  // Compute fake fluxes: J_fake[j][i] = Le/Pr * l0[i] * dc_deta_fix[j][i]
-  for (std::size_t i = 0; i < n_eta; ++i) {
+  // Compute fake fluxes vectorized over each row (RowMajor):
+  // J_fake[j, :] = Le/Pr * l0[:] * dc_deta_fixed[j, :]
+  {
+    const double scale = Le / Pr;
+    Eigen::Map<const Eigen::RowVectorXd> l0_map(coeffs.transport.l0.data(), static_cast<Eigen::Index>(n_eta));
     for (std::size_t j = 0; j < n_species; ++j) {
-      J_fake(j, i) = Le / Pr * coeffs.transport.l0[i] * dc_deta_fixed(j, i);
+      auto dc_row = dc_deta_fixed.eigen().row(static_cast<Eigen::Index>(j));
+      J_fake.eigen().row(static_cast<Eigen::Index>(j)).array() = scale * l0_map.array() * dc_row.array();
     }
   }
 
-  // Compute derivatives of fake fluxes
+  // Compute derivatives of fake fluxes (RowMajor rows are contiguous)
   for (std::size_t j = 0; j < n_species; ++j) {
-    std::vector<double> J_row_data(n_eta);
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      J_row_data[i] = J_fake(j, i);
-    }
-
-    auto dJ_result = coefficients::derivatives::compute_eta_derivative(std::span(J_row_data.data(), n_eta), d_eta);
+    auto J_row = J_fake.eigen().row(static_cast<Eigen::Index>(j));
+    auto dJ_result = coefficients::derivatives::compute_eta_derivative(
+        std::span<const double>(J_row.data(), n_eta), d_eta);
 
     if (!dJ_result) {
       return std::unexpected(EquationError("Failed to compute diffusion flux derivative"));
     }
-    auto dJ = dJ_result.value();
-
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      dJ_fake_deta(j, i) = dJ[i];
-    }
+    const auto& dJ = dJ_result.value();
+    Eigen::Map<const Eigen::RowVectorXd> dJ_map(dJ.data(), static_cast<Eigen::Index>(n_eta));
+    dJ_fake_deta.eigen().row(static_cast<Eigen::Index>(j)) = dJ_map;
   }
 
   return std::make_pair(std::move(J_fake), std::move(dJ_fake_deta));

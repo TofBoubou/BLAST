@@ -22,7 +22,8 @@ template <typename Scalar = double> using MathVector = Eigen::Vector<Scalar, Eig
 
 template <typename Scalar = double, int Size = Eigen::Dynamic> using FixedMathVector = Eigen::Vector<Scalar, Size>;
 
-template <typename Scalar = double> using MathMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>;
+template <typename Scalar = double>
+using MathMatrix = Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
 using PhysicsVector = MathVector<double>;
 using SpeciesVector = MathVector<double>;
@@ -30,7 +31,7 @@ using TemperatureField = MathVector<double>;
 
 template <typename Scalar = double> class Matrix {
 private:
-  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> data_;
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> data_;
 
 public:
   Matrix() = default;

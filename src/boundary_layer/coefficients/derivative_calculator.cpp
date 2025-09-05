@@ -145,29 +145,23 @@ auto DerivativeCalculator::compute_all_derivatives(const equations::SolutionStat
 
 
   for (std::size_t j = 0; j < n_species; ++j) {
-    // Extraire la ligne j de la matrice c
-    std::vector<double> c_row(n_eta);
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      c_row[i] = solution.c(j, i);
-    }
-
-    auto dc_deta_result = eta_derivative_O4(c_row);
+    // Map direct de la ligne j (RowMajor) en span sans copie
+    auto c_row = solution.c.eigen().row(static_cast<Eigen::Index>(j));
+    auto dc_deta_result = eta_derivative_O4(std::span<const double>(c_row.data(), n_eta));
     if (!dc_deta_result) {
       return std::unexpected(CoefficientError("Failed to compute dc/deta for species " + std::to_string(j)));
     }
-    auto dc_deta = dc_deta_result.value();
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      derivatives.dc_deta(j, i) = dc_deta[i];
-    }
+    const auto& dc_deta = dc_deta_result.value();
+    Eigen::Map<const Eigen::RowVectorXd> dc_map(dc_deta.data(), static_cast<Eigen::Index>(n_eta));
+    derivatives.dc_deta.eigen().row(static_cast<Eigen::Index>(j)) = dc_map;
 
-    auto dc_deta2_result = eta_second_derivative_O4(c_row);
+    auto dc_deta2_result = eta_second_derivative_O4(std::span<const double>(c_row.data(), n_eta));
     if (!dc_deta2_result) {
       return std::unexpected(CoefficientError("Failed to compute dc/deta2 for species " + std::to_string(j)));
     }
-    auto dc_deta2 = dc_deta2_result.value();
-    for (std::size_t i = 0; i < n_eta; ++i) {
-      derivatives.dc_deta2(j, i) = dc_deta2[i];
-    }
+    const auto& dc_deta2 = dc_deta2_result.value();
+    Eigen::Map<const Eigen::RowVectorXd> dc2_map(dc_deta2.data(), static_cast<Eigen::Index>(n_eta));
+    derivatives.dc_deta2.eigen().row(static_cast<Eigen::Index>(j)) = dc2_map;
   }
 
   return derivatives;

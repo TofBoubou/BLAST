@@ -95,7 +95,7 @@ base:
     finite_thickness_params:
       v_edge: -111.31796000
       d2_ue_dxdy: -290979.9698604651
-      delta_bl: 0.0105250000
+      delta_bl: 0.03
 
   wall_parameters:
     temperatures: [350]
@@ -172,7 +172,7 @@ catalysis_reconstruction:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 50
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9  
     max_iterations: 100000  
@@ -186,12 +186,12 @@ catalysis_reconstruction:
   output:
     output_directory: test_outputs_catalysis_reconstruction
   
-  target_heat_flux: 900000
+  target_heat_flux: 1600000
   
   boundary_conditions:
     pressure: 7000
-    wall_temperature: 3000
-    edge_temperature: 5905.5
+    wall_temperature: 350
+    edge_temperature: 6150
     radius: 1
   
   flow_parameters:
@@ -202,12 +202,12 @@ catalysis_reconstruction:
   finite_thickness_params:
     v_edge: -111.31796000
     d2_ue_dxdy: -290979.9698604651
-    delta_bl: 0.0105250000
+    delta_bl: 0.03
   
   solver:
     initial_catalyticity_guess: 0.1
     catalyticity_min: 0.0
-    catalyticity_max: 0.2
+    catalyticity_max: 0.45
     tolerance: 1e-6
     max_iterations: 50
 
