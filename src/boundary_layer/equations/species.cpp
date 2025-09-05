@@ -382,10 +382,12 @@ auto build_catalytic_boundary_conditions(const core::Matrix<double>& c_wall, con
     // Fake flux on the wall to compensate f_bc * dc/dη
     // J_fake = Le/Pr * l0 * dc_deta on the wall
     const double dc_deta_wall = (c_wall.cols() > 1) ? (c_wall(i, 1) - c_wall(i, 0)) / d_eta : 0.0;
-    const double J_fake_wall = Le / Pr * coeffs.transport.l0[0] * dc_deta_wall;
+    // Include K_bl here to mirror legacy scaling
+    const double J_fake_wall = Le / Pr * coeffs.transport.l0[0] * coeffs.transport.K_bl * dc_deta_wall;
 
-    // h_bc = J_cat - J_reel + J_fake_wall to ensure the flux balance
-    boundary_conds.h_bc[i] = (+cat_flux[i] - J_reel) * 1 - J_fake_wall;
+    // Match legacy BLAST scaling: multiply by bc_fact/(rho_e*mu_e) and subtract fake flux
+    const double scale = bc_fact / (bc.rho_e() * bc.mu_e());
+    boundary_conds.h_bc[i] = (cat_flux[i] - J_reel) * scale - J_fake_wall;
   }
 
   // Electrons: dummy values (not used in system, determined by charge neutrality)

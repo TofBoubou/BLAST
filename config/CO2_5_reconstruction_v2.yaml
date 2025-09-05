@@ -10,7 +10,7 @@ verbose: true
 
 continuation:
   wall_temperature_stable: 3000
-  edge_temperature_stable: 5000
+  edge_temperature_stable: 4000
   pressure_stable: 7000
 
   # Continuation step controls
@@ -19,10 +19,10 @@ continuation:
   step_max: 0.5
   step_increase_factor: 2
   step_decrease_factor: 0.5
-  max_steps: 20
+  max_steps: 200
 
   # Mode switching thresholds
-  failure_threshold: 8
+  failure_threshold: 50
   success_threshold: 1
 
   predictor:
@@ -47,17 +47,17 @@ base:
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
     only_stagnation_point: true
-    finite_thickness: false
+    finite_thickness: true
     diffusion_type: stefan_maxwell
     consider_thermal_diffusion: false
     consider_dufour_effect: false
     chemical_mode: "non_equilibrium"  # "frozen", "equilibrium", "non_equilibrium"
-    catalytic_wall: false
+    catalytic_wall: true
     wall_mode: "imposed_temperature"  # "adiabatic", "imposed_temperature", "radiative"
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 100
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
