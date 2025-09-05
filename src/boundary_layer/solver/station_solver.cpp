@@ -54,8 +54,18 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
                                                                        solver_.get_original_config(), 
                                                                        stable_guess.value());
 
-                if (cont_result && cont_result.value().success) {
-                    return cont_result.value().solution;
+                if (cont_result) {
+                    if (cont_result.value().success) {
+                        return cont_result.value().solution;
+                    } else {
+                        // Continuation completed but failed to reach target
+                        return std::unexpected(
+                            ConvergenceError(std::format("Continuation failed to reach target at station {} (reached lambda={})", 
+                                                       station, cont_result.value().final_lambda)));
+                    }
+                } else {
+                    // Continuation failed with an error
+                    return std::unexpected(cont_result.error());
                 }
             }
         }
@@ -89,8 +99,18 @@ auto StationSolver::solve_station(int station, double xi, const equations::Solut
                                                                        solver_.get_original_config(), 
                                                                        stable_guess.value());
 
-                if (cont_result && cont_result.value().success) {
-                    return cont_result.value().solution;
+                if (cont_result) {
+                    if (cont_result.value().success) {
+                        return cont_result.value().solution;
+                    } else {
+                        // Continuation completed but failed to reach target
+                        return std::unexpected(
+                            ConvergenceError(std::format("Continuation failed to reach target at station {} after convergence failure (reached lambda={})", 
+                                                       station, cont_result.value().final_lambda)));
+                    }
+                } else {
+                    // Continuation failed with an error
+                    return std::unexpected(cont_result.error());
                 }
             }
         }

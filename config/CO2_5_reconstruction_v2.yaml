@@ -19,7 +19,7 @@ continuation:
   step_max: 0.5
   step_increase_factor: 2
   step_decrease_factor: 0.5
-  max_steps: 20
+  max_steps: 200
 
   # Mode switching thresholds
   failure_threshold: 8
