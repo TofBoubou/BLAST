@@ -4,7 +4,7 @@
 
 namespace blast::boundary_layer::coefficients {
 
-auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) const
+/* auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) const
     -> std::expected<std::vector<double>, CoefficientError> {
 
   const auto n = values.size();
@@ -52,9 +52,49 @@ auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) con
                        dx12;
 
   return derivatives;
+} */
+
+auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) const
+    -> std::expected<std::vector<double>, CoefficientError> {
+
+  const auto n = values.size();
+  std::vector<double> derivatives(n);
+
+  if (d_eta_ <= 0.0) {
+    return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
+  }
+
+  if (n < 2) {
+    return std::unexpected(CoefficientError("Need at least 2 points for derivative"));
+  }
+
+  if (n == 2) {
+    // Différence finie simple pour 2 points seulement
+    derivatives[0] = (values[1] - values[0]) / d_eta_;
+    derivatives[1] = derivatives[0];
+    return derivatives;
+  }
+
+  // Schéma d'ordre 2 (O(h²))
+  
+  // Premier point : différence finie avant (forward) d'ordre 2
+  // f'(x0) = (-3*f(x0) + 4*f(x1) - f(x2)) / (2*h) + O(h²)
+  derivatives[0] = (-3.0 * values[0] + 4.0 * values[1] - values[2]) / (2.0 * d_eta_);
+
+  // Points intérieurs : différence finie centrée d'ordre 2
+  // f'(xi) = (f(xi+1) - f(xi-1)) / (2*h) + O(h²)
+  for (std::size_t i = 1; i < n - 1; ++i) {
+    derivatives[i] = (values[i + 1] - values[i - 1]) / (2.0 * d_eta_);
+  }
+
+  // Dernier point : différence finie arrière (backward) d'ordre 2
+  // f'(xn) = (f(xn-2) - 4*f(xn-1) + 3*f(xn)) / (2*h) + O(h²)
+  derivatives[n - 1] = (values[n - 3] - 4.0 * values[n - 2] + 3.0 * values[n - 1]) / (2.0 * d_eta_);
+
+  return derivatives;
 }
 
-auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> values) const
+/* auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> values) const
     -> std::expected<std::vector<double>, CoefficientError> {
 
   const auto n = values.size();
@@ -102,6 +142,59 @@ auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> valu
   second_derivatives[n - 1] = (11.0 * values[n - 5] - 56.0 * values[n - 4] + 114.0 * values[n - 3] -
                                104.0 * values[n - 2] + 35.0 * values[n - 1]) /
                               dx2_12;
+
+  return second_derivatives;
+} */
+
+auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> values) const
+    -> std::expected<std::vector<double>, CoefficientError> {
+
+  const auto n = values.size();
+  std::vector<double> second_derivatives(n);
+
+  if (d_eta_ <= 0.0) {
+    return std::unexpected(CoefficientError("Invalid grid spacing: d_eta must be positive"));
+  }
+
+  if (n < 3) {
+    return std::unexpected(CoefficientError("Need at least 3 points for second derivative"));
+  }
+
+  const double d_eta_sq = d_eta_ * d_eta_;
+
+  if (n == 3) {
+    // Cas spécial : seulement 3 points, utilisation du schéma centré partout
+    for (std::size_t i = 0; i < n; ++i) {
+      second_derivatives[i] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
+    }
+    return second_derivatives;
+  }
+
+  // Schéma d'ordre 2 (O(h²))
+
+  // Premier point : différence finie avant (forward) d'ordre 2 avec 4 points
+  // f''(x0) = (2*f(x0) - 5*f(x1) + 4*f(x2) - f(x3)) / h² + O(h²)
+  if (n >= 4) {
+    second_derivatives[0] = (2.0 * values[0] - 5.0 * values[1] + 4.0 * values[2] - values[3]) / d_eta_sq;
+  } else {
+    // Si on n'a que 3 points, utiliser le schéma centré
+    second_derivatives[0] = (values[0] - 2.0 * values[1] + values[2]) / d_eta_sq;
+  }
+
+  // Points intérieurs : différence finie centrée d'ordre 2 (schéma classique)
+  // f''(xi) = (f(xi-1) - 2*f(xi) + f(xi+1)) / h² + O(h²)
+  for (std::size_t i = 1; i < n - 1; ++i) {
+    second_derivatives[i] = (values[i - 1] - 2.0 * values[i] + values[i + 1]) / d_eta_sq;
+  }
+
+  // Dernier point : différence finie arrière (backward) d'ordre 2 avec 4 points
+  // f''(xn) = (-f(xn-3) + 4*f(xn-2) - 5*f(xn-1) + 2*f(xn)) / h² + O(h²)
+  if (n >= 4) {
+    second_derivatives[n - 1] = (-values[n - 4] + 4.0 * values[n - 3] - 5.0 * values[n - 2] + 2.0 * values[n - 1]) / d_eta_sq;
+  } else {
+    // Si on n'a que 3 points, utiliser le schéma centré
+    second_derivatives[n - 1] = (values[n - 3] - 2.0 * values[n - 2] + values[n - 1]) / d_eta_sq;
+  }
 
   return second_derivatives;
 }

@@ -35,19 +35,22 @@ continuation:
 
 gasp2:
   xml_file: "CO2_5_gamma.xml"
-  reaction_type: "gamma"
+  # NOTE: In reconstruction modes (edge_reconstruction and catalysis_reconstruction),
+  # the catalysis provider is forcibly set to Mutation++ by the code.
+  # This GASP2 section is ignored in those modes. GASP2 applies only when the provider
+  # is not forced to Mutation++ (e.g., base or abacus with provider left to GASP2).
 
 # =============================================================================
 # BASE MODE
 # =============================================================================
 
 base:
-  enabled: true
+  enabled: false
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
     only_stagnation_point: true
-    finite_thickness: true
+    finite_thickness: false
     diffusion_type: stefan_maxwell
     consider_thermal_diffusion: false
     consider_dufour_effect: false
@@ -57,7 +60,7 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 200
+    n_eta: 500
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
@@ -72,7 +75,6 @@ base:
     thermodynamic_database: RRHO  
     viscosity_algorithm: chapman_enskog_ldlt  
     thermal_conductivity_algorithm: chapman_enskog_ldlt 
-    state_model: ChemNonEq1T 
 
   output:
     output_directory: outputs_simulation
@@ -108,6 +110,8 @@ base:
 
 edge_reconstruction:
   enabled: false
+  # IMPORTANT: In reconstruction modes, the catalysis provider is forced to Mutation++.
+  # GASP2 settings are ignored here even if a gasp2: block is present.
   
   simulation:
     body_type: axisymmetric
@@ -121,6 +125,11 @@ edge_reconstruction:
     eta_max: 6.0
     convergence_tolerance: 1.0e-6  
     max_iterations: 100000  
+    # Defaults used when not explicitly set :
+    # divergence_threshold: 1.0e6
+    # residual_guard: 1.0e10
+    # nan_policy: reduce_step                  # options: reduce_step | fail
+    # continuation_attempt_policy: only_if_residual_below_threshold
   
   mixture:
     name: CO2_5
@@ -162,11 +171,13 @@ edge_reconstruction:
 # =============================================================================
 
 catalysis_reconstruction:
-  enabled: false
+  enabled: true
+  # IMPORTANT : In reconstruction modes, the catalysis provider is forced to Mutation++.
+  # GASP2 settings are ignored here even if a gasp2: block is present.
   
   simulation:
     body_type: axisymmetric
-    finite_thickness: true
+    finite_thickness: false
     diffusion_type: stefan_maxwell 
     consider_thermal_diffusion: false
     consider_dufour_effect: false
@@ -176,9 +187,14 @@ catalysis_reconstruction:
     eta_max: 6.0
     convergence_tolerance: 1.0e-9  
     max_iterations: 100000  
+    # Defaults used when not explicitly set :
+    # divergence_threshold: 1.0e6
+    # residual_guard: 1.0e10
+    # nan_policy: reduce_step                  # options: reduce_step | fail
+    # continuation_attempt_policy: only_if_residual_below_threshold
   
   mixture:
-    name: CO2_5
+    name: air_5
     thermodynamic_database: RRHO  # "RRHO", "NASA9"
     viscosity_algorithm: chapman_enskog_ldlt
     thermal_conductivity_algorithm: chapman_enskog_ldlt 
@@ -186,7 +202,7 @@ catalysis_reconstruction:
   output:
     output_directory: test_outputs_catalysis_reconstruction
   
-  target_heat_flux: 1600000
+  target_heat_flux: 1200000
   
   boundary_conditions:
     pressure: 7000
@@ -207,7 +223,7 @@ catalysis_reconstruction:
   solver:
     initial_catalyticity_guess: 0.1
     catalyticity_min: 0.0
-    catalyticity_max: 0.45
+    catalyticity_max: 1
     tolerance: 1e-6
     max_iterations: 50
 
@@ -240,6 +256,11 @@ abacus:
     eta_max: 6.0
     convergence_tolerance: 1.0e-10
     max_iterations: 100000
+    # Defaults used when not explicitly set :
+    # divergence_threshold: 1.0e6
+    # residual_guard: 1.0e10
+    # nan_policy: reduce_step                  # options: reduce_step | fail
+    # continuation_attempt_policy: only_if_residual_below_threshold
   
   mixture:
     name: CO2_5
