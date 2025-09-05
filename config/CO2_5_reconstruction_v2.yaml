@@ -60,7 +60,7 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 500
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
@@ -177,13 +177,13 @@ catalysis_reconstruction:
   
   simulation:
     body_type: axisymmetric
-    finite_thickness: false
+    finite_thickness: true
     diffusion_type: stefan_maxwell 
     consider_thermal_diffusion: false
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 200
+    n_eta: 50
     eta_max: 6.0
     convergence_tolerance: 1.0e-9  
     max_iterations: 100000  

@@ -67,15 +67,18 @@ auto build_momentum_coefficients(std::span<const double> F_previous, const coeff
 
   const double rho_e_actual = bc.P_e() * coeffs.thermodynamic.MW[n_eta - 1] / (T_edge * R_universal);
 
+  // Include finite thickness scaling (K_bl) consistently with legacy BLAST
+  const double K_bl_sq = coeffs.transport.K_bl * coeffs.transport.K_bl;
+
   for (std::size_t i = 0; i < n_eta; ++i) {
 
     // ----- Coefficient a[i] -----
-    // a[i] = l0[i] / d_eta²
-    coeffs_out.a.push_back(coeffs.transport.l0[i] / d_eta_sq);
+    // a[i] = l0[i]*K_bl^2 / d_eta²
+    coeffs_out.a.push_back(coeffs.transport.l0[i] * K_bl_sq / d_eta_sq);
 
     // ----- Coefficient b[i] -----
-    // b[i] = (dl0_deta[i] - V[i]) / d_eta
-    coeffs_out.b.push_back((coeffs.transport.dl0_deta[i] - V_field[i]) / d_eta);
+    // b[i] = (dl0_deta[i]*K_bl^2 - V[i]) / d_eta
+    coeffs_out.b.push_back((coeffs.transport.dl0_deta[i] * K_bl_sq - V_field[i]) / d_eta);
 
     // ----- Coefficient c[i] -----
     // c[i] = -2*xi*lambda0*F[i]
