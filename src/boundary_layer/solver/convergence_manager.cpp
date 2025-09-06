@@ -145,11 +145,11 @@ auto ConvergenceManager::check_convergence(const equations::SolutionState& old_s
 
     info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
-/*     std::cout << "CONVERGENCE : " << std::setprecision(12) << info.residual_F << " " << info.residual_g << " " << info.residual_c
+    std::cout << "CONVERGENCE : " << std::setprecision(12) << info.residual_F << " " << info.residual_g << " " << info.residual_c
             << " | tol=" << tol << " | converged=" << info.converged
             << " | g_wall=" << std::format("{:.12g}", new_solution.g[0])
             << " | g_mid="  << std::format("{:.12g}", new_solution.g[new_solution.g.size()/2])
-            << std::endl; */
+            << std::endl;
     
     // Print mass fractions at wall (eta=0)
 /*     std::cout << "Mass fractions at wall: ";

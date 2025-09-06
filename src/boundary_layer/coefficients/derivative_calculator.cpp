@@ -4,7 +4,7 @@
 
 namespace blast::boundary_layer::coefficients {
 
-/* auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) const
+auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) const
     -> std::expected<std::vector<double>, CoefficientError> {
 
   const auto n = values.size();
@@ -52,9 +52,9 @@ namespace blast::boundary_layer::coefficients {
                        dx12;
 
   return derivatives;
-} */
+}
 
-auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) const
+/* auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) const
     -> std::expected<std::vector<double>, CoefficientError> {
 
   const auto n = values.size();
@@ -92,9 +92,9 @@ auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) con
   derivatives[n - 1] = (values[n - 3] - 4.0 * values[n - 2] + 3.0 * values[n - 1]) / (2.0 * d_eta_);
 
   return derivatives;
-}
+} */
 
-/* auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> values) const
+auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> values) const
     -> std::expected<std::vector<double>, CoefficientError> {
 
   const auto n = values.size();
@@ -144,9 +144,9 @@ auto DerivativeCalculator::eta_derivative_O4(std::span<const double> values) con
                               dx2_12;
 
   return second_derivatives;
-} */
+}
 
-auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> values) const
+/* auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> values) const
     -> std::expected<std::vector<double>, CoefficientError> {
 
   const auto n = values.size();
@@ -197,7 +197,7 @@ auto DerivativeCalculator::eta_second_derivative_O4(std::span<const double> valu
   }
 
   return second_derivatives;
-}
+} */
 
 auto DerivativeCalculator::compute_all_derivatives(const equations::SolutionState& solution) const
     -> std::expected<UnifiedDerivativeState, CoefficientError> {

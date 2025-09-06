@@ -9,8 +9,8 @@ verbose: true
 # =============================================================================
 
 continuation:
-  wall_temperature_stable: 3000
-  edge_temperature_stable: 4000
+  wall_temperature_stable: 4000
+  edge_temperature_stable: 5000
   pressure_stable: 7000
 
   # Continuation step controls
@@ -45,7 +45,7 @@ gasp2:
 # =============================================================================
 
 base:
-  enabled: false
+  enabled: true
   
   simulation:
     body_type: axisymmetric # axisymmetric or cone or 2D or flatplate
@@ -60,7 +60,7 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 200
+    n_eta: 20000
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
@@ -68,7 +68,7 @@ base:
     divergence_threshold: 1.0e6
     residual_guard: 1.0e10
     nan_policy: fail               # or: fail
-    continuation_attempt_policy: always  # or: always | never | only_if_residual_below_threshold
+    continuation_attempt_policy: never  # or: always | never | only_if_residual_below_threshold
 
   mixture:
     name: air_5
@@ -171,7 +171,7 @@ edge_reconstruction:
 # =============================================================================
 
 catalysis_reconstruction:
-  enabled: true
+  enabled: false
   # IMPORTANT : In reconstruction modes, the catalysis provider is forced to Mutation++.
   # GASP2 settings are ignored here even if a gasp2: block is present.
   
