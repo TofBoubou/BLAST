@@ -288,20 +288,18 @@ auto CatalysisReconstructor::compute_heat_flux_at_catalyticity(double catalytici
 auto CatalysisReconstructor::setup_boundary_conditions(double catalyticity)
     -> std::expected<io::Configuration, solver::SolverError> {
   
-  // Update GSI file with the current catalyticity value
-  if (catalyticity > 0) {
-    auto update_result = gsi_manager_.update_gsi_catalyticity(catalyticity);
-    if (!update_result) {
-      return std::unexpected(solver::SolverError(
-          std::format("Failed to update GSI catalyticity to {}: {}", catalyticity, update_result.error())));
-    }
-    
-    // Reload mixture with updated GSI
-    auto reload_result = mixture_.reload_gsi();
-    if (!reload_result) {
-      return std::unexpected(solver::SolverError(
-          std::format("Failed to reload mixture after GSI update: {}", reload_result.error())));
-    }
+  // Update GSI file with the current catalyticity value (including 0.0)
+  auto update_result = gsi_manager_.update_gsi_catalyticity(catalyticity);
+  if (!update_result) {
+    return std::unexpected(solver::SolverError(
+        std::format("Failed to update GSI catalyticity to {}: {}", catalyticity, update_result.error())));
+  }
+
+  // Reload mixture with updated GSI
+  auto reload_result = mixture_.reload_gsi();
+  if (!reload_result) {
+    return std::unexpected(solver::SolverError(
+        std::format("Failed to reload mixture after GSI update: {}", reload_result.error())));
   }
   
   // Get equilibrium composition at fixed edge temperature

@@ -60,10 +60,10 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 200
+    n_eta: 500
     eta_max: 6.0
-    convergence_tolerance: 1.0e-12
-    max_iterations: 100000
+    convergence_tolerance: 1.0e-9
+    max_iterations: 200000
     # Global numerical guards and policies
     divergence_threshold: 1.0e6
     residual_guard: 1.0e10
@@ -183,10 +183,10 @@ catalysis_reconstruction:
     consider_dufour_effect: false
   
   numerical:
-    n_eta: 200
+    n_eta: 500
     eta_max: 6.0
-    convergence_tolerance: 1.0e-12  
-    max_iterations: 100000  
+    convergence_tolerance: 1.0e-9  
+    max_iterations: 200000  
     # Defaults used when not explicitly set :
     # divergence_threshold: 1.0e6
     # residual_guard: 1.0e10
