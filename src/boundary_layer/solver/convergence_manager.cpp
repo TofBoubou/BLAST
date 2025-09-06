@@ -179,8 +179,12 @@ auto ConvergenceManager::apply_relaxation_differential(const equations::Solution
     for (std::size_t i = 0; i < n_eta; ++i) {
         relaxed_solution.F[i] = old_solution.F[i] + base_factor * (new_solution.F[i] - old_solution.F[i]);
         relaxed_solution.g[i] = old_solution.g[i] + base_factor * (new_solution.g[i] - old_solution.g[i]);
-        relaxed_solution.T[i] = old_solution.T[i] + base_factor * (new_solution.T[i] - old_solution.T[i]);
-        relaxed_solution.V[i] = old_solution.V[i] + base_factor * (new_solution.V[i] - old_solution.V[i]);
+        
+        // Temperature: no relaxation - use directly from thermodynamic consistency
+        relaxed_solution.T[i] = new_solution.T[i];
+        
+        // Velocity: no relaxation - use directly from continuity equation
+        relaxed_solution.V[i] = new_solution.V[i];
         
         for (std::size_t s = 0; s < n_species; ++s) {
             relaxed_solution.c(s, i) = old_solution.c(s, i) + base_factor * (new_solution.c(s, i) - old_solution.c(s, i));
