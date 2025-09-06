@@ -497,6 +497,17 @@ auto CoefficientCalculator::transform_jacobian(
       dwi_dc(i, j) = sum + dwi_dT[i] * dT_dc[j];
 
       if (!std::isfinite(dwi_dc(i, j))) {
+        // Add debug info for iteration failure
+        std::cout << "\n=== JACOBIAN ERROR at station " << station_index << " ===" << std::endl;
+        std::cout << "T = " << T << std::endl;
+        std::cout << "Cp = " << Cp << std::endl;
+        std::cout << "dwi_dc(" << i << "," << j << ") = " << dwi_dc(i, j) << std::endl;
+        std::cout << "sum = " << sum << std::endl;
+        std::cout << "dwi_dT[" << i << "] = " << dwi_dT[i] << std::endl;
+        std::cout << "dT_dc[" << j << "] = " << dT_dc[j] << std::endl;
+        if (j < h_species.size()) {
+          std::cout << "h_species[" << j << "] = " << h_species[j] << std::endl;
+        }
         return std::unexpected(CoefficientError(std::format("Invalid Jacobian element at ({}, {})", i, j)));
       }
     }

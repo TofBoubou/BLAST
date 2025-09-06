@@ -145,10 +145,15 @@ auto ConvergenceManager::check_convergence(const equations::SolutionState& old_s
 
     info.converged = (info.residual_F < tol) && (info.residual_g < tol) && (info.residual_c < tol);
 
+    // Find min/max temperatures for debugging
+    double T_min = *std::min_element(new_solution.T.begin(), new_solution.T.end());
+    double T_max = *std::max_element(new_solution.T.begin(), new_solution.T.end());
+    
     std::cout << "CONVERGENCE : " << std::setprecision(12) << info.residual_F << " " << info.residual_g << " " << info.residual_c
             << " | tol=" << tol << " | converged=" << info.converged
             << " | g_wall=" << std::format("{:.12g}", new_solution.g[0])
             << " | g_mid="  << std::format("{:.12g}", new_solution.g[new_solution.g.size()/2])
+            << " | T_range=[" << T_min << "," << T_max << "]"
             << std::endl;
     
     // Print mass fractions at wall (eta=0)

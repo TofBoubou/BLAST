@@ -33,22 +33,24 @@ public:
     double max_factor = 0.05;      // Reasonable maximum
 
     // Thresholds based on your logic
-    double excellent_threshold = 1;  // Threshold for excellent convergence (< 0.8)
-    double divergence_threshold = 1; // Threshold for divergence (> 1.0)
+    double excellent_threshold = 0.8;  // Threshold for excellent convergence (< 0.8)
+    double divergence_threshold = 1.1; // Threshold for divergence (> 1.1)
 
     // Adaptation factors
-    double strong_increase = 1.001;   // Strong increase for ratio < 0.8
-    double moderate_increase = 1.001; // Moderate increase for [0.8, 1.0]
-    double decrease_factor = 1;      // Decrease for ratio > X
-    double oscillation_penalty = 0.9;  // Penalty factor for oscillations
+    double strong_increase = 1.05;   // Strong increase for ratio < 0.8
+    double moderate_increase = 1.02; // Moderate increase for [0.8, 1.1]
+    double decrease_factor = 0.5;    // Decrease for ratio > 1.1
+    double oscillation_penalty = 0.7;  // Penalty factor for oscillations
 
     // Specialized configurations
     [[nodiscard]] static auto for_stagnation_point() -> Config {
       Config config;
-      config.initial_factor = 0.01;
-      config.max_factor = 1;          // More conservative
-      config.strong_increase = 1.01;   // Slower growth
-      config.moderate_increase = 1.01; // Very moderate
+      config.initial_factor = 0.001;   // Even more conservative for stagnation point
+      config.max_factor = 0.02;        // Lower maximum
+      config.strong_increase = 1.00;   // Slower growth
+      config.moderate_increase = 1.00; // Very moderate
+      config.decrease_factor = 1;    // Conservative decrease
+      config.oscillation_penalty = 1; // Less aggressive penalty
       return config;
     }
 
