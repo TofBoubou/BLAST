@@ -188,8 +188,8 @@ auto InitialGuessFactory::create_multi_species_guess(
         const double eta = static_cast<double>(i) * eta_max / (n_eta - 1);
         const double eta_norm = static_cast<double>(i) / (n_eta - 1);
 
-        // Momentum profile (analytical) - normalized to ensure F=1 at edge
-        guess.F[i] = (1.0 - 1.034 * std::exp(-5.628 * eta / eta_max)) / (1.0 - 1.034 * std::exp(-5.628));
+        // Momentum profile (analytical)
+        guess.F[i] = (1.0 - 0.99 * std::exp(-5.628 * eta / eta_max)) / (1.0 - 0.99 * std::exp(-5.628));
         
         // MODIFIED: Energy profile now follows F profile instead of linear
         guess.g[i] = g_wall + guess.F[i] * (1.0 - g_wall);

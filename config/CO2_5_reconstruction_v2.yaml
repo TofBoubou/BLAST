@@ -60,7 +60,7 @@ base:
     catalysis_provider: "mutation++"  # "mutation++" or "gasp2"
 
   numerical:
-    n_eta: 20000
+    n_eta: 200
     eta_max: 6.0
     convergence_tolerance: 1.0e-9
     max_iterations: 50000
